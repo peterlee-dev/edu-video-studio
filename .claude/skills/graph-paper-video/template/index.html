@@ -1,0 +1,348 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Graph-paper workbook video</title>
+<style>
+  html, body { margin: 0; background: #0E1424; }
+  body { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 12px; font-family: 'Avenir Next', sans-serif; color: #ddd; }
+  canvas { width: min(100%, 1280px); aspect-ratio: 16 / 9; display: block; background: #FEFFFF; }
+  .bar { display: flex; gap: 12px; align-items: center; width: min(100%, 1280px); }
+  .bar input { flex: 1; }
+  body.render { padding: 0; gap: 0; }
+  body.render canvas { width: 1920px; height: 1080px; }
+  body.render .bar { display: none; }
+</style>
+</head>
+<body>
+<script src="timeline.js"></script>
+<script src="content.js"></script>
+<script src="schema.js"></script>
+<canvas id="c" width="1920" height="1080"></canvas>
+<div class="bar">
+  <button id="play">▶ Play</button>
+  <input id="seek" type="range" min="0" max="300" step="0.01" value="0">
+  <span id="time">0.00s</span>
+</div>
+<script>
+// ------------------------------------------------------------
+// Graph-paper workbook video. One continuous sheet of graph paper; each scene is a workbook page. The camera slides
+// sideways between pages (in time with the whoosh in the mix) and stays still while the page is read.
+// Teacher's-pen marks: circles, checks, crosses, boxes, arrows, underlines, highlighter, sticky notes, stamps.
+// Timing: timeline.js, written by tools/make_audio.py from the narration. Pictures follow spoken words
+// (Wc(line, word) looks the word up in TL.lines[line].words). draw(t) is a pure function of time.
+// ------------------------------------------------------------
+const W = 1920, H = 1080, TL = window.TL, DURATION = TL.duration;
+const cv = document.getElementById('c'), ctx = cv.getContext('2d');
+const DEFAULT_CONTENT = JSON.parse(JSON.stringify(window.CONTENT));
+let C = window.CONTENT, K = C.colors;
+const SANS = "'Avenir Next', 'Helvetica Neue', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif";
+const HAND = "'Noteworthy', 'Bradley Hand', 'Marker Felt', cursive";
+const LINE = '#E2E4E8';   // card outline (neutral)
+
+// ---------- basics ----------
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const lerp = (a, b, k) => a + (b - a) * k;
+const p = (t, s, d) => clamp((t - s) / d);
+const eOut = x => 1 - Math.pow(1 - x, 3), eIO = x => x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+const eBack = x => { const c1 = 1.7, c3 = c1 + 1; return x <= 0 ? 0 : 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2); };
+const nz = (i, s = 1) => { const v = Math.sin(i * 12.9898 + s * 78.233) * 43758.5453; return v - Math.floor(v) - .5; };   // fixed jitter (no flicker)
+function rgba(hex, a) { const n = parseInt(hex.slice(1), 16); return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`; }
+const L = id => TL.lines[id] || { start: 0, end: 0, words: [] };
+const S = id => TL.scenes.find(s => s.id === id) || { start: 0, end: 0 };
+const st = (id, f = 0) => L(id).start + (L(id).end - L(id).start) * f;   // f: 0 = start of the narration line, 1 = end
+const en = (id, d = 0) => L(id).end + d;
+// time a word is spoken in a line (one of several spellings, the nth time it occurs); falls back to a fraction of the line
+const norm = s => String(s).toLowerCase().replace(/[^a-z0-9]/g, '');
+const MISS = window.CUE_MISS = new Set();
+function Wd(id, words, f = 0, nth = 1) {
+  const want = (Array.isArray(words) ? words : [words]).map(norm); let n = 0;
+  for (const [w, s] of L(id).words || []) if (want.includes(norm(w)) && ++n === nth) return s;
+  MISS.add(`${id}:${want.join('|')}`); return st(id, f);
+}
+const cueCache = {};
+const Wc = (id, words, f, nth) => { const k = id + '|' + words + '|' + nth; return k in cueCache ? cueCache[k] : (cueCache[k] = Wd(id, words, f, nth)); };
+
+// ---------- shapes and text ----------
+function rr(x, y, w, h, r, fill, stroke, lw = 2, a = 1) { if (a <= 0) return; ctx.save(); ctx.globalAlpha *= a; ctx.beginPath(); ctx.roundRect(x, y, w, h, r); if (fill) { ctx.fillStyle = fill; ctx.fill(); } if (stroke) { ctx.lineWidth = lw; ctx.strokeStyle = stroke; ctx.stroke(); } ctx.restore(); }
+function circle(x, y, r, fill, stroke, lw = 3, a = 1) { if (r <= 0 || a <= 0) return; ctx.save(); ctx.globalAlpha *= a; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); if (fill) { ctx.fillStyle = fill; ctx.fill(); } if (stroke) { ctx.lineWidth = lw; ctx.strokeStyle = stroke; ctx.stroke(); } ctx.restore(); }
+function line0(x1, y1, x2, y2, c, lw = 3, dash) { ctx.save(); ctx.strokeStyle = c; ctx.lineWidth = lw; if (dash) ctx.setLineDash(dash); ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke(); ctx.restore(); }
+function card(x, y, w, h, { fill = '#FFFFFF', stroke = LINE, r = 16, a = 1, shadow = true, lw = 2 } = {}) {
+  if (a <= 0) return; ctx.save(); ctx.globalAlpha *= a;
+  if (shadow) { ctx.shadowColor = 'rgba(30,30,30,.08)'; ctx.shadowBlur = 22; ctx.shadowOffsetY = 8; }
+  ctx.beginPath(); ctx.roundRect(x, y, w, h, r); ctx.fillStyle = fill; ctx.fill(); ctx.shadowColor = 'transparent';
+  if (stroke) { ctx.lineWidth = lw; ctx.strokeStyle = stroke; ctx.stroke(); } ctx.restore();
+}
+function measure(str, size, weight = 600, fam = SANS) { ctx.save(); ctx.font = `${weight} ${size}px ${fam}`; const w = ctx.measureText(str).width; ctx.restore(); return w; }
+function text(str, x, y, { size = 36, weight = 600, fam = SANS, color = K.ink, align = 'left', alpha = 1, maxW, spacing = 0 } = {}) {
+  if (alpha <= 0 || !str) return; ctx.save(); ctx.globalAlpha *= alpha;
+  let sz = size; if (maxW) { const w = measure(str, size, weight, fam) + spacing * str.length; if (w > maxW) sz = size * maxW / w; }
+  ctx.font = `${weight} ${sz}px ${fam}`; ctx.textAlign = align; ctx.textBaseline = 'middle'; ctx.fillStyle = color;
+  if (spacing) ctx.letterSpacing = spacing + 'px';
+  ctx.fillText(str, x, y); ctx.restore();
+}
+// word-wrapped paragraph; returns the number of lines
+function wrapLines(str, maxW, size, weight) {
+  const out = []; let cur = '';
+  for (const w of str.split(' ')) { const nxt = cur ? cur + ' ' + w : w; if (cur && measure(nxt, size, weight) > maxW) { out.push(cur); cur = w; } else cur = nxt; }
+  if (cur) out.push(cur); return out;
+}
+function para(str, x, y, maxW, { size = 22, weight = 500, color = K.ink, lh = 1.32, alpha = 1, align = 'left' } = {}) {
+  const ls = wrapLines(str, maxW, size, weight); ls.forEach((l, i) => text(l, x, y + i * size * lh, { size, weight, color, alpha, align })); return ls.length;
+}
+// entrance: fade + rise (+ optional pop around ox, oy). Moves only while entering, then stays put
+function enter(t, t0, fn, { d = .55, dy = 26, dx = 0, pop = false, ox = 960, oy = 540 } = {}) {
+  const k = p(t, t0, d); if (k <= 0) return 0;
+  ctx.save(); ctx.globalAlpha *= clamp(k * 1.5);
+  if (pop) { const s = lerp(.5, 1, eBack(k)); ctx.translate(ox, oy); ctx.scale(s, s); ctx.translate(-ox, -oy); }
+  else ctx.translate((1 - eOut(k)) * dx, (1 - eOut(k)) * dy);
+  fn(k); ctx.restore(); return k;
+}
+
+// ---------- teacher's pen ----------
+function strokePts(pts, k, color, lw = 5, a = 1, dash) {
+  if (k <= 0 || a <= 0 || pts.length < 2) return;
+  let tot = 0; const seg = []; for (let i = 1; i < pts.length; i++) { const d = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); seg.push(d); tot += d; }
+  let left = tot * clamp(k);
+  ctx.save(); ctx.globalAlpha *= a; ctx.strokeStyle = color; ctx.lineWidth = lw; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; if (dash) ctx.setLineDash(dash);
+  ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]);
+  for (let i = 1; i < pts.length && left > 0; i++) { const f = Math.min(1, left / seg[i - 1]); ctx.lineTo(lerp(pts[i - 1][0], pts[i][0], f), lerp(pts[i - 1][1], pts[i][1], f)); left -= seg[i - 1]; }
+  ctx.stroke(); ctx.restore();
+}
+function wobble(x1, y1, x2, y2, seed = 1, amp = 1.6, n = 14) {
+  const dx = x2 - x1, dy = y2 - y1, len = Math.hypot(dx, dy) || 1, nx = -dy / len, ny = dx / len, pts = [];
+  for (let i = 0; i <= n; i++) { const f = i / n, j = (i === 0 || i === n) ? 0 : nz(i, seed) * amp * 2; pts.push([x1 + dx * f + nx * j, y1 + dy * f + ny * j]); }
+  return pts;
+}
+const pen = (x1, y1, x2, y2, k, c = K.red, lw = 5, seed = 1, a = 1, dash) => strokePts(wobble(x1, y1, x2, y2, seed), k, c, lw, a, dash);
+function penCircle(cx, cy, rx, ry, k, c = K.red, lw = 5, seed = 1, a = 1) {
+  const pts = [], a0 = -2.3 + nz(1, seed) * .4, n = 56;
+  for (let i = 0; i <= n; i++) { const ang = a0 + (i / n) * Math.PI * 2.12, r = 1 + nz(i, seed) * .05 + (i / n) * .06; pts.push([cx + Math.cos(ang) * rx * r, cy + Math.sin(ang) * ry * r]); }
+  strokePts(pts, k, c, lw, a);
+}
+function arrowHead(x2, y2, ang, hk, c, lw, a = 1, s = 16 + lw) {
+  if (hk <= 0) return;
+  pen(x2, y2, x2 - Math.cos(ang - .5) * s, y2 - Math.sin(ang - .5) * s, hk, c, lw, 3, a);
+  pen(x2, y2, x2 - Math.cos(ang + .5) * s, y2 - Math.sin(ang + .5) * s, hk, c, lw, 5, a);
+}
+function penArrow(x1, y1, x2, y2, k, c = K.red, lw = 5, seed = 1, a = 1, dash) {
+  pen(x1, y1, x2, y2, clamp(k / .8), c, lw, seed, a, dash);
+  arrowHead(x2, y2, Math.atan2(y2 - y1, x2 - x1), clamp((k - .75) / .25), c, lw, a);
+}
+function penCurve(x1, y1, cx, cy, x2, y2, k, c = K.red, lw = 5, a = 1, arrow = false) {
+  const pts = []; for (let i = 0; i <= 30; i++) { const f = i / 30; pts.push([(1 - f) * (1 - f) * x1 + 2 * (1 - f) * f * cx + f * f * x2, (1 - f) * (1 - f) * y1 + 2 * (1 - f) * f * cy + f * f * y2]); }
+  strokePts(pts, arrow ? clamp(k / .85) : k, c, lw, a);
+  if (arrow) arrowHead(x2, y2, Math.atan2(y2 - cy, x2 - cx), clamp((k - .8) / .2), c, lw, a);
+}
+function check(x, y, s, k, c = K.red, lw = 7) { strokePts([[x - s * .5, y], [x - s * .12, y + s * .38], [x + s * .55, y - s * .45]], k, c, lw); }
+function crossMark(x, y, s, k, c = K.navy, lw = 6) { pen(x - s / 2, y - s / 2, x + s / 2, y + s / 2, clamp(k * 2), c, lw, 2); pen(x + s / 2, y - s / 2, x - s / 2, y + s / 2, clamp(k * 2 - 1), c, lw, 4); }
+function hiLite(x, y, w, h, k, c = K.blush) { if (k <= 0) return; const e = eOut(k); ctx.save(); ctx.globalCompositeOperation = 'multiply'; ctx.fillStyle = c;   // multiply: text under the marker stays readable
+  ctx.beginPath(); ctx.moveTo(x, y + 4); ctx.lineTo(x + w * e, y); ctx.lineTo(x + w * e - 6, y + h); ctx.lineTo(x - 4, y + h - 3); ctx.closePath(); ctx.fill(); ctx.restore(); }
+function hbox(x, y, w, h, k, c = K.red, lw = 4, seed = 3) { strokePts([...wobble(x, y, x + w, y, seed, 1), ...wobble(x + w, y, x + w, y + h, seed + 1, 1).slice(1), ...wobble(x + w, y + h, x, y + h, seed + 2, 1).slice(1), ...wobble(x, y + h, x, y, seed + 3, 1).slice(1)], k, c, lw); }
+function sticky(x, y, w, h, rot, k, lines, { size = 32, color = K.ink } = {}) {
+  if (k <= 0) return; const s = lerp(.6, 1, eBack(k));
+  ctx.save(); ctx.globalAlpha *= clamp(k * 2); ctx.translate(x + w / 2, y + h / 2); ctx.rotate(rot); ctx.scale(s, s);
+  ctx.shadowColor = 'rgba(30,30,30,.14)'; ctx.shadowBlur = 16; ctx.shadowOffsetY = 8; ctx.fillStyle = K.lightBox; ctx.fillRect(-w / 2, -h / 2, w, h); ctx.shadowColor = 'transparent';
+  ctx.fillStyle = rgba(K.lineGrey, .45); ctx.fillRect(-w / 2, -h / 2, w, 26);
+  lines.forEach((l, i) => text(l, 0, (i - (lines.length - 1) / 2) * size * 1.25 + 8, { size, weight: 700, fam: HAND, color, align: 'center', maxW: w - 30 }));
+  ctx.restore();
+}
+// rectangular rubber stamp, lands from a bigger size
+function stamp(str, x, y, k, c = K.red, rot = -.08, size = 34) {
+  if (k <= 0) return; const s = lerp(1.8, 1, eOut(k)), w = measure(str, size, 800) + 2 * str.length + 60;
+  ctx.save(); ctx.globalAlpha *= clamp(k * 3) * .92; ctx.translate(x, y); ctx.rotate(rot); ctx.scale(s, s);
+  ctx.strokeStyle = c; ctx.lineWidth = 6; ctx.strokeRect(-w / 2, -size, w, size * 2); ctx.lineWidth = 2.5; ctx.strokeRect(-w / 2 + 8, -size + 8, w - 16, size * 2 - 16);
+  text(str, 0, 2, { size, weight: 800, color: c, align: 'center', spacing: 2 }); ctx.restore();
+}
+
+// ---------- workbook parts ----------
+// pill label; returns its width. White underneath: tinted labels never show the grid
+function chip(str, x, y, { size = 22, fill = K.red, color = '#FFFFFF', a = 1, pad = 16, weight = 700, spacing = 1.5, align = 'left' } = {}) {
+  if (a <= 0) return 0; const w = measure(str, size, weight) + spacing * str.length + pad * 2, h = size * 1.8, x0 = align === 'center' ? x - w / 2 : x;
+  rr(x0, y - h / 2, w, h, h / 2, '#FFFFFF', null, 0, a); rr(x0, y - h / 2, w, h, h / 2, fill, null, 0, a); text(str, x0 + pad, y + 1, { size, weight, color, alpha: a, spacing }); return w;
+}
+// numbered circle (1 2 3 of a comparison: red, blue, mint)
+function num(n, x, y, col, { r = 26, a = 1 } = {}) { if (a <= 0) return; circle(x, y, r, '#FFFFFF', null, 0, a); circle(x, y, r, col, null, 0, a); text(String(n), x, y + 1, { size: r * 1.1, weight: 800, color: '#FFFFFF', align: 'center', alpha: a }); }
+// a sheet of paper with grey text lines
+function sheet(x, y, w, h, rot = 0, a = 1, lines = 5) {
+  if (a <= 0) return; ctx.save(); ctx.globalAlpha *= a; ctx.translate(x, y); ctx.rotate(rot);
+  ctx.shadowColor = 'rgba(30,30,30,.10)'; ctx.shadowBlur = 12; ctx.shadowOffsetY = 5; ctx.fillStyle = '#FFFFFF'; ctx.fillRect(-w / 2, -h / 2, w, h); ctx.shadowColor = 'transparent';
+  ctx.strokeStyle = LINE; ctx.lineWidth = 2; ctx.strokeRect(-w / 2, -h / 2, w, h);
+  ctx.strokeStyle = rgba(K.lineGrey, .7); ctx.lineWidth = 4; for (let i = 0; i < lines; i++) { const yy = -h / 2 + h * .2 + i * h * .7 / lines; ctx.beginPath(); ctx.moveTo(-w / 2 + w * .14, yy); ctx.lineTo(w / 2 - w * (i % 2 ? .3 : .14), yy); ctx.stroke(); }
+  ctx.restore();
+}
+// vertical gauge: v = 0..1 filled, ↑ or ↓ beside the top
+function meter(x, y, h, v, col, label, sub, a, up) {
+  if (a <= 0) return; ctx.save(); ctx.globalAlpha *= a;
+  rr(x - 44, y - h, 88, h, 12, '#FFFFFF', LINE, 2); rr(x - 32, y - 12 - (h - 24) * v, 64, (h - 24) * v, 8, col);
+  text(label, x, y + 40, { size: 28, weight: 700, align: 'center', maxW: 240 }); text(sub, x, y + 76, { size: 21, weight: 500, color: K.muted, align: 'center', maxW: 250 });
+  text(up ? '↑' : '↓', x + 72, y - 12 - (h - 24) * v, { size: 44, weight: 800, color: col, align: 'center' });
+  ctx.restore();
+}
+// a checked list row: red check + text
+function checkRow(t, t0, x, y, str, { size = 30, w = 1300, col = K.red } = {}) {
+  enter(t, t0, () => text(str, x + 50, y, { size, weight: 700, maxW: w }), { dx: 20, dy: 0 });
+  check(x + 14, y + 2, 30, p(t, t0 + .25, .3), col, 5);
+}
+// dark statement bar across the page (a closing line)
+function bar(str, y, a, { x = 210, w = 1590, h = 84, size = 28 } = {}) {
+  if (a <= 0) return; rr(x, y, w, h, 14, K.ink, null, 0, a); text(str, x + 36, y + h / 2 + 1, { size, weight: 700, color: '#FFFFFF', alpha: a, maxW: w - 72 });
+}
+// speech bubble (tail at the top left), drawn at the current origin: left edge x = 0, middle y = 0
+function bubble(w, fill) {
+  const r = 36, y0 = -36;
+  ctx.save(); ctx.beginPath(); ctx.moveTo(r, y0); ctx.lineTo(42, y0); ctx.lineTo(88, y0 - 24); ctx.lineTo(70, y0); ctx.lineTo(w - r, y0); ctx.arc(w - r, 0, r, -Math.PI / 2, Math.PI / 2);
+  ctx.lineTo(r, -y0); ctx.arc(r, 0, r, Math.PI / 2, Math.PI * 3 / 2); ctx.closePath();
+  ctx.fillStyle = '#FFFFFF'; ctx.fill(); ctx.fillStyle = fill; ctx.fill(); ctx.restore();
+}
+
+// ---------- page furniture ----------
+function paper(cam) {
+  ctx.fillStyle = K.paper; ctx.fillRect(0, 0, W, H);
+  const minor = ((cam % 40) + 40) % 40, major = ((cam % 200) + 200) % 200;
+  [[40, minor, K.grid], [200, major, K.gridMajor]].forEach(([step, off, col]) => {
+    ctx.lineWidth = 1; ctx.strokeStyle = col; ctx.beginPath();
+    for (let x = -off; x <= W; x += step) { ctx.moveTo(Math.round(x) + .5, 0); ctx.lineTo(Math.round(x) + .5, H); }
+    for (let y = 0; y <= H; y += step) { ctx.moveTo(0, y + .5); ctx.lineTo(W, y + .5); }
+    ctx.stroke();
+  });
+}
+function pageFurniture(i) {
+  ctx.save(); ctx.strokeStyle = K.margin; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(150, 0); ctx.lineTo(150, H); ctx.stroke(); ctx.restore();
+  text(`p. ${i + 1}`, 1800, 92, { size: 26, weight: 700, fam: HAND, color: K.muted, align: 'right' });
+}
+// section tab (always red) + title (top-left). Slides in once, then stays still
+function header(t, t0, tab, title) {
+  const k1 = eOut(p(t, t0, .5)), k2 = eOut(p(t, t0 + .15, .6));
+  if (k1 > 0 && !SHARED_OFF) { ctx.save(); ctx.translate((1 - k1) * -30, 0); chip(tab, 210, 92, { size: 18, fill: K.red, a: k1, spacing: 2.5 }); ctx.restore(); }
+  if (k2 > 0) { ctx.save(); ctx.translate((1 - k2) * -30, 0); text(title, 210, 160, { size: 54, weight: 700, alpha: k2, maxW: 1560 }); ctx.restore(); }
+}
+const H0 = id => S(id).start + .15;   // header time for a scene
+const subline = (t, id, str, d = .45) => text(str, 210, 228, { size: 26, weight: 500, color: K.muted, alpha: p(t, H0(id) + d, .5), maxW: 1590 });
+
+// ============================================================
+// scenes (absolute time t). One SC entry per scene id in tools/script.py SCENES, in the same order
+// ============================================================
+const SC = {};
+
+// ---------- 1. title ----------
+SC.title = t => {
+  chip(C.title.kicker, 210, 262, { size: 18, fill: K.red, a: eOut(p(t, .3, .5)), spacing: 2.5 });
+  hiLite(200, 334, measure(C.title.words[0], 92, 800) + 22, 74, p(t, 1.5, .7));
+  C.title.words.forEach((w, i) => enter(t, .6 + i * .25, () => text(w, 210, 372 + i * 108, { size: 92, weight: 800, color: i === 0 ? K.red : K.ink, maxW: 860 })));
+  enter(t, 1.6, () => text(C.title.sub, 214, 720, { size: 32, weight: 500, color: K.muted, maxW: 820 }));
+  text(C.title.team, 214, 790, { size: 30, weight: 700, fam: HAND, color: K.red, alpha: p(t, 2.1, .5) });
+  // a worksheet being marked: ✓ red, ✗ navy; the key phrase underlined with the pen
+  const t0 = st('l1_1', .2), x = 1240, y = 300;
+  enter(t, t0 - .4, () => { card(x, y, 520, 470, { r: 14 }); text('Diagnostic test', x + 40, y + 52, { size: 26, weight: 700 }); });
+  [1, 1, 0, 1, 0, 1].forEach((ok, i) => {
+    const yy = y + 112 + i * 52, k = p(t, t0 + i * .3, .3);
+    text(`Q${i + 1}`, x + 40, yy, { size: 20, weight: 700, color: K.muted, alpha: p(t, t0 - .2, .4) }); rr(x + 96, yy - 6, [260, 200, 150, 240, 180, 210][i], 12, 6, K.lightBox, null, 0, p(t, t0 - .2, .4));
+    ok ? check(x + 450, yy, 30, k, K.red, 5) : crossMark(x + 450, yy, 22, k, K.navy, 5);
+  });
+  const kS = Wc('l1_1', ['starting', 'start'], .8);
+  text('Find the starting point', x + 260, y + 430, { size: 26, weight: 700, align: 'center', alpha: p(t, kS - .3, .4) });
+  pen(x + 120, y + 452, x + 400, y + 450, p(t, kS + .2, .5), K.red, 5, 7);
+};
+
+// ---------- 2. problem: red = up / positive, navy = down / negative, grey = everything else ----------
+SC.problem = t => {
+  header(t, H0('problem'), '01  ·  BACKGROUND', 'The problem today');
+  subline(t, 'problem', 'Every learner answers the same set of questions');
+  const q = Wc('l2_1', ['91', 'ninetyone', 'ninety'], .6);
+  for (let i = 0; i < 9; i++) sheet(470 + nz(i, 2) * 14, 700 - i * 22, 300, 70, nz(i, 5) * .05, eOut(p(t, st('l2_1', .1) + i * .07, .3)), 1);
+  enter(t, q - .2, () => text('91 questions', 470, 380, { size: 60, weight: 800, align: 'center' }), { pop: true, ox: 470, oy: 380 });
+  text('for every learner', 470, 436, { size: 30, weight: 700, fam: HAND, color: K.red, align: 'center', alpha: p(t, q + .3, .4) });
+  const tA = Wc('l2_2', 'accuracy', .25), tB = Wc('l2_2', 'burden', .55), tE = Wc('l2_2', 'efficiency', .85);
+  meter(1000, 760, 380, .75 * eOut(p(t, tA, .8)), K.lightRed, 'Accuracy', 'more questions help', p(t, tA - .2, .4), true);
+  meter(1260, 760, 380, .92 * eOut(p(t, tB, .8)), K.red, 'Burden', 'on learners', p(t, tB - .2, .4), true);
+  meter(1520, 760, 380, .3 * eOut(p(t, tE, .8)), K.navy, 'Efficiency', 'finding the starting point', p(t, tE - .2, .4), false);
+  const kBut = p(t, Wc('l2_2', 'but', .5) - .1, .4);
+  text('BUT', 1130, 330, { size: 30, weight: 700, fam: HAND, color: K.navy, align: 'center', alpha: kBut }); penCircle(1130, 330, 50, 28, kBut, K.navy, 3, 11);
+};
+
+// ---------- 3. steps: 1st / 2nd / 3rd of a comparison = red / blue / mint ----------
+SC.steps = t => {
+  header(t, H0('steps'), '02  ·  THE NEW APPROACH', 'Three steps');
+  const STEPS = [['ASSESS', 'Before learning starts', K.red, 'assess'], ['DIAGNOSE', "Find the learner's level", K.blue, 'diagnose'], ['PRESCRIBE', 'A personalized program', K.mintDark, 'prescribe']];
+  STEPS.forEach(([a, b, col, w], i) => {
+    const t0 = Wc('l3_1', w, .3 + i * .2), x = 210 + i * 560;
+    enter(t, t0 - .15, () => {
+      card(x, 330, 460, 400);
+      num(i + 1, x + 52, 384, col); text(a, x + 92, 386, { size: 26, weight: 800, color: col, spacing: 2 });
+      if (i === 0) sheet(x + 230, 520, 150, 180, -.04, 1, 5);
+      if (i === 1) [.35, .55, .8, 1].forEach((v, j) => rr(x + 140 + j * 50, 600 - 160 * v, 36, 160 * v, 4, j === 3 ? K.blue : K.blueTint));
+      if (i === 2) [0, 1, 2].forEach(j => { rr(x + 160, 450 + j * 52, 30, 30, 4, null, K.mintDark, 3); check(x + 175, 465 + j * 52, 22, 1, K.mintDark, 4); rr(x + 206, 460 + j * 52, 110, 10, 5, K.lightBox); });
+      text(b, x + 40, 680, { size: 26, weight: 700, maxW: 380 });
+    }, { pop: true, ox: x + 230, oy: 530 });
+    if (i < 2) penArrow(x + 476, 530, x + 544, 530, p(t, Wc('l3_1', STEPS[i + 1][3], .5) - .4, .4), K.ink, 4, 30 + i);
+  });
+  const kB = p(t, Wc('l3_2', 'before', .6), .6);
+  hiLite(206, 812, measure('Each step builds on the one before it.', 34, 700) + 16, 52, kB);
+  text('Each step builds on the one before it.', 214, 840, { size: 34, weight: 700, alpha: p(t, st('l3_2'), .5) });
+};
+
+// ---------- 4. outro ----------
+SC.outro = t => {
+  header(t, H0('outro'), 'SUMMARY', C.outro.title);
+  C.outro.points.forEach((pt, i) => checkRow(t, H0('outro') + .7 + i * .35, 210, 320 + i * 70, pt));
+  enter(t, st('l4_1'), () => text(C.outro.thanks, 960, 640, { size: 130, weight: 700, fam: HAND, align: 'center' }), { pop: true, ox: 960, oy: 640 });
+  pen(760, 730, 1160, 726, p(t, st('l4_1') + .5, .6), K.red, 6, 9);
+};
+
+// ============================================================
+// compositor: slide between pages (with the whoosh), then hold still
+// ============================================================
+// pages that continue the one before on the same sheet (tools/script.py CONT): the shared picture stays put and only the
+// rest cross-fades, no page turn and no whoosh. SHARED[id](t) draws the part that stays (section tab included)
+const CONT = new Set(TL.cont || []), SHARED = {};
+let SHARED_OFF = false;
+const PAGE_NO = TL.scenes.map((s, i) => i - TL.scenes.slice(1, i + 1).filter(x => CONT.has(x.id)).length);
+const TR = .8;
+function frame(i, t, ox) {
+  if (Math.abs(ox) >= W) return; const s = TL.scenes[i];
+  ctx.save(); ctx.translate(Math.round(ox), 0); pageFurniture(PAGE_NO[i]); SC[s.id](t); ctx.restore();
+}
+function draw(t) {
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1;
+  const SCN = TL.scenes; let i = SCN.findIndex(s => t < s.end); if (i < 0) i = SCN.length - 1;
+  const k = i > 0 ? eIO(p(t, SCN[i].start - .15, TR)) : 1, cont = i > 0 && CONT.has(SCN[i].id);
+  paper(i > 0 ? Math.round((PAGE_NO[i - 1] + (cont ? 0 : k)) * W) : 0);
+  if (cont && k < 1) {
+    pageFurniture(PAGE_NO[i]); SHARED_OFF = true;
+    ctx.save(); ctx.globalAlpha = 1 - k; SC[SCN[i - 1].id](t); ctx.restore();
+    ctx.save(); ctx.globalAlpha = k; SC[SCN[i].id](t); ctx.restore();
+    SHARED_OFF = false; (SHARED[SCN[i].id] || (() => {}))(t);
+  } else {
+    if (k < 1) frame(i - 1, t, -k * W);
+    frame(i, t, (1 - k) * W);
+  }
+  const f = p(t, DURATION - 1.2, 1.2); if (f > 0) { ctx.fillStyle = rgba(K.paper, eIO(f)); ctx.fillRect(0, 0, W, H); }
+}
+
+// ---------- preview player ----------
+const seekEl = document.getElementById('seek'), timeEl = document.getElementById('time'), playEl = document.getElementById('play');
+seekEl.max = DURATION.toFixed(2);
+let playing = false, t0 = 0, tCur = 0;
+const audio = new Audio(); if (!location.search.includes('render')) { audio.src = 'audio/mix.wav'; audio.preload = 'auto'; }   // renders and snaps need no sound
+function show(t) { tCur = t; draw(t); seekEl.value = t; timeEl.textContent = t.toFixed(2) + 's'; }
+function loop(now) { if (!playing) return; const t = (now - t0) / 1000; if (t >= DURATION) { playing = false; playEl.textContent = '▶ Play'; audio.pause(); show(DURATION); return; } show(t); requestAnimationFrame(loop); }
+playEl.onclick = () => { playing = !playing; playEl.textContent = playing ? '❚❚ Pause' : '▶ Play'; if (playing) { if (tCur >= DURATION) tCur = 0; t0 = performance.now() - tCur * 1000; try { audio.currentTime = tCur; audio.play().catch(() => {}); } catch (e) {} requestAnimationFrame(loop); } else audio.pause(); };
+seekEl.oninput = () => { show(+seekEl.value); if (playing) { t0 = performance.now() - tCur * 1000; try { audio.currentTime = tCur; } catch (e) {} } };
+
+// ---------- video editor hooks (../editor/PROTOCOL.md) ----------
+window.draw = draw; window.DURATION = DURATION;
+function merge(base, over) {
+  if (Array.isArray(base)) return Array.isArray(over) ? over.map((v, i) => base[i] !== undefined ? merge(base[i], v) : v) : base;
+  if (base && typeof base === 'object') { const o = {}; for (const k in base) o[k] = over && k in over ? merge(base[k], over[k]) : base[k]; return o; }
+  return over === undefined || over === null ? base : over;
+}
+function apply(content) { C = window.CONTENT = merge(DEFAULT_CONTENT, content); K = C.colors; }
+window.VIDEO = { schema: window.SCHEMA, defaults: DEFAULT_CONTENT, get content() { return C; }, apply, canvas: cv };
+window.ready = document.fonts.ready.then(() => {
+  if (location.search.includes('render')) document.body.classList.add('render');
+  const m = location.search.match(/[?&]t=([\d.]+)/); show(m ? +m[1] : 0); return true;
+});
+</script>
+</body>
+</html>
