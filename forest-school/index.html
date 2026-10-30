@@ -1,0 +1,431 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>숲 학교 사계절</title>
+<style>
+  @font-face { font-family: 'Noto Sans KR'; src: url('fonts/NotoSansKR.ttf') format('truetype'); font-weight: 100 900; font-display: block; }
+  @font-face { font-family: 'Jua'; src: url('fonts/Jua-Regular.ttf') format('truetype'); font-display: block; }
+  html, body { margin: 0; background: #1E2A22; }
+  body { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 12px; font-family: 'Noto Sans KR', sans-serif; color: #ddd; }
+  canvas { width: min(100%, 1280px); aspect-ratio: 16 / 9; display: block; background: #FBF5E6; }
+  .bar { display: flex; gap: 12px; align-items: center; width: min(100%, 1280px); }
+  .bar input { flex: 1; }
+  .bar a { color: #cde; }
+  body.render { padding: 0; gap: 0; }
+  body.render canvas { width: 1920px; height: 1080px; }
+  body.render .bar { display: none; }
+</style>
+</head>
+<body>
+<script src="timeline_spring.js"></script>
+<script src="timeline_summer.js"></script>
+<script src="timeline_autumn.js"></script>
+<script src="timeline_winter.js"></script>
+<script src="video/clips.js"></script>
+<canvas id="c" width="1920" height="1080"></canvas>
+<div class="bar">
+  <button id="play">▶ 재생</button>
+  <input id="seek" type="range" min="0" max="300" step="0.01" value="0">
+  <span id="time">0.00s</span>
+  <a href="?ep=spring">봄</a><a href="?ep=summer">여름</a><a href="?ep=autumn">가을</a><a href="?ep=winter">겨울</a>
+</div>
+<script>
+// ------------------------------------------------------------
+// 숲 학교 사계절 — 도전 골든벨 준비 영상 (봄·여름·가을·겨울 4편, ?ep=spring …)
+// 그림: codex 가 그린 그림책 장면(img/gen), 오프닝과 몇 장면은 grok 이 움직인 영상(video/<키>/프레임.jpg)
+// 시각: timeline_<편>.js (tools/make_audio.py 가 실제 음성 길이로 씀). draw(t) 는 시간만으로 정해져요.
+// 화면 층: 장면 그림(천천히 확대·이동, 장면이 바뀌면 겹쳐 바뀜) → 생물 그림판·낱말 카드 → 문제 카드 → 자막
+// ------------------------------------------------------------
+const q = new URLSearchParams(location.search);
+const EP = q.get('ep') || 'spring';
+const TL = window.TLS[EP], W = 1920, H = 1080, TAU = Math.PI * 2, DURATION = TL.duration;
+const CLIPS = window.CLIPS || {};
+const cv = document.getElementById('c'), ctx = cv.getContext('2d');
+const SANS = "'Noto Sans KR', sans-serif", JUA = "'Jua', 'Noto Sans KR', sans-serif";
+const K = { ink: '#3B2F25', paper: '#FBF5E6', paper2: '#F3E9D0', season: TL.color, leaf: '#5E9C4B', teacher: '#5E9C4B', gold: '#F2B530', red: '#E2574C', blue: '#4C86D9', navy: '#1F2A4A' };
+const SEASON_NAME = { spring: '봄', summer: '여름', autumn: '가을', winter: '겨울' }, NEXT = { spring: 'summer', summer: 'autumn', autumn: 'winter' };
+
+// ---------- 기본 ----------
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const lerp = (a, b, k) => a + (b - a) * k;
+const p = (t, s, d) => clamp((t - s) / d);
+const eOut = x => 1 - Math.pow(1 - x, 3), eIO = x => x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+const eBack = x => { const c1 = 1.7, c3 = c1 + 1; return x <= 0 ? 0 : 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2); };
+const nz = (i, s = 1) => { const v = Math.sin(i * 12.9898 + s * 78.233) * 43758.5453; return v - Math.floor(v) - .5; };
+const hash = s => [...s].reduce((a, c) => (a * 31 + c.charCodeAt(0)) | 0, 7);
+function rgba(hex, a) { const n = parseInt(hex.slice(1), 16); return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`; }
+function shade(hex, f) { const n = parseInt(hex.slice(1), 16), m = v => Math.round(clamp(f < 0 ? v * (1 + f) : v + (255 - v) * f, 0, 255)); return `rgb(${m(n >> 16 & 255)},${m(n >> 8 & 255)},${m(n & 255)})`; }
+function rr(x, y, w, h, r, fill, stroke, lw = 3) { ctx.beginPath(); ctx.roundRect(x, y, w, h, r); if (fill) { ctx.fillStyle = fill; ctx.fill(); } if (stroke) { ctx.lineWidth = lw; ctx.strokeStyle = stroke; ctx.stroke(); } }
+function circle(x, y, r, fill, stroke, lw = 3) { if (r <= 0) return; ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); if (fill) { ctx.fillStyle = fill; ctx.fill(); } if (stroke) { ctx.lineWidth = lw; ctx.strokeStyle = stroke; ctx.stroke(); } }
+function measure(str, size, weight = 700, fam = SANS) { ctx.save(); ctx.font = `${weight} ${size}px ${fam}`; const w = ctx.measureText(str).width; ctx.restore(); return w; }
+function text(str, x, y, { size = 36, weight = 700, fam = SANS, color = K.ink, align = 'left', maxW, stroke, lw = 10, shadow } = {}) {
+  if (!str) return; ctx.save();
+  let sz = size; if (maxW) { const w = measure(str, size, weight, fam); if (w > maxW) sz = size * maxW / w; }
+  ctx.font = `${weight} ${sz}px ${fam}`; ctx.textAlign = align; ctx.textBaseline = 'middle';
+  if (shadow) { ctx.fillStyle = shadow; ctx.fillText(str, x + 3, y + 5); }
+  if (stroke) { ctx.lineJoin = 'round'; ctx.strokeStyle = stroke; ctx.lineWidth = lw; ctx.strokeText(str, x, y); }
+  ctx.fillStyle = color; ctx.fillText(str, x, y); ctx.restore();
+}
+// 띄어쓰기 기준으로 줄 나누기 (한 낱말이 너무 길면 글자 단위)
+function wrap(str, size, maxW, weight = 400, fam = JUA) {
+  const words = str.split(' '), lines = []; let cur = '';
+  for (const w of words) { const nx = cur ? cur + ' ' + w : w; if (measure(nx, size, weight, fam) > maxW && cur) { lines.push(cur); cur = w; } else cur = nx; }
+  if (cur) lines.push(cur); return lines;
+}
+function pop(t, s, fn, { ox = 960, oy = 540, d = .45, out } = {}) {
+  const k = p(t, s, d); if (k <= 0) return; let a = clamp(k * 3);
+  if (out !== undefined) a *= 1 - p(t, out, .35);
+  if (a <= 0) return;
+  const sc = eBack(k); ctx.save(); ctx.globalAlpha *= a; ctx.translate(ox, oy); ctx.scale(sc, sc); ctx.translate(-ox, -oy); fn(); ctx.restore();
+}
+// 종이 카드 (살짝 그림자 + 테두리)
+function paper(x, y, w, h, { r = 34, fill = K.paper, edge = K.season, lw = 6 } = {}) {
+  ctx.save(); ctx.shadowColor = 'rgba(40,30,10,.28)'; ctx.shadowBlur = 30; ctx.shadowOffsetY = 10; rr(x, y, w, h, r, fill); ctx.restore();
+  rr(x + 10, y + 10, w - 20, h - 20, r - 8, null, rgba(edge, .55), lw);
+}
+function pill(str, x, y, { size = 34, fill = K.season, color = '#fff', pad = 22, fam = JUA, weight = 400, border = '#fff', bw = 4 } = {}) {
+  const w = measure(str, size, weight, fam) + pad * 2, h = size * 1.6;
+  rr(x - w / 2 - bw, y - h / 2 - bw, w + bw * 2, h + bw * 2, h / 2 + bw, border); rr(x - w / 2, y - h / 2, w, h, h / 2, fill);
+  text(str, x, y + 2, { size, fam, weight, color, align: 'center' }); return w;
+}
+function sparkle(x, y, r, a = 1, color = '#fff') {
+  if (r <= 0 || a <= 0) return; ctx.save(); ctx.globalAlpha *= a; ctx.fillStyle = color; ctx.beginPath();
+  for (let i = 0; i < 8; i++) { const ang = i * Math.PI / 4, rad = i % 2 ? r * .28 : r; ctx.lineTo(x + Math.cos(ang) * rad, y + Math.sin(ang) * rad); }
+  ctx.closePath(); ctx.fill(); ctx.restore();
+}
+
+// ---------- 그림·영상 ----------
+const IMG = {};
+function loadImg(src) { return new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = () => rej(new Error('image ' + src)); im.src = src; }); }
+const imgKeys = new Set([TL.openBg]);
+TL.items.forEach(it => { if (it.bg) imgKeys.add(it.bg); if (it.ov && ['panel', 'chain', 'anat', 'nodes'].includes(it.ov[0])) imgKeys.add(it.ov[0] === 'anat' ? 'su_insect' : it.ov[1]); });
+const FRAMES = new Map();   // 'key/0001' → Image (필요할 때 불러요)
+async function frame(key, i) {
+  const id = `${key}/${String(i).padStart(4, '0')}`; if (FRAMES.has(id)) return FRAMES.get(id);
+  const im = await loadImg(`video/${id}.jpg`); FRAMES.set(id, im);
+  if (FRAMES.size > 400) FRAMES.delete(FRAMES.keys().next().value); return im;
+}
+// 이미지를 영역에 꽉 차게 (cover), 확대·이동 포함
+function cover(im, x, y, w, h, z = 1, dx = 0, dy = 0) {
+  const s = Math.max(w / im.width, h / im.height) * z, iw = im.width * s, ih = im.height * s;
+  ctx.drawImage(im, x + (w - iw) / 2 + dx, y + (h - ih) / 2 + dy, iw, ih);
+}
+
+// ---------- 장면 그림 구간 ----------
+// bg 가 바뀌는 시각 목록. 각 구간 [s, e) 동안 천천히 확대·이동. grok 영상이 있는 그림은 구간 첫머리에서 한 번 재생
+const BG = [{ key: TL.openBg, s: 0 }];
+TL.items.forEach(it => { if (it.bg && it.bg !== BG[BG.length - 1].key) BG.push({ key: it.bg, s: it.start - .35 }); });
+BG.forEach((b, i) => { b.e = i + 1 < BG.length ? BG[i + 1].s : DURATION; b.dir = hash(b.key) % 2 ? 1 : -1; });
+const clipLen = key => CLIPS[key] ? CLIPS[key] / 24 : 0;
+const clipShown = new Set();   // 같은 그림이 다시 나올 때는 영상을 다시 틀지 않아요
+BG.forEach(b => { b.clip = CLIPS[b.key] && !clipShown.has(b.key); clipShown.add(b.key); });
+
+async function drawBgSeg(t, b) {
+  const k = clamp((t - b.s) / Math.max(1, b.e - b.s));
+  const z = 1.03 + .07 * eIO(k), dx = b.dir * 40 * (k - .5), dy = -10 * k;
+  cover(IMG[b.key], 0, 0, W, H, z, dx, dy);
+  if (b.clip) {
+    const L = clipLen(b.key), ct = t - b.s;
+    if (ct >= 0 && ct < L + .6) {
+      const fi = clamp(Math.floor(ct * 24) + 1, 1, CLIPS[b.key]);
+      const a = 1 - p(ct, L - .1, .7);   // 영상 끝나면 선명한 원본 그림으로 겹쳐 돌아와요
+      if (a > 0) { ctx.save(); ctx.globalAlpha *= a; ctx.imageSmoothingQuality = 'high'; cover(await frame(b.key, fi), 0, 0, W, H, z, dx, dy); ctx.restore(); }
+    }
+  }
+}
+async function background(t) {
+  let i = 0; for (let j = 0; j < BG.length; j++) if (t >= BG[j].s) i = j;
+  const b = BG[i], prev = BG[i - 1], f = p(t, b.s, .7);
+  if (prev && f < 1) await drawBgSeg(t, prev);
+  ctx.save(); ctx.globalAlpha = prev ? eIO(f) : 1; await drawBgSeg(t, b); ctx.restore();
+  // 가장자리를 살짝 어둡게 (그림 위 글자가 잘 보이게)
+  const g = ctx.createRadialGradient(960, 520, 500, 960, 540, 1250); g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(30,20,5,.35)');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+}
+
+// ---------- 그림 위에 띄우는 것 ----------
+// 같은 ov 가 이어지는 줄들은 한 번만 나타나고(run), 줄마다 바뀌는 설명만 새로 보여요
+const sameOv = (a, b) => a && b && a[0] === b[0] && a[1] === b[1];
+const RUNS = [];
+TL.items.forEach(it => {
+  if (!it.ov) return; const last = RUNS[RUNS.length - 1];
+  if (last && sameOv(last.ov, it.ov) && last.items[last.items.length - 1].end + 1.5 > it.start) last.items.push(it);
+  else RUNS.push({ ov: it.ov, items: [it] });
+});
+RUNS.forEach(r => { r.s = r.items[0].start - .15; r.e = r.items[r.items.length - 1].end + .5; });
+const PANEL_CROP = { sp_pinetree: 0, su_insect: 0, sp_branches: .04 };   // 그림판 위아래 여백을 얼마나 잘라 쓸지
+
+function labelOf(x) { return Array.isArray(x) ? { name: x[0], note: x[1] } : { name: x, note: null }; }
+function curItem(r, t) { let c = r.items[0]; for (const it of r.items) if (t >= it.start - .1) c = it; return c; }
+
+async function drawPanel(t, r, { chain = false } = {}) {
+  const key = r.ov[1], im = IMG[key], it = curItem(r, t), labels = it.ov[2].map(labelOf), n = labels.length;
+  // grok 영상이 있는 그림판은 처음 나올 때 한 번 움직였다가 원래 그림으로 돌아와요
+  const ct = t - r.s, L = clipLen(key);
+  const vid = L && ct >= 0 && ct < L + .6 ? await frame(key, clamp(Math.floor(ct * 24) + 1, 1, CLIPS[key])) : null, va = vid ? 1 - p(ct, L - .1, .7) : 0;
+  const crop = PANEL_CROP[key] ?? .1, sy = im.height * crop, sh = im.height * (1 - 2 * crop);
+  const cx = 90, cy = 64, cw = 1740, ch = 820;
+  pop(t, r.s, () => {
+    paper(cx, cy, cw, ch);
+    const maxW = cw - 80, maxH = 600, ar = im.width / sh; let iw = maxW, ih = iw / ar; if (ih > maxH) { ih = maxH; iw = ih * ar; }
+    const ix = 960 - iw / 2, iy = cy + 40;
+    ctx.drawImage(im, 0, sy, im.width, sh, ix, iy, iw, ih);
+    if (vid && va > 0) { ctx.save(); ctx.globalAlpha *= va; ctx.drawImage(vid, 0, vid.height * crop, vid.width, vid.height * (1 - 2 * crop), ix, iy, iw, ih); ctx.restore(); }
+    const colW = iw / n, anyNote = labels.some(l => l.note), allNote = labels.every(l => l.note);
+    labels.forEach((l, i) => {
+      const x = ix + colW * (i + .5), ly = iy + ih + 50, st = r.s + .3 + i * Math.min(.45, (r.items[0].end - r.items[0].start) * .5 / n);
+      if (l.note && !allNote) { ctx.save(); ctx.globalAlpha *= clamp((t - it.start + .1) * 3); rr(x - colW / 2 + 8, iy - 10, colW - 16, ih + 150, 26, null, K.season, 7); ctx.restore(); }
+      let psz = n > 4 ? 34 : 42; const pw = measure(l.name, psz, 400, JUA) + 52; if (pw > colW - 8) psz *= (colW - 8) / pw;   // 칸보다 긴 이름은 글자를 줄여요
+      pop(t, st, () => {
+        pill(l.name, x, ly, { size: psz, fill: l.note && !allNote ? K.season : shade(K.season, -.15) });
+        if (l.note) text(l.note, x, ly + 62, { size: n > 4 ? 26 : 32, weight: 800, color: shade(K.season, -.45), align: 'center', maxW: colW - 16 });
+      }, { ox: x, oy: ly, d: .4 });
+      if (chain && i < n - 1) {
+        const ax = ix + colW * (i + 1), ay = iy + ih * .5, ak = eOut(p(t, st + .3, .4));
+        if (ak > 0) {
+          ctx.save(); ctx.globalAlpha *= ak; ctx.strokeStyle = K.red; ctx.lineWidth = 10; ctx.lineCap = 'round';
+          ctx.beginPath(); ctx.moveTo(ax - 40, ay); ctx.lineTo(ax + 40 * (2 * ak - 1), ay); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(ax + 40 * (2 * ak - 1) - 18, ay - 18); ctx.lineTo(ax + 40 * (2 * ak - 1), ay); ctx.lineTo(ax + 40 * (2 * ak - 1) - 18, ay + 18); ctx.stroke();
+          text('먹어요', ax, ay - 44, { size: 30, fam: JUA, weight: 400, color: K.red, align: 'center', stroke: '#fff', lw: 8 }); ctx.restore();
+        }
+      }
+    });
+  }, { out: r.e, d: .5 });
+}
+
+function drawKey(t, r) {
+  const [, word, desc] = r.ov, w = Math.max(measure(word, 84, 400, JUA), measure(desc, 40, 800)) + 120, x = 1840 - w, y = 70, h = 230;
+  pop(t, r.s, () => {
+    paper(x, y, w, h, { r: 30 });
+    pill('핵심 낱말', x + 120, y, { size: 30, fill: K.season });
+    text(word, x + w / 2, y + 95, { size: 84, fam: JUA, weight: 400, color: shade(K.season, -.4), align: 'center' });
+    text(desc, x + w / 2, y + 172, { size: 40, weight: 800, color: K.ink, align: 'center' });
+  }, { ox: x + w / 2, oy: y + h / 2, out: r.e });
+}
+
+const TRASH = [['비닐', 20], ['금속', 12], ['종이', 10], ['플라스틱', 9], ['플라스틱 병', 8], ['건축 자재', 6], ['옷·신발', 5], ['음식물', 5]];
+function drawTrash(t, r) {
+  pop(t, r.s, () => {
+    paper(260, 70, 1400, 820);
+    text('숲 플로깅 쓰레기 수거표', 960, 150, { size: 60, fam: JUA, weight: 400, color: shade(K.season, -.4), align: 'center' });
+    TRASH.forEach(([name, v], i) => {
+      const y = 245 + i * 78, k = eOut(p(t, r.s + .4 + i * .12, .8)), bw = 900 * v / 20 * k;
+      text(name, 560, y, { size: 38, weight: 800, align: 'right' });
+      rr(590, y - 26, Math.max(1, bw), 52, 26, i === 0 ? K.red : shade(K.season, .1));
+      if (k > .5) text(`${v}개`, 610 + bw, y, { size: 36, weight: 900, color: i === 0 ? K.red : K.ink });
+      if (i === 0 && k > .9) pill('가장 많아요!', 610 + bw + 210, y, { size: 30, fill: K.red });
+    });
+  }, { out: r.e });
+}
+
+// 곤충의 몸 (su_insect 그림 위 위치는 그림을 보고 맞춘 값, 그림 비율 0~1)
+const ANAT = window.ANAT || {
+  parts: [['머리', .5, .22, -1], ['가슴', .5, .41, 1], ['배', .5, .72, -1]],
+  head: [['더듬이', .42, .06, -1], ['겹눈', .445, .21, -1], ['홑눈', .5, .155, 1], ['입', .5, .3, 1]],
+  thorax: [['날개', .2, .25, -1], ['날개', .8, .25, 1], ['다리', .31, .72, -1], ['다리', .66, .72, 1]],
+};
+function drawAnat(t, r) {
+  const im = IMG.su_insect, mode = curItem(r, t).ov[1];
+  const ih = 860, iw = ih * im.width / im.height, ix = 960 - iw / 2, iy = 50;
+  pop(t, r.s, () => {
+    paper(ix - 40, iy - 20, iw + 80, ih + 40);
+    ctx.drawImage(im, ix, iy + 10, iw, ih - 20);
+    const it = curItem(r, t);
+    (ANAT[mode] || []).forEach(([name, fx, fy, side], i) => {
+      const x = ix + iw * fx, y = iy + 10 + (ih - 20) * fy, lx = x + side * (mode === 'parts' ? 330 : 280);
+      const k = eOut(p(t, it.start + .2 + i * .5, .4)); if (k <= 0) return;
+      ctx.save(); ctx.globalAlpha *= k;
+      circle(x, y, 13, K.red, '#fff', 5);
+      ctx.strokeStyle = K.red; ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(lerp(x, lx, k), y); ctx.stroke();
+      pill(name, lx + side * 40, y, { size: 44, fill: mode === 'parts' ? [K.red, K.blue, K.leaf][i] : K.season });
+      ctx.restore();
+    });
+  }, { out: r.e });
+}
+
+// 잣나무 마디 (sp_pinetree 위 층 위치, 위에서부터)
+const NODES = window.NODES || [.13, .245, .39, .54, .73];
+function drawNodes(t, r) {
+  const im = IMG.sp_pinetree, ih = 860, iw = ih * im.width / im.height, ix = 960 - iw / 2, iy = 50, it = r.items[0];
+  pop(t, r.s, () => {
+    paper(ix - 40, iy - 20, iw + 80, ih + 40);
+    ctx.drawImage(im, ix, iy + 10, iw, ih - 20);
+    [...NODES].reverse().forEach((fy, i) => {
+      const y = iy + 10 + (ih - 20) * fy, k = eOut(p(t, it.start + .4 + i * .45, .35)); if (k <= 0) return;
+      ctx.save(); ctx.globalAlpha *= k; pill(`${i + 1}살`, ix + iw * .78, y, { size: 40, fill: K.season }); ctx.restore();
+    });
+  }, { out: r.e });
+}
+
+async function overlays(t) {
+  for (const r of RUNS) {
+    if (t < r.s - .05 || t > r.e + .5) continue;
+    const kind = r.ov[0];
+    if (kind === 'panel') await drawPanel(t, r); else if (kind === 'chain') await drawPanel(t, r, { chain: true });
+    else if (kind === 'key') drawKey(t, r); else if (kind === 'chart') drawTrash(t, r);
+    else if (kind === 'anat') drawAnat(t, r); else if (kind === 'nodes') drawNodes(t, r);
+  }
+}
+
+// ---------- 문제 카드 ----------
+function bell(x, y, s, glow = 0) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
+  if (glow > 0) { const g = ctx.createRadialGradient(0, 0, 10, 0, 0, 160); g.addColorStop(0, `rgba(255,220,90,${.6 * glow})`); g.addColorStop(1, 'rgba(255,220,90,0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, 160, 0, TAU); ctx.fill(); }
+  const gr = ctx.createLinearGradient(-70, -80, 70, 80); gr.addColorStop(0, '#FFE58A'); gr.addColorStop(.5, '#F2B530'); gr.addColorStop(1, '#C98612');
+  ctx.fillStyle = gr; ctx.beginPath(); ctx.moveTo(-14, -92); ctx.quadraticCurveTo(0, -104, 14, -92);
+  ctx.bezierCurveTo(60, -80, 62, -10, 70, 40); ctx.quadraticCurveTo(80, 62, 96, 70); ctx.lineTo(-96, 70); ctx.quadraticCurveTo(-80, 62, -70, 40); ctx.bezierCurveTo(-62, -10, -60, -80, -14, -92); ctx.fill();
+  circle(0, 86, 20, '#C98612'); rr(-100, 62, 200, 18, 9, '#E0A020');
+  ctx.fillStyle = 'rgba(255,255,255,.55)'; ctx.beginPath(); ctx.ellipse(-30, -30, 12, 40, .25, 0, TAU); ctx.fill();
+  ctx.restore();
+}
+function stageBg(t) {
+  const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#2A2F6B'); g.addColorStop(1, '#5B3C8C'); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  for (let i = 0; i < 3; i++) {   // 무대 조명
+    const x = 360 + i * 600 + 60 * Math.sin(t * .6 + i * 2); ctx.save(); ctx.globalAlpha = .13;
+    const lg = ctx.createLinearGradient(x, 0, x, H); lg.addColorStop(0, '#FFF6C8'); lg.addColorStop(1, 'rgba(255,246,200,0)'); ctx.fillStyle = lg;
+    ctx.beginPath(); ctx.moveTo(x - 40, 0); ctx.lineTo(x + 40, 0); ctx.lineTo(x + 300, H); ctx.lineTo(x - 300, H); ctx.fill(); ctx.restore();
+  }
+  for (let i = 0; i < 40; i++) sparkle(960 + nz(i, 3) * 1900, 540 + nz(i, 5) * 1060, 5 + 4 * Math.sin(t * 2 + i), .5, '#FFE9A8');
+}
+function quizCard(t, Q) {
+  const gb = Q.num != null, a0 = eOut(p(t, Q.start, .45));
+  // 배경: 장면 문제는 그림을 흐리게, 골든벨은 무대
+  ctx.save(); ctx.globalAlpha *= a0 * (1 - p(t, Q.end - .2, .4)) * .55; ctx.fillStyle = gb ? '#140A28' : '#2A2014'; ctx.fillRect(0, 0, W, H); ctx.restore();
+  pop(t, Q.start, () => {
+    const cx = 210, cy = 120, cw = 1500, ch = 760;
+    paper(cx, cy, cw, ch, { edge: gb ? K.gold : K.season });
+    // 머리표
+    if (gb) { bell(cx + 110, cy + 20, .55); pill(`골든벨 ${Q.num}번`, cx + 330, cy, { size: 44, fill: K.gold, color: K.navy }); }
+    else pill('문제!', cx + 160, cy, { size: 48, fill: K.red });
+    // 문제
+    const lines = wrap(Q.q, 66, cw - 200), y0 = cy + 200 - (lines.length - 1) * 40;
+    lines.forEach((l, i) => text(l, 960, y0 + i * 84, { size: 66, fam: JUA, weight: 400, color: K.ink, align: 'center' }));
+    const by = cy + ch - 180;
+    if (Q.ox) {
+      // O X 고르기
+      [['O', 680, K.blue], ['X', 1240, K.red]].forEach(([s, x, c]) => {
+        const right = s === Q.a, rk = p(t, Q.reveal, .4), dim = right ? 1 : 1 - .7 * rk, grow = right ? 1 + .25 * eBack(rk) : 1;
+        ctx.save(); ctx.globalAlpha *= dim; ctx.translate(x, by); ctx.scale(grow, grow);
+        circle(0, 0, 105, rgba(c, .15), c, 8); text(s, 0, 6, { size: 150, fam: JUA, weight: 400, color: c, align: 'center' }); ctx.restore();
+      });
+    }
+    // 카운트다운 (문제 읽은 뒤 5초)
+    const cd = t - Q.cd;
+    if (cd >= 0 && t < Q.reveal) {
+      const n = Math.max(1, TL.count - Math.floor(cd)), f = cd % 1, cxr = Q.ox ? 960 : 960, cyr = Q.ox ? by : by;
+      ctx.save();
+      circle(cxr, cyr, 96, '#fff', rgba(K.ink, .12), 14);
+      ctx.strokeStyle = n <= 2 ? K.red : K.season; ctx.lineWidth = 14; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.arc(cxr, cyr, 96, -Math.PI / 2, -Math.PI / 2 + TAU * (1 - cd / TL.count)); ctx.stroke();
+      const s = 1 + .25 * (1 - eOut(clamp(f * 3)));
+      ctx.translate(cxr, cyr); ctx.scale(s, s); text(String(n), 0, 6, { size: 110, fam: JUA, weight: 400, color: n <= 2 ? K.red : K.ink, align: 'center' });
+      ctx.restore();
+    }
+    // 정답
+    if (!Q.ox && t >= Q.reveal) {
+      pop(t, Q.reveal, () => {
+        const w = Math.max(520, measure(Q.a, 100, 400, JUA) + 200);
+        rr(960 - w / 2, by - 85, w, 170, 85, gb ? K.gold : K.season); rr(960 - w / 2 + 10, by - 75, w - 20, 150, 75, null, 'rgba(255,255,255,.7)', 5);
+        text(Q.a, 960, by + 6, { size: 100, fam: JUA, weight: 400, color: gb ? K.navy : '#fff', align: 'center', maxW: w - 80 });
+        pill('정답', 960 - w / 2 + 40, by - 80, { size: 34, fill: K.red });
+      }, { ox: 960, oy: by, d: .5 });
+    }
+    if (t >= Q.reveal) for (let i = 0; i < 14; i++) { const k = p(t, Q.reveal + i * .03, 1.1); if (k > 0 && k < 1) sparkle(960 + Math.cos(i * 2.4) * (200 + 520 * eOut(k)), by + Math.sin(i * 2.4) * (90 + 260 * eOut(k)), 22 * (1 - k), 1, [K.gold, K.red, K.season, K.blue][i % 4]); }
+  }, { out: Q.end - .3, d: .5 });
+}
+function quizzes(t) { for (const Q of TL.quizzes) if (t >= Q.start - .05 && t <= Q.end + .4) quizCard(t, Q); }
+
+// ---------- 제목·골든벨 안내·마무리 ----------
+function titleCard(t) {
+  if (t > TL.open + .8) return;
+  const a = 1 - p(t, TL.open - .4, .8);
+  ctx.save(); ctx.globalAlpha *= a;
+  pop(t, 1.1, () => {
+    pill('숲 학교 · 사계절', 960, 250, { size: 50, fill: K.leaf });
+    text(SEASON_NAME[EP], 960, 440, { size: 260, fam: JUA, weight: 400, color: '#fff', align: 'center', stroke: shade(K.season, -.3), lw: 26, shadow: 'rgba(0,0,0,.25)' });
+    text(TL.sub, 960, 620, { size: 64, fam: JUA, weight: 400, color: '#fff', align: 'center', stroke: 'rgba(40,30,10,.55)', lw: 14 });
+  }, { ox: 960, oy: 440, d: .7 });
+  pop(t, 2.2, () => { pill('도전! 골든벨 준비', 960, 760, { size: 44, fill: K.gold, color: K.navy }); bell(1290, 745, .42, .5 + .5 * Math.sin(t * 4)); }, { ox: 960, oy: 760 });
+  ctx.restore();
+}
+function gbScene(t) {
+  const S = TL.scenes.find(s => s.id === 'gb'); if (!S || t < S.start - .2 || t > S.end + .6) return null;
+  const a = eIO(p(t, S.start - .1, .7)) * (1 - p(t, S.end - .1, .6));
+  ctx.save(); ctx.globalAlpha *= a; stageBg(t); ctx.restore();
+  const intro = TL.items.find(i => i.id === 'gb0');
+  if (intro && t < intro.end + .6) pop(t, S.start + .1, () => {
+    bell(960, 330, 1.5 + .04 * Math.sin(t * 8) * (1 - p(t, S.start + 2, .5)), 1);
+    text('도전! 골든벨', 960, 620, { size: 150, fam: JUA, weight: 400, color: '#FFE58A', align: 'center', stroke: '#5A2E00', lw: 18, shadow: 'rgba(0,0,0,.35)' });
+    text(`${SEASON_NAME[EP]} 숲 · 10문제`, 960, 760, { size: 60, fam: JUA, weight: 400, color: '#fff', align: 'center' });
+  }, { ox: 960, oy: 480, out: intro.end + .2 });
+  return true;
+}
+function endCard(t) {
+  const S = TL.scenes.find(s => s.id === 'end'); if (!S || t < S.start) return;
+  pop(t, S.start + .2, () => {
+    paper(410, 210, 1100, 560, { edge: K.gold });
+    bell(960, 340, .8, .7 + .3 * Math.sin(t * 3));
+    text('참 잘했어요!', 960, 520, { size: 120, fam: JUA, weight: 400, color: shade(K.season, -.35), align: 'center' });
+    text(NEXT[EP] ? `다음 편: ${SEASON_NAME[NEXT[EP]]} 숲` : '사계절 숲 학교 끝!', 960, 660, { size: 56, fam: JUA, weight: 400, color: K.ink, align: 'center' });
+  }, { ox: 960, oy: 490, d: .6 });
+  for (let i = 0; i < 26; i++) sparkle(960 + nz(i, 7) * 1700, 540 + nz(i, 9) * 900, (8 + 8 * Math.sin(t * 3 + i)) * p(t, S.start + .6, .6), .8, [K.gold, '#fff', K.season][i % 3]);
+}
+
+// ---------- 장면 이름표·자막 ----------
+function sceneChip(t) {
+  const S = TL.scenes.find(s => t >= s.start && t < s.end); if (!S || S.kind !== 'scene' || S.id === 'open') return;
+  const a = clamp((t - S.start) * 2) * (1 - p(t, S.end - .3, .3)); if (a <= 0) return;
+  ctx.save(); ctx.globalAlpha *= a; pill(`${SEASON_NAME[EP]} · ${S.label}`, 60 + measure(`${SEASON_NAME[EP]} · ${S.label}`, 34, 400, JUA) / 2 + 22, 64, { size: 34, fill: rgba('#000000', .45), border: 'rgba(255,255,255,.85)', bw: 3 }); ctx.restore();
+}
+function subtitle(t) {
+  const it = TL.items.find(l => t >= l.start - .1 && t < l.end + .3); if (!it || it.role === 'q' || it.role === 'a') return;
+  const cs = it.chunks; let ci = 0; for (let i = 0; i < cs.length; i++) if (t >= cs[i].start - .05) ci = i;
+  const str = cs[ci].text, a = Math.min(eOut(p(t, it.start - .1, .2)), 1 - p(t, it.end + .1, .2));
+  const tw = measure(str, 50, 800), tag = it.who === 't' ? '곰취 쌤' : null, tagW = tag ? measure(tag, 34, 400, JUA) + 50 : 0;
+  const w = Math.min(1820, tw + 100 + tagW), x0 = 960 - w / 2;
+  ctx.save(); ctx.globalAlpha *= a;
+  rr(x0, 948, w, 96, 48, 'rgba(25,22,15,.78)');
+  if (tag) { rr(x0 + 14, 962, tagW, 68, 34, K.teacher); text(tag, x0 + 14 + tagW / 2, 998, { size: 34, fam: JUA, weight: 400, color: '#fff', align: 'center' }); }
+  text(str, x0 + tagW + (w - tagW) / 2, 997, { size: 50, weight: 800, color: '#fff', align: 'center', maxW: w - tagW - 60 });
+  ctx.restore();
+}
+
+// ============================================================
+async function draw(t) {
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.filter = 'none';
+  // 문제 시간에는 그림을 살짝 흐리게
+  const Q = TL.quizzes.find(qz => t >= qz.start - .05 && t <= qz.end + .4);
+  const blur = Q && Q.num == null ? 10 * eOut(p(t, Q.start, .45)) * (1 - p(t, Q.end - .2, .5)) : 0;
+  if (blur > .3) ctx.filter = `blur(${blur.toFixed(1)}px)`;
+  await background(t); ctx.filter = 'none';
+  titleCard(t);
+  const inGb = gbScene(t);
+  if (!inGb) { await overlays(t); sceneChip(t); }
+  endCard(t);
+  quizzes(t);
+  subtitle(t);
+  const f = p(t, DURATION - 1.2, 1.2); if (f > 0) { ctx.fillStyle = `rgba(20,16,10,${eIO(f)})`; ctx.fillRect(0, 0, W, H); }
+  const fi = 1 - p(t, 0, .6); if (fi > 0) { ctx.fillStyle = `rgba(251,245,230,${fi})`; ctx.fillRect(0, 0, W, H); }
+}
+
+// ---------- 미리보기 플레이어 ----------
+const seekEl = document.getElementById('seek'), timeEl = document.getElementById('time'), playEl = document.getElementById('play');
+seekEl.max = DURATION.toFixed(2);
+let playing = false, t0 = 0, tCur = 0, busy = false;
+const audio = new Audio(`audio/mix_${EP}.wav`); audio.preload = 'auto';
+async function show(t) { tCur = t; if (busy) return; busy = true; await draw(t); busy = false; seekEl.value = t; timeEl.textContent = t.toFixed(2) + 's'; }
+function loop(now) { if (!playing) return; const t = (now - t0) / 1000; if (t >= DURATION) { playing = false; playEl.textContent = '▶ 재생'; audio.pause(); show(DURATION); return; } show(t); requestAnimationFrame(loop); }
+playEl.onclick = () => { playing = !playing; playEl.textContent = playing ? '❚❚ 멈춤' : '▶ 재생'; if (playing) { if (tCur >= DURATION) tCur = 0; t0 = performance.now() - tCur * 1000; try { audio.currentTime = tCur; audio.play().catch(() => {}); } catch (e) {} requestAnimationFrame(loop); } else audio.pause(); };
+seekEl.oninput = () => { show(+seekEl.value); if (playing) { t0 = performance.now() - tCur * 1000; try { audio.currentTime = tCur; } catch (e) {} } };
+if (q.has('t')) tCur = +q.get('t');
+
+window.draw = draw; window.DURATION = DURATION; window.TL = TL;
+window.ready = Promise.all([
+  document.fonts.load(`700 100px 'Noto Sans KR'`, '가A'), document.fonts.load(`100px 'Jua'`, '가'),
+  ...[...imgKeys].map(k => loadImg(`img/gen/${k}.png`).then(im => IMG[k] = im)),
+]).then(r => { if (!r[0].length || !r[1].length) throw new Error('font failed to load (check fonts/)'); })
+  .then(() => document.fonts.ready).then(async () => { if (location.search.includes('render')) document.body.classList.add('render'); await show(tCur); return true; });
+</script>
+</body>
+</html>

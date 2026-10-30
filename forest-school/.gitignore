@@ -1,0 +1,12 @@
+node_modules/
+out/
+audio/tts_cache/
+audio/voice_cands/
+audio/*.wav
+!audio/voice_narr.wav
+!audio/voice_teacher.wav
+video/*.mp4
+img/gen/log.txt
+audio/make_log.txt
+video/log.txt
+__pycache__/
