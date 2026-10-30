@@ -8,7 +8,7 @@
 
 1. 이 저장소를 받고 작업 브랜치로 가요
    ```bash
-   git clone https://github.com/peterlee-dev/git-branch-test.git && cd git-branch-test
+   git clone https://github.com/peterlee-dev/edu-video-studio.git && cd edu-video-studio
    git checkout claude/jaenung-promo-video-n91oud
    ```
 2. `tools/jei_tts.example.json`을 `tools/jei_tts.local.json`으로 복사해서 채워요. 이 파일은 저장소에 올라가지 않아요 (토큰은 여기에만)
