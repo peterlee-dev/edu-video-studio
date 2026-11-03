@@ -1,0 +1,713 @@
+1
+00:00:02,600 --> 00:00:05,125
+We would like to share
+the development direction
+
+2
+00:00:05,178 --> 00:00:07,440
+for our new JEI English
+program in the U.S.
+
+3
+00:00:07,890 --> 00:00:11,400
+We will also explain the curriculum
+design we have developed so far.
+
+4
+00:00:13,150 --> 00:00:16,603
+In the U.S., reading education
+based on the Science of Reading,
+
+5
+00:00:16,657 --> 00:00:20,110
+or SoR, is expanding through state
+laws and education policies.
+
+6
+00:00:20,560 --> 00:00:22,946
+SoR brings together scientific research on
+
+7
+00:00:23,003 --> 00:00:25,730
+how children learn to read
+and understand texts.
+
+8
+00:00:26,180 --> 00:00:28,801
+In the U.S., this research
+is being used to improve
+
+9
+00:00:28,853 --> 00:00:31,320
+reading education policies
+and teaching methods.
+
+10
+00:00:32,970 --> 00:00:37,905
+However, according to the 2024 National
+Assessment of Educational Progress,
+
+11
+00:00:37,971 --> 00:00:42,840
+or NAEP, about 40% of fourth-grade
+students scored Below Basic in reading.
+
+12
+00:00:43,290 --> 00:00:47,190
+This shows that there is still a strong
+need to improve literacy skills.
+
+13
+00:00:48,840 --> 00:00:51,975
+Major states, including New
+York, New Jersey, California,
+
+14
+00:00:52,030 --> 00:00:55,220
+Florida, and Texas, are also
+introducing related policies.
+
+15
+00:00:55,670 --> 00:00:58,726
+Major education companies,
+such as Amplify, Lexia,
+
+16
+00:00:58,787 --> 00:01:01,660
+and Savvas, also emphasize
+SoR-based curricula.
+
+17
+00:01:03,310 --> 00:01:07,730
+In response to these changes, we aim
+to develop a new JEI English program.
+
+18
+00:01:08,180 --> 00:01:12,142
+The program will help students build
+skills step by step, from basic reading
+
+19
+00:01:12,194 --> 00:01:16,000
+to vocabulary, reading comprehension,
+and broader language understanding.
+
+20
+00:01:16,450 --> 00:01:19,320
+It will also help students
+develop their thinking skills.
+
+21
+00:01:20,970 --> 00:01:24,500
+Our goal is to go beyond simply
+reading and understanding texts.
+
+22
+00:01:24,950 --> 00:01:27,453
+We want students to think
+independently, make
+
+23
+00:01:27,509 --> 00:01:30,290
+decisions, and express
+their ideas using evidence.
+
+24
+00:01:31,940 --> 00:01:35,086
+To achieve this, we plan to
+build a learning system that
+
+25
+00:01:35,142 --> 00:01:38,681
+connects JEI's strengths in precise
+assessment and personalized
+
+26
+00:01:38,737 --> 00:01:41,770
+learning plans with POD
+workbooks and center coaching.
+
+27
+00:01:43,520 --> 00:01:46,600
+Our target students range
+from Pre-K through Grade 9.
+
+28
+00:01:47,050 --> 00:01:49,658
+We have organized the
+program into four levels
+
+29
+00:01:49,715 --> 00:01:52,040
+based on students' stages of development.
+
+30
+00:01:53,690 --> 00:01:58,100
+JEI Reading Ready is designed
+for Pre-K through Grade 2.
+
+31
+00:01:58,550 --> 00:02:02,850
+It focuses on building the basic skills
+students need to read independently.
+
+32
+00:02:04,300 --> 00:02:07,360
+Reading Builder is designed
+for Grades 3 through 5.
+
+33
+00:02:07,810 --> 00:02:11,890
+It helps students expand their vocabulary
+and background knowledge through reading.
+
+34
+00:02:13,340 --> 00:02:16,040
+Reading Plus is designed
+for Grades 6 and 7.
+
+35
+00:02:16,490 --> 00:02:19,048
+It helps students develop
+deeper thinking skills
+
+36
+00:02:19,102 --> 00:02:21,340
+by comparing and analyzing what they read.
+
+37
+00:02:22,790 --> 00:02:26,350
+Finally, Reading Pro is
+designed for Grades 8 and 9.
+
+38
+00:02:26,800 --> 00:02:29,248
+It helps students evaluate information and
+
+39
+00:02:29,307 --> 00:02:31,930
+express their ideas
+logically using evidence.
+
+40
+00:02:33,580 --> 00:02:37,260
+Through these four programs, we aim
+to help students grow step by step.
+
+41
+00:02:37,710 --> 00:02:40,102
+They will move from
+basic reading skills to
+
+42
+00:02:40,157 --> 00:02:42,660
+analysis, evaluation,
+and building arguments.
+
+43
+00:02:44,310 --> 00:02:50,270
+Overall, we plan to develop 11 levels
+with a total of 352 standard sets.
+
+44
+00:02:50,720 --> 00:02:53,631
+We plan to provide the
+content through POD workbooks
+
+45
+00:02:53,687 --> 00:02:56,150
+first and later expand
+into online learning.
+
+46
+00:02:56,600 --> 00:02:59,472
+However, we will continue to
+review and improve the number
+
+47
+00:02:59,521 --> 00:03:02,740
+of sets and learning objectives
+at each level during development.
+
+48
+00:03:04,690 --> 00:03:07,660
+We will now explain the key
+features of the new program, what
+
+49
+00:03:07,709 --> 00:03:10,630
+makes it different, and how we
+are designing the curriculum.
+
+50
+00:03:11,080 --> 00:03:13,500
+Our new program has four main features.
+
+51
+00:03:14,950 --> 00:03:17,360
+First, we focus on building reading skills
+
+52
+00:03:17,418 --> 00:03:20,000
+step by step based on
+the Science of Reading.
+
+53
+00:03:20,450 --> 00:03:24,340
+We are designing the program to match
+each student's reading development.
+
+54
+00:03:24,790 --> 00:03:28,148
+Students will move from basic
+reading skills to vocabulary
+
+55
+00:03:28,206 --> 00:03:30,870
+and reading comprehension
+in a structured way.
+
+56
+00:03:32,320 --> 00:03:36,370
+Second, we provide integrated
+literacy learning based on context.
+
+57
+00:03:36,820 --> 00:03:39,367
+We connect different
+types of texts, including
+
+58
+00:03:39,422 --> 00:03:42,190
+literary and informational
+texts, under one theme.
+
+59
+00:03:42,640 --> 00:03:44,962
+Students will learn reading comprehension,
+
+60
+00:03:45,018 --> 00:03:47,340
+vocabulary, grammar, and writing together.
+
+61
+00:03:48,790 --> 00:03:52,060
+Third, we plan to provide
+precise Adaptive Assessment.
+
+62
+00:03:52,510 --> 00:03:55,970
+Fourth, we plan to use AI to
+support learning and coaching.
+
+63
+00:03:56,420 --> 00:03:59,810
+We are considering using AI for
+writing feedback, POD workbook
+
+64
+00:03:59,865 --> 00:04:03,310
+grading, learning result analysis,
+and center coaching support.
+
+65
+00:04:04,960 --> 00:04:08,100
+Next, we will explain
+what makes JEI different.
+
+66
+00:04:08,550 --> 00:04:12,848
+Our main goal is to connect precise
+assessment, personalized learning paths,
+
+67
+00:04:12,905 --> 00:04:16,920
+customized POD workbooks, and center
+coaching into one learning system.
+
+68
+00:04:17,370 --> 00:04:19,926
+Through this approach, we
+aim to provide students
+
+69
+00:04:19,978 --> 00:04:22,430
+with a unique personalized
+learning experience.
+
+70
+00:04:24,080 --> 00:04:26,864
+We also plan to reflect each
+state's education standards
+
+71
+00:04:26,914 --> 00:04:29,350
+in our learning objectives
+and learning sequence.
+
+72
+00:04:29,800 --> 00:04:32,310
+At the same time, we will
+adjust learning content
+
+73
+00:04:32,361 --> 00:04:35,230
+through Adaptive Learning
+based on each student's level.
+
+74
+00:04:35,680 --> 00:04:39,450
+This will allow us to provide a higher
+level of personalized learning.
+
+75
+00:04:41,300 --> 00:04:43,900
+Now, we will explain
+our curriculum design.
+
+76
+00:04:44,350 --> 00:04:47,583
+We have selected eight common
+themes based on topics from
+
+77
+00:04:47,640 --> 00:04:50,760
+major U.S. textbooks and
+grade-level standards in CCSS.
+
+78
+00:04:52,410 --> 00:04:54,570
+We use a spiral curriculum structure.
+
+79
+00:04:55,020 --> 00:04:58,890
+This means students revisit the same
+themes across different grades.
+
+80
+00:04:59,340 --> 00:05:02,566
+As students move to higher
+grades, the topics become deeper,
+
+81
+00:05:02,620 --> 00:05:05,470
+and the level of reading and
+thinking also increases.
+
+82
+00:05:07,120 --> 00:05:10,280
+For example, let's look at the
+theme of Animals and Nature.
+
+83
+00:05:10,730 --> 00:05:14,140
+In Pre-K, students begin by
+learning about animals around them.
+
+84
+00:05:14,590 --> 00:05:18,860
+In Grade 4, they learn how animals
+survive and adapt to their environments.
+
+85
+00:05:19,310 --> 00:05:21,986
+By Grade 9, students
+evaluate and build arguments
+
+86
+00:05:22,041 --> 00:05:24,990
+about their responsibility
+to protect the environment.
+
+87
+00:05:26,640 --> 00:05:30,090
+We have also adjusted the balance
+between literary and informational
+
+88
+00:05:30,140 --> 00:05:32,880
+texts based on students'
+grade levels and development.
+
+89
+00:05:33,330 --> 00:05:36,820
+In the early grades, we place
+more focus on literary texts.
+
+90
+00:05:37,270 --> 00:05:39,820
+This helps students become
+more familiar with reading.
+
+91
+00:05:40,270 --> 00:05:43,361
+As students move to higher
+grades, we increase the amount of
+
+92
+00:05:43,413 --> 00:05:46,710
+informational texts and texts
+related to arguments and opinions.
+
+93
+00:05:47,560 --> 00:05:52,510
+We developed these ratios as JEI's own
+guidelines, using the reading standards
+
+94
+00:05:52,574 --> 00:05:57,080
+in CCSS and the grade-level assessment
+structure of NAEP as references.
+
+95
+00:05:58,730 --> 00:06:00,753
+Through this curriculum design, we want
+
+96
+00:06:00,805 --> 00:06:03,140
+students to develop more
+than reading skills.
+
+97
+00:06:03,590 --> 00:06:07,350
+Even within the same theme, students
+will gradually build vocabulary,
+
+98
+00:06:07,404 --> 00:06:11,110
+background knowledge, analysis
+skills, and critical thinking skills.
+
+99
+00:06:13,060 --> 00:06:15,375
+Finally, we will explain an example of our
+
+100
+00:06:15,430 --> 00:06:18,130
+workbook design and our
+future development plans.
+
+101
+00:06:18,580 --> 00:06:21,185
+First, we will introduce
+a sample Reading Builder
+
+102
+00:06:21,238 --> 00:06:23,950
+workbook developed for Grade
+3 students in the U.S.
+
+103
+00:06:24,400 --> 00:06:27,370
+The sample uses one theme,
+Building a Home Together.
+
+104
+00:06:29,020 --> 00:06:32,440
+We connect literary and informational
+texts under this theme.
+
+105
+00:06:32,890 --> 00:06:36,067
+The learning activities move
+from reading comprehension
+
+106
+00:06:36,125 --> 00:06:38,320
+to analysis, application, and writing.
+
+107
+00:06:39,970 --> 00:06:43,390
+We also follow JEI's
+small-step learning approach.
+
+108
+00:06:43,840 --> 00:06:46,174
+The weekly learning schedule includes one
+
+109
+00:06:46,231 --> 00:06:48,850
+center session and four
+days of home learning.
+
+110
+00:06:50,500 --> 00:06:53,130
+The learning activities are
+connected step by step.
+
+111
+00:06:53,580 --> 00:06:56,850
+Students begin with vocabulary
+preparation before reading.
+
+112
+00:06:57,300 --> 00:07:00,961
+They then move to reading the
+main text, reading comprehension,
+
+113
+00:07:01,019 --> 00:07:03,460
+advanced vocabulary, grammar, and writing.
+
+114
+00:07:03,910 --> 00:07:07,350
+This structure is designed to help
+students learn independently.
+
+115
+00:07:09,000 --> 00:07:12,210
+Each set includes 24 pages
+of learning content.
+
+116
+00:07:12,660 --> 00:07:17,340
+It also includes two pages for the
+Interim Test, answer sheets, and covers.
+
+117
+00:07:17,790 --> 00:07:19,730
+The total is 32 pages.
+
+118
+00:07:21,380 --> 00:07:23,930
+However, this is a
+standard sample workbook.
+
+119
+00:07:24,380 --> 00:07:28,090
+We are currently studying how to
+apply personalized POD learning.
+
+120
+00:07:28,540 --> 00:07:31,226
+Our goal is to adjust and
+assign the right content
+
+121
+00:07:31,280 --> 00:07:33,590
+based on each student's
+assessment results.
+
+122
+00:07:35,440 --> 00:07:38,150
+Finally, we will explain
+our next development steps.
+
+123
+00:07:38,600 --> 00:07:41,152
+We have completed our
+review and analysis of
+
+124
+00:07:41,210 --> 00:07:44,110
+ELA education standards
+across all 50 U.S. states.
+
+125
+00:07:44,560 --> 00:07:46,870
+We are now working to match JEI's learning
+
+126
+00:07:46,925 --> 00:07:49,620
+objectives with each state's
+education standards.
+
+127
+00:07:51,070 --> 00:07:55,080
+As part of this process, we are reviewing
+our existing learning objectives.
+
+128
+00:07:55,530 --> 00:07:57,856
+We are checking whether
+they are appropriate and
+
+129
+00:07:57,904 --> 00:08:00,230
+whether they follow the
+right learning sequence.
+
+130
+00:08:00,680 --> 00:08:03,360
+We plan to improve any
+areas that need changes.
+
+131
+00:08:04,810 --> 00:08:07,575
+At the same time, we are
+analyzing the content
+
+132
+00:08:07,635 --> 00:08:10,580
+of our existing JEI English
+workbooks in the U.S.
+
+133
+00:08:11,030 --> 00:08:14,600
+We are reviewing which content
+can be used in the new program.
+
+134
+00:08:15,050 --> 00:08:17,735
+Based on these findings, we
+will connect the improved
+
+135
+00:08:17,786 --> 00:08:20,370
+learning objectives with
+state education standards.
+
+136
+00:08:20,820 --> 00:08:23,507
+We will then develop a
+more detailed theme-based
+
+137
+00:08:23,563 --> 00:08:25,970
+curriculum and personalized
+learning paths.
+
+138
+00:08:27,420 --> 00:08:32,040
+Next, we plan to use AI Agents to develop
+content for each learning objective.
+
+139
+00:08:32,490 --> 00:08:35,440
+Our researchers will review
+and improve the content.
+
+140
+00:08:35,890 --> 00:08:39,430
+We will then build a content pool
+and use it for product development.
+
+141
+00:08:41,080 --> 00:08:43,598
+Rather than developing
+all four programs at the
+
+142
+00:08:43,651 --> 00:08:46,490
+same time, we plan to focus
+on Reading Builder first.
+
+143
+00:08:46,940 --> 00:08:49,955
+We will conduct a pilot test
+to check learning results
+
+144
+00:08:50,011 --> 00:08:52,580
+and how well the program
+works at JEI centers.
+
+145
+00:08:53,030 --> 00:08:57,410
+After this, we plan to expand development
+to the other programs step by step.
+
+146
+00:08:59,160 --> 00:08:59,740
+Thank you.
+
