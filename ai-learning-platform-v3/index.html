@@ -645,11 +645,21 @@ const NODES = (() => {   // fixed pseudo-random network
   out.forEach((a, i) => { const near = out.map((b, j) => [Math.hypot(a.x - b.x, a.y - b.y), j]).filter(([d, j]) => j > i && d < 120).sort((u, v) => u[0] - v[0]).slice(0, 3); near.forEach(([, j]) => edges.push([i, j])); });
   return { nodes: out, edges };
 })();
-const REC_PATH = (() => { const used = new Set(); return [[560, 810, 'gap'], [600, 620], [660, 520], [700, 420]].map(([x, y, s]) => {
-  const n = NODES.nodes.filter(n => !used.has(n) && (!s || n.s === s)).sort((a, b) => Math.hypot(a.x - x, a.y - y) - Math.hypot(b.x - x, b.y - y))[0]; used.add(n); return n; }); })();
+// recommended route: from a learning gap at the bottom up to a not-yet-studied objective, hop by hop along the map's edges.
+// Shortest path where going down costs much more, from whichever gap near the bottom-middle gives the steadiest climb
+const REC_PATH = (() => {
+  const N = NODES.nodes, adj = N.map(() => []); NODES.edges.forEach(([i, j]) => { adj[i].push(j); adj[j].push(i); });
+  const far = (i, x, y) => Math.hypot(N[i].x - x, N[i].y - y);
+  const b = N.map((n, i) => i).filter(i => N[i].zone === 'up').sort((u, v) => far(u, 700, 420) - far(v, 700, 420))[0];
+  const route = a => { const dist = N.map(() => Infinity), prev = N.map(() => -1), done = new Set(); dist[a] = 0;
+    while (true) { let u = -1; N.forEach((_, i) => { if (!done.has(i) && dist[i] < Infinity && (u < 0 || dist[i] < dist[u])) u = i; }); if (u < 0 || u === b) break; done.add(u);
+      adj[u].forEach(v => { const d = dist[u] + Math.hypot(N[v].x - N[u].x, N[v].y - N[u].y) + Math.max(0, N[v].y - N[u].y) * 30; if (d < dist[v]) { dist[v] = d; prev[v] = u; } }); }
+    const out = []; if (dist[b] < Infinity) for (let i = b; i >= 0; i = prev[i]) out.unshift(N[i]); return { out, cost: dist[b] + far(a, 560, 810) }; };
+  return N.map((n, i) => i).filter(i => N[i].s === 'gap' && N[i].y > 740 && far(i, 560, 810) < 300).map(route).sort((u, v) => u.cost - v.cost)[0].out;
+})();
 const STATUS = [['mastered', 'Mastered', 'learning complete', 'red'], ['needs', 'Needs more practice', 'check and reinforce understanding', 'mint'], ['gap', 'Learning gap', 'top priority: passed but not mastered', 'navy'], ['not', 'Not yet studied', 'a path not studied yet', 'midGrey']];
 const SM = () => ({ t0: st('l7_1', .1), tz: [Wc('l7_2', 'top', .15), Wc('l7_3', 'middle', .1), Wc('l7_3', 'bottom', .7)],
-  ts: { mastered: Wc('l7_4', 'mastered', .45), needs: Wc('l7_4', 'needs', .6), gap: Wc('l7_4', 'gap', .8), not: Wc('l7_4', 'not', .9) }, tSup: Wc('l7_4', 'gap', .8) + .6, tRec: Wc('l7_5', 'recommend', .75) });
+  ts: { mastered: Wc('l7_4', 'mastered', .45), needs: Wc('l7_4', 'needs', .6), gap: Wc('l7_4', 'gap', .8), not: Wc('l7_4', 'not', .9) }, tRec: Wc('l7_5', 'recommend', .75) });
 function drawStatusMap(t, { path = false } = {}) {
   const c = SM(), mk = p(t, c.t0, .5); if (mk <= 0 || SHARED_OFF) return c;
   card(MAP.x, MAP.y, MAP.w, MAP.h, { r: 8, a: mk });
@@ -662,11 +672,9 @@ function drawStatusMap(t, { path = false } = {}) {
     if (n.s === 'gap' && ck > 0) circle(n.x, n.y, (n.r + 7) * k, rgba(K.navy, .16 * ck));
     circle(n.x, n.y, n.r * k, ck > 0 ? col : K.lineGrey, '#FFFFFF', 1.5); if (ck > 0 && ck < 1) circle(n.x, n.y, n.r * k, rgba(K.lineGrey, 1 - ck)); });
   ctx.restore();
-  const gaps = N.filter(n => n.s === 'gap' && n.zone === 'low').slice(0, 3);
-  gaps.forEach((n, i) => penCircle(n.x, n.y, 26, 24, p(t, c.tSup + i * .25, .45), K.red, 4, 160 + i));
-  if (path) { const pk = p(t, c.tRec, 1.6), P = REC_PATH;
-    for (let i = 1; i < P.length; i++) { const k = clamp(pk * 3 - (i - 1)); if (k > 0) penArrow(P[i - 1].x, P[i - 1].y, P[i].x, P[i].y, k, K.blue, 6, 170 + i); }
-    text('next step', P[3].x + 22, P[3].y - 24, { size: 28, weight: 700, fam: HAND, color: K.blue, alpha: p(t, c.tRec + 1.4, .4) }); }
+  if (path) { const P = REC_PATH, n = P.length - 1, pk = p(t, c.tRec, .4 * n);
+    for (let i = 1; i < P.length; i++) { const k = clamp(pk * n - (i - 1)); if (k > 0) penArrow(P[i - 1].x, P[i - 1].y, P[i].x, P[i].y, k, K.blue, 5, 170 + i); }
+    text('next step', P[n].x + 22, P[n].y - 24, { size: 28, weight: 700, fam: HAND, color: K.blue, alpha: p(t, c.tRec + .4 * n - .2, .4) }); }
   text("Learner's active Knowledge Map (conceptual example)", MAP.x, MAP.y + MAP.h + 28, { size: 20, weight: 600, color: K.muted, alpha: mk });
   return c;
 }

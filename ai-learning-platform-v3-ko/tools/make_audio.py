@@ -12,7 +12,7 @@
   ref A B   cut audio/voice_ref.wav and voice_ref.txt from the recording, A–B seconds (a clean 15–30 s stretch of whole sentences)
 
 Writes timeline.js (scenes, and every line with its spoken words and their times: index.html keys pictures to them),
-audio/mix.wav (narration + a whoosh at each page turn + a ding before DING_BEFORE, no music) and subtitles.srt (never burned in).
+audio/mix.wav (narration + a whoosh at each page turn + a chime at CHIME_AT and before DING_BEFORE, no music) and subtitles.srt (never burned in).
 
   uv run --with numpy python tools/make_audio.py dry
   uv run --with numpy --with mlx-whisper python tools/make_audio.py tts
@@ -23,8 +23,11 @@ import numpy as np
 sys.dont_write_bytecode = True   # no __pycache__ next to script.py
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from script import LANGUAGE, SCENES, CONT, SCRIPT, CLONE, LEAD, GAP, SCENE_GAP, TAIL, DING_BEFORE
+import script
+TEMPO, CHIME_AT = getattr(script, 'TEMPO', 1.), getattr(script, 'CHIME_AT', None)
 
 SR = 48000
+TURN = 1.2                  # a page starts this long before its first line (its turn, index.html TR = 1.1 s, starts .15 s before that)
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
 AUD = os.path.join(ROOT, 'audio')
 CACHE = os.path.join(AUD, 'tts_cache')
@@ -223,7 +226,8 @@ def clips_tts(redo):
     out = {}
     for lid, c in pick.items():
         db = frames_db(c['y']); y = c['y'] * (.08 / np.sqrt(np.mean(10 ** (db[db > -40] / 10))))   # same loudness for every line
-        out[lid] = {'y': y, 'dur': len(y) / SR, 'words': spoken(c['tr']['words'], c['off'])}
+        if TEMPO != 1: y = atempo(y, TEMPO)
+        out[lid] = {'y': y, 'dur': len(y) / SR, 'words': spoken(c['tr']['words'], c['off'], TEMPO)}
     return out
 
 
@@ -295,7 +299,7 @@ def lay_out(clips):
     for lid in IDS:
         sc, sub, _, extra = LINE[lid]; c = clips[lid]
         if prev and sc != prev: t += SCENE_GAP
-        if sc not in scene_t: scene_t[sc] = 0 if not prev else t - .9   # the page turn lands just before its first line
+        if sc not in scene_t: scene_t[sc] = 0 if not prev else t - TURN   # the page turn (index.html TR) lands just before its first line
         lines[lid] = {'scene': sc, 'text': sub, 'start': round(t, 3), 'end': round(t + c['dur'], 3), 'words': [[w, round(t + s, 3)] for w, s in c['words']]}
         if c['y'] is not None: voice.append((t, c['y']))
         t += c['dur'] + GAP + extra; prev = sc
@@ -337,9 +341,14 @@ def lp(x, a):
     for i, v in enumerate(x): s += a * (v - s); y[i] = s
     return y
 def whoosh():
-    x = lp(np.random.default_rng(3).standard_normal(int(.55 * SR)), .07); e = np.sin(np.pi * np.linspace(0, 1, len(x)) ** .8) ** 2; return x * e * 1.4
-def ding():
-    tt = t_(.9); return sum(np.sin(2 * np.pi * 1318.5 * k * tt) / k ** 1.5 for k in (1, 2, 3)) * np.exp(-tt * 5) * .3
+    x = lp(np.random.default_rng(3).standard_normal(int(.75 * SR)), .06); e = np.sin(np.pi * np.linspace(0, 1, len(x)) ** .8) ** 2; return x * e * 1.4
+def chime():
+    """a bright rising C–E–G–C bell arpeggio (the single high ding sounded like a wrong-answer buzzer, review 1)"""
+    out = np.zeros(int(1.6 * SR))
+    for i, f in enumerate((1046.5, 1318.5, 1568.0, 2093.0)):
+        tt = t_(1.6 - i * .09); y = (np.sin(2 * np.pi * f * tt) + .25 * np.sin(2 * np.pi * 2 * f * tt) * np.exp(-tt * 6)) * np.exp(-tt * (3.2 if i == 3 else 5.5))
+        y[:int(.004 * SR)] *= np.linspace(0, 1, int(.004 * SR)); place(out, i * .09, y * (.22 if i < 3 else .3))
+    return out
 def place(buf, t, x, g=1.):
     i = int(t * SR); n = min(len(x), len(buf) - i)
     if n > 0 and i >= 0: buf[i:i + n] += x[:n] * g
@@ -351,7 +360,8 @@ def mix(scenes, lines, voice, dur):
     nar *= .9 / (np.abs(nar).max() + 1e-9)
     for s in scenes[1:]:   # the page slides sideways at the same time (index.html draw); CONT pages do not turn
         if s['id'] not in CONT: place(fx, s['start'] - .15, whoosh(), .3)
-    if DING_BEFORE: place(fx, lines[DING_BEFORE]['start'] - .3, ding(), .35)
+    if CHIME_AT is not None: place(fx, CHIME_AT, chime(), .4)
+    if DING_BEFORE: place(fx, lines[DING_BEFORE]['start'] - .55, chime(), .4)
     m = np.tanh((nar + fx) * 1.1) / 1.1
     write_wav(os.path.join(AUD, 'mix.wav'), m / (np.abs(m).max() + 1e-9) * .89, stereo=True)
 

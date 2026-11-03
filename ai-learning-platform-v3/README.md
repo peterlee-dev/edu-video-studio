@@ -13,7 +13,7 @@
   - 네이비 #0F2F57은 부정·오답·하락에만 (학습 결손, 오답 ✗). 그 밖의 어두운 칩·띠는 텍스트색 #383838
   - 덜 중요한 박스는 밝은 그레이 #F3F4F6, 배경은 중립 화이트 #FEFFFF, 형광펜은 블러시 #FDDCD6(곱하기로 칠해 글자가 비침), 포스트잇도 그레이
   - 작은 빨간 글자는 크림슨 #B81F2E, 흰 글씨 민트 칩은 민트 다크 #1E9C8A. 3계층 그림은 레드 한 가지 색의 진하기(블러시 → 라이트 레드 → 레드)로
-- 1920×1080, 30fps. 글꼴은 macOS 시스템 글꼴 Avenir Next(본문)·Noteworthy(손글씨). 배경음악 없음 (내레이션 + 장면 전환 휙 소리, 끝인사 딩)
+- 1920×1080, 30fps. 글꼴은 macOS 시스템 글꼴 Avenir Next(본문)·Noteworthy(손글씨). 배경음악 없음 (내레이션 + 장면 전환 휙 소리, 끝인사 앞의 올라가는 차임 — 한국어판과 같은 소리)
 - 화면에 자막은 넣지 않아요 (내레이션만)
 
 | p. | 장면 | 문장 | 구성 |
@@ -37,7 +37,7 @@
 | 17 | behavior | l6_6–7 | 문제 푸는 화면(시간·힌트·재시도)과 학습행동 4가지 |
 | 18 | loop | l6_8 | 온라인 4단계와 복습·추가 연습·심화 |
 | 19 | assistant | l6_9 | 학생(답 대신 힌트·설명), 교사(학생별 정보 → 더 효과적인 지도) |
-| 20 | statusMap · statuses · recommend | l7_1–6 | 한 장에서 왼쪽 지식맵은 그대로, 오른쪽만 바뀜(쪽 넘김·휙 소리 없음): 3구역 → 4가지 상태 → 다음 단계 추천·기준 포스트잇 |
+| 20 | statusMap · statuses · recommend | l7_1–6 | 한 장에서 왼쪽 지식맵은 그대로, 오른쪽만 바뀜(쪽 넘김·휙 소리 없음): 3구역 → 4가지 상태 → 다음 단계 추천(학습 결손에서 지도의 선을 따라 한 칸씩 올라가는 파란 화살표)·기준 포스트잇 |
 | 21–24 | ben1–4 | l8_1–5 | 기대효과 한 쪽에 하나(1 2 3 4 진행 점) |
 | 25 | roadmap · roadmapPhases | l9_1–3 | 한 장에서 위쪽 분기 띠는 그대로(Phase 2 화살표가 이어서 나옴), 아래쪽만 바뀜 |
 | | roadmap | l9_1–2 | 분기 띠의 Phase 1 화살표, 지식맵·콘텐츠 생성·POD 시범(미국 → 한국) |
@@ -69,6 +69,6 @@ npm install
 node tools/snap.mjs out/snaps --ends            # 장면마다 다 그려진 때의 정지 화면 + 못 찾은 큐 단어
 export CHROMIUM="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"   # macOS
 export FFMPEG=../math-di-improvement-v2/node_modules/ffmpeg-static/ffmpeg         # PATH 에 ffmpeg 가 없으면
-node render.mjs --workers 6                      # out/ai_learning_platform_v3.mp4 (브라우저 6개가 나눠 그려요)
-node render.mjs --workers 6 --only 99-115,217-end   # 고친 구간(초)만 다시 그리고 나머지는 기존 영상에서 가져와요
+node render.mjs --workers 3                      # out/ai_learning_platform_v3.mp4 (GPU 렌더, 브라우저 3개가 나눠 그려요. GPU 가 없으면 --cpu --workers 6)
+node render.mjs --workers 3 --only 99-115,217-end   # 고친 구간(초)만 다시 그리고 나머지는 기존 영상에서 가져와요
 ```

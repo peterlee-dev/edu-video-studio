@@ -8,7 +8,7 @@
   re-reads that line (--redo l3_2,l6_4 reads those again)
 - Lines are placed with GAP between lines and SCENE_GAP between pages. Writes ../timeline.js (with each line's
   spoken words and their times, so index.html can key pictures to words) and audio/mix.wav (narration + page-turn
-  whoosh + a ding before the thank-you, no music)
+  whoosh + a rising chime before the thank-you, no music)
 
   export FFMPEG=../math-di-improvement-v2/node_modules/ffmpeg-static/ffmpeg   # or any ffmpeg (also needed on PATH by whisper)
   uv run --with mlx-whisper python tools/make_audio.py
@@ -226,8 +226,13 @@ def whoosh():
     x = lp(np.random.default_rng(3).standard_normal(int(.55 * SR)), .07); e = np.sin(np.pi * np.linspace(0, 1, len(x)) ** .8) ** 2; return x * e * 1.4
 def tick():
     tt = t_(.06); return np.sin(2 * np.pi * 1700 * tt) * np.exp(-tt * 70) * .5
-def ding():
-    tt = t_(.9); return sum(np.sin(2 * np.pi * 1318.5 * k * tt) / k ** 1.5 for k in (1, 2, 3)) * np.exp(-tt * 5) * .3
+def chime():
+    """a bright rising C–E–G–C bell arpeggio (the single high ding sounded like a wrong-answer buzzer, review 10/30; same as ../ai-learning-platform-v3-ko)"""
+    out = np.zeros(int(1.6 * SR))
+    for i, f in enumerate((1046.5, 1318.5, 1568.0, 2093.0)):
+        tt = t_(1.6 - i * .09); y = (np.sin(2 * np.pi * f * tt) + .25 * np.sin(2 * np.pi * 2 * f * tt) * np.exp(-tt * 6)) * np.exp(-tt * (3.2 if i == 3 else 5.5))
+        y[:int(.004 * SR)] *= np.linspace(0, 1, int(.004 * SR)); place(out, i * .09, y * (.22 if i < 3 else .3))
+    return out
 def place(buf, t, x, g=1.):
     i = int(t * SR); n = min(len(x), len(buf) - i)
     if n > 0 and i >= 0: buf[i:i + n] += x[:n] * g
@@ -263,7 +268,7 @@ def main():
     for s0, y in voice: place(nar, s0, y)
     for s in scenes[1:]:   # the page slides sideways at the same time (index.html); pages that carry on the same sheet (CONT) do not turn
         if s['id'] not in CONT: place(fx, s['start'] - .15, whoosh(), .3)
-    place(fx, lines['l10_2']['start'] - .3, ding(), .35)
+    place(fx, lines['l10_2']['start'] - .55, chime(), .4)
     mix = nar + fx
     mix = np.tanh(mix * 1.1) / 1.1
     mix = mix / (np.abs(mix).max() + 1e-9) * .89

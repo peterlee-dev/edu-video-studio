@@ -18,11 +18,11 @@ SCENES = [('title', '제목'), ('vision', '비전'),
 # scenes that continue the page before on the same sheet: no page turn and no whoosh (index.html SHARED draws the part that stays)
 CONT = {'statuses', 'recommend', 'roadmapPhases'}
 
-# read forms: English names said the Korean way, numbers in words (the screen keeps the written form)
-KM = '날리지 맵'
+# read forms: English names said the Korean way, numbers in words (the screen keeps the written form).
+# "Knowledge" stays in English: read as 날리지 it sounded like Konglish (review 1). A take whisper writes as 날리지 counts as a misread
 def R(s):
-    for a, b in [('JEI-Math Knowledge Map', f'제이이아이 매스 {KM}'), ('Knowledge Map', KM), ('Knowledge Layer', '날리지 레이어'),
-                 ('AI Engine Layer', '에이아이 엔진 레이어'), ('Service Layer', '서비스 레이어'), ('Knowledge, AI Engine, Service', '날리지, 에이아이 엔진, 서비스'),
+    for a, b in [('JEI-Math', '제이이아이 매스'), ('Knowledge, AI Engine, Service', 'Knowledge, 에이아이 엔진, 서비스'),
+                 ('AI Engine Layer', '에이아이 엔진 레이어'), ('Service Layer', '서비스 레이어'),
                  ('AI Learning Assistant', '에이아이 러닝 어시스턴트'), ('LLM Wiki', '엘엘엠 위키'), ('POD', '피오디'), ('JEI-SLI', '제이이아이 에스엘아이'),
                  ('50년', '오십 년'), ('18 이하', '십팔 이하'), ('7개', '일곱 개'),
                  ('2026년 4분기', '이천이십육 년 사 분기'), ('2027년', '이천이십칠 년'), ('2028년', '이천이십팔 년'), ('비교·분석', '비교 분석')]:
@@ -52,7 +52,7 @@ _SCRIPT = [
     ('l4_4', 'layerS', '마지막으로 Service Layer는 이러한 기능을 기존 학습지와 개인 맞춤형 POD, 온라인 학습, 교사 지원도구 등의 실제 서비스로 구현합니다.', .2),
     ('l4_5', 'layerS', '학생의 학습 결과는 다시 시스템에 반영되어 다음에 무엇을 학습할지 결정하는 데 활용됩니다.', 0),
 
-    ('l5_1', 'phases', '서로 연계된 7개 프로젝트는 크게 두 단계에 걸쳐 추진됩니다.', 0),
+    ('l5_1', 'phases', '서로 연계된 7개 프로젝트는 크게 두 단계에 걸쳐 추진됩니다.', 1.4),   # the bars grow on its last word: time to read them
     ('l5_2', 'phase1', '1단계에서는 Knowledge Map 구축과 학습 콘텐츠 자동 생성, 개인 맞춤형 POD에 집중합니다.', .1),
     ('l5_3', 'phase1', '이를 통해 진단 결과가 학습 처방과 후속 연습으로 연결되는 학습체계를 구현하고 검증합니다.', 0),
     ('l5_4', 'phase2', '2단계에서는 학습 진행 상황 분석과 적응형 학습경로, AI Learning Assistant를 결합하여 온라인 개인 맞춤형 학습으로 확장합니다.', 0),
@@ -89,12 +89,34 @@ _SCRIPT = [
     ('l10_2', 'outro', '감사합니다.', 0),
 ]
 # the four statuses are said in Korean only (the English names in brackets are on screen)
-READ = {'l7_3': '각 학습목표는 숙달, 추가 연습 필요, 학습 결손, 미학습의 네 가지 상태로 구분됩니다.'}
-SCRIPT = [(lid, sc, s, READ.get(lid) or (R(s) if R(s) != s else None), x) for lid, sc, s, x in _SCRIPT]
+READ = {'l7_3': '각 학습목표는, 숙달, 추가 연습 필요, 학습 결손, 미학습의, 네 가지 상태로 구분됩니다.'}
+# breaths: a comma after these words in the read form, so the voice pauses between phrases instead of running the words together (review 1)
+BREATH = {
+    'l1_1': ['프로젝트는'], 'l1_2': ['재능교육은'], 'l1_3': ['교육자료를', '학습을'],
+    'l2_1': ['것이'], 'l2_2': ['Map은', '맺고'], 'l2_3': ['시작해'], 'l2_4': ['학습목표에는'],
+    'l3_1': ['Map은'], 'l3_2': ['위해', '교육철학을'], 'l3_3': ['바탕으로'], 'l3_4': ['연구원은'], 'l3_5': ['Map을', '콘텐츠를'],
+    'l4_1': ['플랫폼은'], 'l4_2': ['먼저', 'Layer는', '정리하여'], 'l4_3': ['Layer는', '활용해'], 'l4_4': ['마지막으로', 'Layer는'], 'l4_5': ['결과는'],
+    'l5_1': ['프로젝트는'], 'l5_2': ['1단계에서는'], 'l5_3': ['통해'], 'l5_4': ['2단계에서는', '결합하여'], 'l5_5': ['함께', '구축하여'],
+    'l6_1': ['서비스는'], 'l6_2': ['먼저', '분석하여'], 'l6_3': ['바탕으로', '거쳐'], 'l6_4': ['이후'], 'l6_5': ['2단계에서는'],
+    'l6_6': ['온라인에서는', '아니라'], 'l6_7': ['AI는', '활용해'], 'l6_8': ['또한', 'Assistant는', '제공해'], 'l6_9': ['역시', '활용하여'],
+    'l7_1': ['화면은', '통해'], 'l7_4': ['AI는', '통해'], 'l7_5': ['기준은', '활용하여'],
+    'l8_1': ['통해'], 'l8_2': ['콘텐츠를'], 'l8_3': ['통해'], 'l8_4': ['조정하여'], 'l8_5': ['살펴봄으로써'],
+    'l9_1': ['1단계는'], 'l9_2': ['기간에는', '후'], 'l9_3': ['통합한'], 'l9_4': ['과정에서'], 'l10_1': ['재능교육은'],
+}
+def breathe(lid, s):
+    for w in BREATH.get(lid, []):
+        assert w + ' ' in s, f'{lid}: no "{w} " to breathe after'
+        s = s.replace(w + ' ', w + ', ', 1)
+    return s
+SCRIPT = [(lid, sc, s, READ.get(lid) or (lambda r: r if r != s else None)(R(breathe(lid, s))), x) for lid, sc, s, x in _SCRIPT]
 
 # take mode only: lines reworded after the recording. They are read by a clone of the recorded voice (audio/voice_ref.wav)
 # instead of being cut from the recording
 CLONE = set()
 
-LEAD, GAP, SCENE_GAP, TAIL = 2.6, .45, 1.0, 2.4   # s before the first line, between lines, extra between pages, after the last line
-DING_BEFORE = 'l10_2'   # a soft ding just before this line (the thank-you); None for no ding
+# review 1: the voice came in late on a silent title page, and pages turned too soon after their last word → a chime at the start,
+# the first line sooner, longer breaks between lines and pages. The voice keeps its own pace (asked for pauses, not a slower read)
+LEAD, GAP, SCENE_GAP, TAIL = 1.3, .6, 1.8, 2.4   # s before the first line, between lines, extra between pages, after the last line
+TEMPO = 1.              # tts mode: 1 = as read. Only change it when asked
+CHIME_AT = .25          # a bright chime at this time on the title page; None for none
+DING_BEFORE = 'l10_2'   # the same chime just before this line (the thank-you); None for none
