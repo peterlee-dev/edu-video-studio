@@ -1,0 +1,821 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>JEI English Online Adaptive Assessment</title>
+<style>
+  html, body { margin: 0; background: #0E1424; }
+  body { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 12px; font-family: 'Avenir Next', sans-serif; color: #ddd; }
+  canvas { width: min(100%, 1280px); aspect-ratio: 16 / 9; display: block; background: #FEFFFF; }
+  .bar { display: flex; gap: 12px; align-items: center; width: min(100%, 1280px); }
+  .bar input { flex: 1; }
+  body.render { padding: 0; gap: 0; }
+  body.render canvas { width: 1920px; height: 1080px; }
+  body.render .bar { display: none; }
+</style>
+</head>
+<body>
+<script src="timeline.js"></script>
+<script src="content.js"></script>
+<script src="schema.js"></script>
+<canvas id="c" width="1920" height="1080"></canvas>
+<div class="bar">
+  <button id="play">▶ Play</button>
+  <input id="seek" type="range" min="0" max="300" step="0.01" value="0">
+  <span id="time">0.00s</span>
+</div>
+<script>
+// ------------------------------------------------------------
+// Graph-paper workbook video. One continuous sheet of graph paper; each scene is a workbook page. The camera slides
+// sideways between pages (in time with the whoosh in the mix) and stays still while the page is read.
+// Teacher's-pen marks: circles, checks, crosses, boxes, arrows, underlines, highlighter, sticky notes, stamps.
+// Timing: timeline.js, written by tools/make_audio.py from the narration. Pictures follow spoken words
+// (Wc(line, word) looks the word up in TL.lines[line].words). draw(t) is a pure function of time.
+// ------------------------------------------------------------
+const W = 1920, H = 1080, TL = window.TL, DURATION = TL.duration;
+const cv = document.getElementById('c'), ctx = cv.getContext('2d');
+const DEFAULT_CONTENT = JSON.parse(JSON.stringify(window.CONTENT));
+let C = window.CONTENT, K = C.colors;
+const SANS = "'Avenir Next', 'Helvetica Neue', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif";
+const HAND = "'Noteworthy', 'Bradley Hand', 'Marker Felt', cursive";
+const LINE = '#E2E4E8';   // card outline (neutral)
+
+// ---------- basics ----------
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const lerp = (a, b, k) => a + (b - a) * k;
+const p = (t, s, d) => clamp((t - s) / d);
+const eOut = x => 1 - Math.pow(1 - x, 3), eIO = x => x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+const eBack = x => { const c1 = 1.7, c3 = c1 + 1; return x <= 0 ? 0 : 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2); };
+const nz = (i, s = 1) => { const v = Math.sin(i * 12.9898 + s * 78.233) * 43758.5453; return v - Math.floor(v) - .5; };   // fixed jitter (no flicker)
+function rgba(hex, a) { const n = parseInt(hex.slice(1), 16); return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`; }
+const L = id => TL.lines[id] || { start: 0, end: 0, words: [] };
+const S = id => TL.scenes.find(s => s.id === id) || { start: 0, end: 0 };
+const st = (id, f = 0) => L(id).start + (L(id).end - L(id).start) * f;   // f: 0 = start of the narration line, 1 = end
+const en = (id, d = 0) => L(id).end + d;
+// time a word is spoken in a line (one of several spellings, the nth time it occurs); falls back to a fraction of the line
+const norm = s => String(s).toLowerCase().replace(/[^a-z0-9]/g, '');
+const MISS = window.CUE_MISS = new Set();
+function Wd(id, words, f = 0, nth = 1) {
+  const want = (Array.isArray(words) ? words : [words]).map(norm); let n = 0;
+  for (const [w, s] of L(id).words || []) if (want.includes(norm(w)) && ++n === nth) return s;
+  MISS.add(`${id}:${want.join('|')}`); return st(id, f);
+}
+const cueCache = {};
+const Wc = (id, words, f, nth) => { const k = id + '|' + words + '|' + nth; return k in cueCache ? cueCache[k] : (cueCache[k] = Wd(id, words, f, nth)); };
+
+// ---------- shapes and text ----------
+function rr(x, y, w, h, r, fill, stroke, lw = 2, a = 1) { if (a <= 0) return; ctx.save(); ctx.globalAlpha *= a; ctx.beginPath(); ctx.roundRect(x, y, w, h, r); if (fill) { ctx.fillStyle = fill; ctx.fill(); } if (stroke) { ctx.lineWidth = lw; ctx.strokeStyle = stroke; ctx.stroke(); } ctx.restore(); }
+function circle(x, y, r, fill, stroke, lw = 3, a = 1) { if (r <= 0 || a <= 0) return; ctx.save(); ctx.globalAlpha *= a; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); if (fill) { ctx.fillStyle = fill; ctx.fill(); } if (stroke) { ctx.lineWidth = lw; ctx.strokeStyle = stroke; ctx.stroke(); } ctx.restore(); }
+function line0(x1, y1, x2, y2, c, lw = 3, dash) { ctx.save(); ctx.strokeStyle = c; ctx.lineWidth = lw; if (dash) ctx.setLineDash(dash); ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke(); ctx.restore(); }
+function card(x, y, w, h, { fill = '#FFFFFF', stroke = LINE, r = 16, a = 1, shadow = true, lw = 2 } = {}) {
+  if (a <= 0) return; ctx.save(); ctx.globalAlpha *= a;
+  if (shadow) { ctx.shadowColor = 'rgba(30,30,30,.08)'; ctx.shadowBlur = 22; ctx.shadowOffsetY = 8; }
+  ctx.beginPath(); ctx.roundRect(x, y, w, h, r); ctx.fillStyle = fill; ctx.fill(); ctx.shadowColor = 'transparent';
+  if (stroke) { ctx.lineWidth = lw; ctx.strokeStyle = stroke; ctx.stroke(); } ctx.restore();
+}
+function measure(str, size, weight = 600, fam = SANS) { ctx.save(); ctx.font = `${weight} ${size}px ${fam}`; const w = ctx.measureText(str).width; ctx.restore(); return w; }
+function text(str, x, y, { size = 36, weight = 600, fam = SANS, color = K.ink, align = 'left', alpha = 1, maxW, spacing = 0 } = {}) {
+  if (alpha <= 0 || !str) return; ctx.save(); ctx.globalAlpha *= alpha;
+  let sz = size; if (maxW) { const w = measure(str, size, weight, fam) + spacing * str.length; if (w > maxW) sz = size * maxW / w; }
+  ctx.font = `${weight} ${sz}px ${fam}`; ctx.textAlign = align; ctx.textBaseline = 'middle'; ctx.fillStyle = color;
+  if (spacing) ctx.letterSpacing = spacing + 'px';
+  ctx.fillText(str, x, y); ctx.restore();
+}
+// word-wrapped paragraph; returns the number of lines
+function wrapLines(str, maxW, size, weight) {
+  const out = []; let cur = '';
+  for (const w of str.split(' ')) { const nxt = cur ? cur + ' ' + w : w; if (cur && measure(nxt, size, weight) > maxW) { out.push(cur); cur = w; } else cur = nxt; }
+  if (cur) out.push(cur); return out;
+}
+function para(str, x, y, maxW, { size = 22, weight = 500, color = K.ink, lh = 1.32, alpha = 1, align = 'left' } = {}) {
+  const ls = wrapLines(str, maxW, size, weight); ls.forEach((l, i) => text(l, x, y + i * size * lh, { size, weight, color, alpha, align })); return ls.length;
+}
+// entrance: fade + rise (+ optional pop around ox, oy). Moves only while entering, then stays put
+function enter(t, t0, fn, { d = .55, dy = 26, dx = 0, pop = false, ox = 960, oy = 540 } = {}) {
+  const k = p(t, t0, d); if (k <= 0) return 0;
+  ctx.save(); ctx.globalAlpha *= clamp(k * 1.5);
+  if (pop) { const s = lerp(.5, 1, eBack(k)); ctx.translate(ox, oy); ctx.scale(s, s); ctx.translate(-ox, -oy); }
+  else ctx.translate((1 - eOut(k)) * dx, (1 - eOut(k)) * dy);
+  fn(k); ctx.restore(); return k;
+}
+
+// ---------- teacher's pen ----------
+function strokePts(pts, k, color, lw = 5, a = 1, dash) {
+  if (k <= 0 || a <= 0 || pts.length < 2) return;
+  let tot = 0; const seg = []; for (let i = 1; i < pts.length; i++) { const d = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); seg.push(d); tot += d; }
+  let left = tot * clamp(k);
+  ctx.save(); ctx.globalAlpha *= a; ctx.strokeStyle = color; ctx.lineWidth = lw; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; if (dash) ctx.setLineDash(dash);
+  ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]);
+  for (let i = 1; i < pts.length && left > 0; i++) { const f = Math.min(1, left / seg[i - 1]); ctx.lineTo(lerp(pts[i - 1][0], pts[i][0], f), lerp(pts[i - 1][1], pts[i][1], f)); left -= seg[i - 1]; }
+  ctx.stroke(); ctx.restore();
+}
+function wobble(x1, y1, x2, y2, seed = 1, amp = 1.6, n = 14) {
+  const dx = x2 - x1, dy = y2 - y1, len = Math.hypot(dx, dy) || 1, nx = -dy / len, ny = dx / len, pts = [];
+  for (let i = 0; i <= n; i++) { const f = i / n, j = (i === 0 || i === n) ? 0 : nz(i, seed) * amp * 2; pts.push([x1 + dx * f + nx * j, y1 + dy * f + ny * j]); }
+  return pts;
+}
+const pen = (x1, y1, x2, y2, k, c = K.red, lw = 5, seed = 1, a = 1, dash) => strokePts(wobble(x1, y1, x2, y2, seed), k, c, lw, a, dash);
+function penCircle(cx, cy, rx, ry, k, c = K.red, lw = 5, seed = 1, a = 1) {
+  const pts = [], a0 = -2.3 + nz(1, seed) * .4, n = 56;
+  for (let i = 0; i <= n; i++) { const ang = a0 + (i / n) * Math.PI * 2.12, r = 1 + nz(i, seed) * .05 + (i / n) * .06; pts.push([cx + Math.cos(ang) * rx * r, cy + Math.sin(ang) * ry * r]); }
+  strokePts(pts, k, c, lw, a);
+}
+function arrowHead(x2, y2, ang, hk, c, lw, a = 1, s = 16 + lw) {
+  if (hk <= 0) return;
+  pen(x2, y2, x2 - Math.cos(ang - .5) * s, y2 - Math.sin(ang - .5) * s, hk, c, lw, 3, a);
+  pen(x2, y2, x2 - Math.cos(ang + .5) * s, y2 - Math.sin(ang + .5) * s, hk, c, lw, 5, a);
+}
+function penArrow(x1, y1, x2, y2, k, c = K.red, lw = 5, seed = 1, a = 1, dash) {
+  pen(x1, y1, x2, y2, clamp(k / .8), c, lw, seed, a, dash);
+  arrowHead(x2, y2, Math.atan2(y2 - y1, x2 - x1), clamp((k - .75) / .25), c, lw, a);
+}
+function penCurve(x1, y1, cx, cy, x2, y2, k, c = K.red, lw = 5, a = 1, arrow = false) {
+  const pts = []; for (let i = 0; i <= 30; i++) { const f = i / 30; pts.push([(1 - f) * (1 - f) * x1 + 2 * (1 - f) * f * cx + f * f * x2, (1 - f) * (1 - f) * y1 + 2 * (1 - f) * f * cy + f * f * y2]); }
+  strokePts(pts, arrow ? clamp(k / .85) : k, c, lw, a);
+  if (arrow) arrowHead(x2, y2, Math.atan2(y2 - cy, x2 - cx), clamp((k - .8) / .2), c, lw, a);
+}
+function check(x, y, s, k, c = K.red, lw = 7) { strokePts([[x - s * .5, y], [x - s * .12, y + s * .38], [x + s * .55, y - s * .45]], k, c, lw); }
+function crossMark(x, y, s, k, c = K.navy, lw = 6) { pen(x - s / 2, y - s / 2, x + s / 2, y + s / 2, clamp(k * 2), c, lw, 2); pen(x + s / 2, y - s / 2, x - s / 2, y + s / 2, clamp(k * 2 - 1), c, lw, 4); }
+function hiLite(x, y, w, h, k, c = K.blush) { if (k <= 0) return; const e = eOut(k); ctx.save(); ctx.globalCompositeOperation = 'multiply'; ctx.fillStyle = c;   // multiply: text under the marker stays readable
+  ctx.beginPath(); ctx.moveTo(x, y + 4); ctx.lineTo(x + w * e, y); ctx.lineTo(x + w * e - 6, y + h); ctx.lineTo(x - 4, y + h - 3); ctx.closePath(); ctx.fill(); ctx.restore(); }
+function hbox(x, y, w, h, k, c = K.red, lw = 4, seed = 3) { strokePts([...wobble(x, y, x + w, y, seed, 1), ...wobble(x + w, y, x + w, y + h, seed + 1, 1).slice(1), ...wobble(x + w, y + h, x, y + h, seed + 2, 1).slice(1), ...wobble(x, y + h, x, y, seed + 3, 1).slice(1)], k, c, lw); }
+function sticky(x, y, w, h, rot, k, lines, { size = 32, color = K.ink } = {}) {
+  if (k <= 0) return; const s = lerp(.6, 1, eBack(k));
+  ctx.save(); ctx.globalAlpha *= clamp(k * 2); ctx.translate(x + w / 2, y + h / 2); ctx.rotate(rot); ctx.scale(s, s);
+  ctx.shadowColor = 'rgba(30,30,30,.14)'; ctx.shadowBlur = 16; ctx.shadowOffsetY = 8; ctx.fillStyle = K.lightBox; ctx.fillRect(-w / 2, -h / 2, w, h); ctx.shadowColor = 'transparent';
+  ctx.fillStyle = rgba(K.lineGrey, .45); ctx.fillRect(-w / 2, -h / 2, w, 26);
+  lines.forEach((l, i) => text(l, 0, (i - (lines.length - 1) / 2) * size * 1.25 + 8, { size, weight: 700, fam: HAND, color, align: 'center', maxW: w - 30 }));
+  ctx.restore();
+}
+// rectangular rubber stamp, lands from a bigger size
+function stamp(str, x, y, k, c = K.red, rot = -.08, size = 34) {
+  if (k <= 0) return; const s = lerp(1.8, 1, eOut(k)), w = measure(str, size, 800) + 2 * str.length + 60;
+  ctx.save(); ctx.globalAlpha *= clamp(k * 3) * .92; ctx.translate(x, y); ctx.rotate(rot); ctx.scale(s, s);
+  ctx.strokeStyle = c; ctx.lineWidth = 6; ctx.strokeRect(-w / 2, -size, w, size * 2); ctx.lineWidth = 2.5; ctx.strokeRect(-w / 2 + 8, -size + 8, w - 16, size * 2 - 16);
+  text(str, 0, 2, { size, weight: 800, color: c, align: 'center', spacing: 2 }); ctx.restore();
+}
+
+// ---------- workbook parts ----------
+// pill label; returns its width. White underneath: tinted labels never show the grid
+function chip(str, x, y, { size = 22, fill = K.red, color = '#FFFFFF', a = 1, pad = 16, weight = 700, spacing = 1.5, align = 'left' } = {}) {
+  if (a <= 0) return 0; const w = measure(str, size, weight) + spacing * str.length + pad * 2, h = size * 1.8, x0 = align === 'center' ? x - w / 2 : x;
+  rr(x0, y - h / 2, w, h, h / 2, '#FFFFFF', null, 0, a); rr(x0, y - h / 2, w, h, h / 2, fill, null, 0, a); text(str, x0 + pad, y + 1, { size, weight, color, alpha: a, spacing }); return w;
+}
+// numbered circle (1 2 3 of a comparison: red, blue, mint)
+function num(n, x, y, col, { r = 26, a = 1 } = {}) { if (a <= 0) return; circle(x, y, r, '#FFFFFF', null, 0, a); circle(x, y, r, col, null, 0, a); text(String(n), x, y + 1, { size: r * 1.1, weight: 800, color: '#FFFFFF', align: 'center', alpha: a }); }
+// a sheet of paper with grey text lines
+function sheet(x, y, w, h, rot = 0, a = 1, lines = 5) {
+  if (a <= 0) return; ctx.save(); ctx.globalAlpha *= a; ctx.translate(x, y); ctx.rotate(rot);
+  ctx.shadowColor = 'rgba(30,30,30,.10)'; ctx.shadowBlur = 12; ctx.shadowOffsetY = 5; ctx.fillStyle = '#FFFFFF'; ctx.fillRect(-w / 2, -h / 2, w, h); ctx.shadowColor = 'transparent';
+  ctx.strokeStyle = LINE; ctx.lineWidth = 2; ctx.strokeRect(-w / 2, -h / 2, w, h);
+  ctx.strokeStyle = rgba(K.lineGrey, .7); ctx.lineWidth = 4; for (let i = 0; i < lines; i++) { const yy = -h / 2 + h * .2 + i * h * .7 / lines; ctx.beginPath(); ctx.moveTo(-w / 2 + w * .14, yy); ctx.lineTo(w / 2 - w * (i % 2 ? .3 : .14), yy); ctx.stroke(); }
+  ctx.restore();
+}
+// vertical gauge: v = 0..1 filled, ↑ or ↓ beside the top
+function meter(x, y, h, v, col, label, sub, a, up) {
+  if (a <= 0) return; ctx.save(); ctx.globalAlpha *= a;
+  rr(x - 44, y - h, 88, h, 12, '#FFFFFF', LINE, 2); rr(x - 32, y - 12 - (h - 24) * v, 64, (h - 24) * v, 8, col);
+  text(label, x, y + 40, { size: 28, weight: 700, align: 'center', maxW: 240 }); text(sub, x, y + 76, { size: 21, weight: 500, color: K.muted, align: 'center', maxW: 250 });
+  text(up ? '↑' : '↓', x + 72, y - 12 - (h - 24) * v, { size: 44, weight: 800, color: col, align: 'center' });
+  ctx.restore();
+}
+// a checked list row: red check + text
+function checkRow(t, t0, x, y, str, { size = 30, w = 1300, col = K.red } = {}) {
+  enter(t, t0, () => text(str, x + 50, y, { size, weight: 700, maxW: w }), { dx: 20, dy: 0 });
+  check(x + 14, y + 2, 30, p(t, t0 + .25, .3), col, 5);
+}
+// dark statement bar across the page (a closing line)
+function bar(str, y, a, { x = 210, w = 1590, h = 84, size = 28 } = {}) {
+  if (a <= 0) return; rr(x, y, w, h, 14, K.ink, null, 0, a); text(str, x + 36, y + h / 2 + 1, { size, weight: 700, color: '#FFFFFF', alpha: a, maxW: w - 72 });
+}
+// speech bubble (tail at the top left), drawn at the current origin: left edge x = 0, middle y = 0
+function bubble(w, fill) {
+  const r = 36, y0 = -36;
+  ctx.save(); ctx.beginPath(); ctx.moveTo(r, y0); ctx.lineTo(42, y0); ctx.lineTo(88, y0 - 24); ctx.lineTo(70, y0); ctx.lineTo(w - r, y0); ctx.arc(w - r, 0, r, -Math.PI / 2, Math.PI / 2);
+  ctx.lineTo(r, -y0); ctx.arc(r, 0, r, Math.PI / 2, Math.PI * 3 / 2); ctx.closePath();
+  ctx.fillStyle = '#FFFFFF'; ctx.fill(); ctx.fillStyle = fill; ctx.fill(); ctx.restore();
+}
+
+// ---------- page furniture ----------
+function paper(cam) {
+  ctx.fillStyle = K.paper; ctx.fillRect(0, 0, W, H);
+  const minor = ((cam % 40) + 40) % 40, major = ((cam % 200) + 200) % 200;
+  [[40, minor, K.grid], [200, major, K.gridMajor]].forEach(([step, off, col]) => {
+    ctx.lineWidth = 1; ctx.strokeStyle = col; ctx.beginPath();
+    for (let x = -off; x <= W; x += step) { ctx.moveTo(Math.round(x) + .5, 0); ctx.lineTo(Math.round(x) + .5, H); }
+    for (let y = 0; y <= H; y += step) { ctx.moveTo(0, y + .5); ctx.lineTo(W, y + .5); }
+    ctx.stroke();
+  });
+}
+function pageFurniture(i) {
+  ctx.save(); ctx.strokeStyle = K.margin; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(150, 0); ctx.lineTo(150, H); ctx.stroke(); ctx.restore();
+  text(`p. ${i + 1}`, 1800, 92, { size: 26, weight: 700, fam: HAND, color: K.muted, align: 'right' });
+}
+// section tab (always red) + title (top-left). Slides in once, then stays still
+function header(t, t0, tab, title) {
+  const k1 = eOut(p(t, t0, .5)), k2 = eOut(p(t, t0 + .15, .6));
+  if (k1 > 0 && !SHARED_OFF) { ctx.save(); ctx.translate((1 - k1) * -30, 0); chip(tab, 210, 92, { size: 18, fill: K.red, a: k1, spacing: 2.5 }); ctx.restore(); }
+  if (k2 > 0) { ctx.save(); ctx.translate((1 - k2) * -30, 0); text(title, 210, 160, { size: 54, weight: 700, alpha: k2, maxW: 1560 }); ctx.restore(); }
+}
+const H0 = id => S(id).start + .15;   // header time for a scene
+const subline = (t, id, str, d = .45) => text(str, 210, 228, { size: 26, weight: 500, color: K.muted, alpha: p(t, H0(id) + d, .5), maxW: 1590 });
+
+// ---------- shared pictures ----------
+// small line icons (s ≈ half size)
+function icon(kind, x, y, s, c, a = 1) {
+  if (a <= 0) return; ctx.save(); ctx.globalAlpha *= a; ctx.strokeStyle = c; ctx.fillStyle = c; ctx.lineWidth = 4; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  const B = () => ctx.beginPath(), Sk = () => ctx.stroke();
+  if (kind === 'target') [1, .62, .25].forEach((r, i) => { B(); ctx.arc(x, y, s * r, 0, 7); i === 2 ? ctx.fill() : Sk(); });
+  if (kind === 'spark') [[0, 0, 1], [s * .9, -s * .8, .45], [-s * .85, s * .75, .35]].forEach(([dx, dy, r]) => { const R = s * r; B(); ctx.moveTo(x + dx, y + dy - R); ctx.quadraticCurveTo(x + dx, y + dy, x + dx + R, y + dy); ctx.quadraticCurveTo(x + dx, y + dy, x + dx, y + dy + R); ctx.quadraticCurveTo(x + dx, y + dy, x + dx - R, y + dy); ctx.quadraticCurveTo(x + dx, y + dy, x + dx, y + dy - R); ctx.fill(); });
+  if (kind === 'lens') { B(); ctx.arc(x - s * .2, y - s * .2, s * .62, 0, 7); Sk(); B(); ctx.moveTo(x + s * .25, y + s * .25); ctx.lineTo(x + s * .9, y + s * .9); ctx.lineWidth = 7; Sk(); }
+  if (kind === 'data') { [0, 1, 2].forEach(i => { B(); ctx.ellipse(x, y - s * .55 + i * s * .55, s * .8, s * .28, 0, 0, 7); Sk(); }); B(); ctx.moveTo(x - s * .8, y - s * .55); ctx.lineTo(x - s * .8, y + s * .55); ctx.moveTo(x + s * .8, y - s * .55); ctx.lineTo(x + s * .8, y + s * .55); Sk(); }
+  if (kind === 'route') { B(); ctx.moveTo(x - s, y + s * .7); ctx.bezierCurveTo(x - s * .2, y + s * .7, x + s * .2, y - s * .7, x + s, y - s * .7); ctx.setLineDash([7, 7]); Sk(); ctx.setLineDash([]); circle(x - s, y + s * .7, s * .2, c); circle(x + s, y - s * .7, s * .26, null, c, 4); }
+  if (kind === 'book') { B(); ctx.moveTo(x, y - s * .6); ctx.quadraticCurveTo(x - s * .5, y - s * .9, x - s, y - s * .7); ctx.lineTo(x - s, y + s * .7); ctx.quadraticCurveTo(x - s * .5, y + s * .5, x, y + s * .8); ctx.quadraticCurveTo(x + s * .5, y + s * .5, x + s, y + s * .7); ctx.lineTo(x + s, y - s * .7); ctx.quadraticCurveTo(x + s * .5, y - s * .9, x, y - s * .6); ctx.lineTo(x, y + s * .8); Sk(); }
+  if (kind === 'student') { B(); ctx.arc(x, y - s * .45, s * .4, 0, 7); Sk(); B(); ctx.arc(x, y + s * .95, s * .85, Math.PI * 1.15, Math.PI * 1.85); Sk(); }
+  if (kind === 'map') { B(); ctx.moveTo(x, y + s * .95); ctx.bezierCurveTo(x - s * .95, y - s * .1, x - s * .65, y - s, x, y - s); ctx.bezierCurveTo(x + s * .65, y - s, x + s * .95, y - s * .1, x, y + s * .95); Sk(); B(); ctx.arc(x, y - s * .35, s * .24, 0, 7); Sk(); }
+  if (kind === 'stairs') { B(); ctx.moveTo(x - s, y + s); for (let i = 0; i < 4; i++) { ctx.lineTo(x - s + i * s / 2, y + s - (i + 1) * s / 2); ctx.lineTo(x - s + (i + 1) * s / 2, y + s - (i + 1) * s / 2); } ctx.lineTo(x + s, y + s); ctx.closePath(); Sk(); }
+  if (kind === 'sheet') { rr(x - s * .75, y - s, s * 1.5, s * 2, 4, null, c, 4); [-.45, -.05, .35].forEach((f, i) => { B(); ctx.moveTo(x - s * .45, y + s * f); ctx.lineTo(x + s * (i === 2 ? .15 : .45), y + s * f); Sk(); }); }
+  if (kind === 'qmark') text('?', x, y + s * .08, { size: s * 2, weight: 800, color: c, align: 'center' });
+  ctx.restore();
+}
+// a filled person (head + shoulders)
+function person(x, y, s, c, a = 1) { if (a <= 0 || s <= 0) return; circle(x, y - s * .55, s * .42, c, null, 0, a); ctx.save(); ctx.globalAlpha *= a; ctx.fillStyle = c; ctx.beginPath(); ctx.arc(x, y + s * .75, s * .78, Math.PI, Math.PI * 2); ctx.closePath(); ctx.fill(); ctx.restore(); }
+// chips in a row from x; items [str, t0, fill, color]; arrows between when arrow is set. Returns the right edge
+function chipRow(t, items, x, y, { size = 20, gap = 14, arrow = false } = {}) {
+  items.forEach(([s, t0, fill = K.redTint, color = K.crimson], n) => { const a = eBack(p(t, t0 - .1, .4)), w = measure(s, size, 700) + 1.5 * s.length + 32;
+    if (a > 0) chip(s, x, y, { size, fill, color, a: clamp(a) }); x += w + gap;
+    if (arrow && n < items.length - 1) { text('→', x + 2, y, { size: size + 4, weight: 700, color: K.muted, alpha: p(t, t0, .3) }); x += size + 18; } });
+  return x;
+}
+function brace(x1, x2, y, k, c = K.red, lw = 4, dir = 1) { pen(x1, y - 12 * dir, x1, y, k, c, lw, 3); pen(x1, y, x2, y, k, c, lw, 4); pen(x2, y, x2, y - 12 * dir, k, c, lw, 5); }
+// correct / incorrect marks: a red ring and a navy cross
+const oMark = (x, y, s, k, seed = 21) => penCircle(x, y, s / 2, s / 2, k, K.red, 5, seed);
+const xMark = (x, y, s, k) => crossMark(x, y, s * .8, k, K.navy, 5);
+// a labelled box in a flow (fill, text colour)
+function flowBox(x, y, w, h, str, a, { fill = '#FFFFFF', color = K.ink, stroke = LINE, size = 26 } = {}) {
+  if (a <= 0) return; card(x, y, w, h, { fill, stroke, a, r: 12, shadow: fill === '#FFFFFF' }); text(str, x + w / 2, y + h / 2 + 1, { size, weight: 700, color, align: 'center', alpha: a, maxW: w - 40 });
+}
+const T1 = '01  ·  BACKGROUND', T2 = '02  ·  U.S. MARKET BENCHMARK', T3 = '03  ·  ASSESSMENT BY LEVEL', T4 = '04  ·  QUESTION STRUCTURE', T5 = '05  ·  A DIFFERENT APPROACH',
+  T6 = '06  ·  SKILL AREAS', T7 = '07  ·  ASSESSMENT LOGIC', T8 = '08  ·  WHY IMPROVE', T9 = '09  ·  AS-IS / TO-BE', T10 = '10  ·  ASSESSMENT PROCESS';
+
+// ============================================================
+// scenes (absolute time t). One SC entry per scene id in tools/script.py SCENES, in the same order
+// ============================================================
+const SC = {};
+
+// ---------- title: an adaptive path, harder after ✓ and easier after ✗, ending at the starting point ----------
+SC.title = t => {
+  chip(C.title.kicker, 210, 262, { size: 18, fill: K.red, a: eOut(p(t, .3, .5)), spacing: 2.5 });
+  hiLite(200, 334, measure(C.title.words[0], 92, 800) + 22, 74, p(t, 1.5, .7));
+  C.title.words.forEach((w, i) => enter(t, .6 + i * .25, () => text(w, 210, 372 + i * 108, { size: 92, weight: 800, color: i === 0 ? K.red : K.ink, maxW: 900 })));
+  enter(t, 1.6, () => text(C.title.sub, 214, 720, { size: 32, weight: 500, color: K.muted, maxW: 860 }));
+  text(C.title.team, 214, 790, { size: 30, weight: 700, fam: HAND, color: K.red, alpha: p(t, 2.1, .5) });
+  const x = 1220, y = 280, t0 = st('l1_1', .05), tA = Wc('l1_1', 'adaptive', .7);
+  enter(t, t0 - .5, () => { card(x, y, 560, 520, { r: 14 }); text('Adaptive assessment', x + 40, y + 52, { size: 26, weight: 700 }); text('harder ↑', x + 40, y + 100, { size: 19, weight: 600, color: K.muted }); });
+  const LV = [1, 2, 3, 2, 3, 4, 3], px = i => x + 80 + i * 70, py = l => y + 430 - l * 70;
+  LV.forEach((l, i) => {
+    const k = p(t, t0 + i * .4, .3); if (k <= 0) return;
+    if (i > 0) pen(px(i - 1), py(LV[i - 1]), px(i), py(l), k, K.lineGrey, 3, 40 + i);
+    circle(px(i), py(l), 15 * eBack(k), '#FFFFFF', K.ink, 3);
+    if (i < LV.length - 1) { const up = LV[i + 1] > l, km = p(t, t0 + i * .4 + .2, .3); up ? check(px(i), py(l) - 36, 24, km, K.red, 4) : crossMark(px(i), py(l) - 36, 18, km, K.navy, 4); }
+  });
+  const tE = t0 + LV.length * .4, xe = px(LV.length - 1), ye = py(LV[LV.length - 1]);
+  penCircle(xe, ye, 30, 30, p(t, Math.max(tE, tA), .5), K.red, 5, 9);
+  text('starting point', xe - 50, ye + 62, { size: 26, weight: 700, fam: HAND, color: K.red, align: 'center', alpha: p(t, Math.max(tE, tA) + .3, .4) });
+};
+
+// ---------- 01 background ----------
+SC.parents = t => {
+  header(t, H0('parents'), T1, 'What parents expect');
+  subline(t, 'parents', 'More than a simple level assessment');
+  const tAI = Wc('l2_1', ['ai', 'a'], .1), tS = Wc('l2_1', 'simple', .8), tM = Wc('l2_1', 'more', .7);
+  enter(t, tAI - .2, () => {
+    card(210, 310, 620, 230); circle(300, 400, 52, K.redTint); icon('spark', 300, 400, 28, K.red);
+    text('AI & data-driven', 380, 384, { size: 34, weight: 800, maxW: 420 }); text('learning', 380, 428, { size: 34, weight: 800 });
+    text('more common', 380, 492, { size: 26, weight: 700, fam: HAND, color: K.red, alpha: p(t, Wc('l2_1', 'common', .3), .4) });
+  }, { dx: -20, dy: 0 });
+  enter(t, tS - .3, () => {
+    card(210, 600, 620, 200, { fill: K.lightBox, shadow: false });
+    text('A simple level assessment', 250, 650, { size: 28, weight: 700, color: K.muted });
+    ['AA', 'A', 'B', 'C', 'D', '…'].forEach((s, i) => chip(s, 250 + i * 90, 730, { size: 20, fill: i === 3 ? K.midGrey : '#FFFFFF', color: i === 3 ? '#FFFFFF' : K.muted }));
+  }, { dx: -20, dy: 0 });
+  text('more than this', 700, 840, { size: 30, weight: 700, fam: HAND, color: K.red, align: 'center', alpha: p(t, tM, .4) });
+  penCurve(780, 820, 860, 760, 900, 620, p(t, tM + .2, .5), K.red, 4, 1, true);
+  person(960, 600, 66, K.ink, p(t, st('l2_2') - .3, .4));
+  const Q = [['Where does my child ', 'struggle', '?', 'struggle'], ['Where should they ', 'start', '?', 'start'], ['How much have they ', 'improved', '?', ['improved', 'improve']]];
+  Q.forEach(([a, b, c, w], i) => {
+    const t0 = Wc('l2_2', w, .3 + i * .3), y = 400 + i * 160, x = 1060;
+    enter(t, t0 - .35, () => { ctx.save(); ctx.translate(x, y); bubble(740, K.lightBox); ctx.restore(); text(a + b + c, x + 40, y + 2, { size: 32, weight: 700 }); }, { dx: 20, dy: 0 });
+    const xb = x + 40 + measure(a, 32, 700); pen(xb, y + 26, xb + measure(b, 32, 700), y + 26, p(t, t0 + .1, .4), K.red, 4, 20 + i);
+  });
+};
+
+SC.aim = t => {
+  header(t, H0('aim'), T1, 'Our aim');
+  subline(t, 'aim', 'A better assessment system');
+  const tI = Wc('l2_3', 'improve', .15), tA = Wc('l2_3', 'accurate', .5), tP = Wc('l2_3', 'personalized', .8);
+  enter(t, st('l2_3') - .2, () => { card(210, 340, 520, 400); sheet(470, 500, 170, 210, -.03, 1, 5); text('Assessment system', 470, 670, { size: 32, weight: 800, align: 'center' }); }, { pop: true, ox: 470, oy: 540 });
+  text('improve', 830, 405, { size: 30, weight: 700, fam: HAND, color: K.red, align: 'center', alpha: p(t, tI, .4) });
+  penArrow(750, 500, 910, 430, p(t, tI + .2, .5), K.red, 5, 31); penArrow(750, 580, 910, 650, p(t, tI + .35, .5), K.red, 5, 32);
+  [['target', 'More accurate', 'starting points', tA], ['route', 'Personalized', 'learning plans', tP]].forEach(([ic, a, b, t0], i) => {
+    const y = 330 + i * 220;
+    enter(t, t0 - .2, () => { card(940, y, 860, 190); circle(1040, y + 95, 60, K.redTint); icon(ic, 1040, y + 95, 32, K.red); text(a, 1140, y + 70, { size: 36, weight: 800 }); text(b, 1140, y + 122, { size: 36, weight: 800, color: K.red }); }, { dx: 30, dy: 0 });
+    check(1730, y + 95, 44, p(t, t0 + .5, .4));
+  });
+  bar('Accurate assessment makes the right learning plan possible.', 812, p(t, en('l2_3', -.3), .5));
+};
+
+// ---------- 02 U.S. market benchmark ----------
+SC.market = t => {
+  header(t, H0('market'), T2, 'Adaptive Assessment in the U.S.');
+  subline(t, 'market', 'Questions follow each response, and results lead to learning');
+  const tAd = Wc('l3_1', 'adjust', .3), tR = Wc('l3_1', 'responses', .5), tC = Wc('l3_1', 'connect', .65), tP = Wc('l3_1', 'personalized', .8);
+  const X = [210, 785, 1360], Y = 350, CW = 440, CH = 400;
+  enter(t, tR - .2, () => {
+    card(X[0], Y, CW, CH); text('Student responses', X[0] + CW / 2, Y + 60, { size: 30, weight: 800, align: 'center' });
+    [1, 1, 0].forEach((ok, i) => { const yy = Y + 150 + i * 70; rr(X[0] + 70, yy - 8, 220, 16, 8, K.lightBox); ok ? check(X[0] + 350, yy, 34, 1, K.red, 5) : crossMark(X[0] + 350, yy, 26, 1, K.navy, 5); });
+  }, { pop: true, ox: X[0] + CW / 2, oy: Y + CH / 2 });
+  enter(t, tAd - .2, () => {
+    card(X[1], Y, CW, CH); text('Questions adjust', X[1] + CW / 2, Y + 60, { size: 30, weight: 800, align: 'center' });
+    const bx = X[1] + 60; [1, 2, 3, 2].forEach((l, i) => rr(bx + i * 62, Y + 340 - l * 55, 48, l * 55, 6, i === 2 ? K.red : K.redTint));
+    text('harder ↑', X[1] + 370, Y + 170, { size: 24, weight: 700, fam: HAND, color: K.red, align: 'center' }); text('easier ↓', X[1] + 370, Y + 250, { size: 24, weight: 700, fam: HAND, color: K.navy, align: 'center' });
+  }, { pop: true, ox: X[1] + CW / 2, oy: Y + CH / 2 });
+  enter(t, tP - .2, () => {
+    card(X[2], Y, CW, CH); text('Personalized learning', X[2] + CW / 2, Y + 60, { size: 30, weight: 800, align: 'center' });
+    circle(X[2] + CW / 2, Y + 210, 80, K.redTint); icon('route', X[2] + CW / 2, Y + 210, 44, K.red);
+  }, { pop: true, ox: X[2] + CW / 2, oy: Y + CH / 2 });
+  penArrow(X[0] + CW + 8, Y + CH / 2, X[1] - 8, Y + CH / 2, p(t, tR + .3, .4), K.ink, 4, 33);
+  penArrow(X[1] + CW + 8, Y + CH / 2, X[2] - 8, Y + CH / 2, p(t, tC, .4), K.ink, 4, 34);
+  ['results', 'connected'].forEach((s, i) => text(s, (X[1] + CW + X[2]) / 2, Y + CH / 2 + 40 + i * 28, { size: 22, weight: 700, fam: HAND, color: K.red, align: 'center', alpha: p(t, tC + .2, .4) }));
+};
+
+SC.catirt = t => {
+  header(t, H0('catirt'), T2, 'Two common methods');
+  const tC = Wc('l3_2', ['cat', 'c'], .2), tI = Wc('l3_2', ['irt', 'i'], .65), tCA = Wc('l3_3', 'adjusts', .1), tIU = Wc('l3_3', 'uses', .55), tAb = Wc('l3_3', 'ability', .9);
+  const CX = 210, IX = 1030, Y = 290, CW = 770, CH = 600;
+  enter(t, tC - .2, () => { card(CX, Y, CW, CH); chip('CAT', CX + 40, Y + 56, { size: 24, fill: K.red }); text('Computerized Adaptive Testing', CX + 150, Y + 58, { size: 30, weight: 800, maxW: 580 }); }, { dx: -20, dy: 0 });
+  enter(t, tI - .2, () => { card(IX, Y, CW, CH); chip('IRT', IX + 40, Y + 56, { size: 24, fill: K.blue }); text('Item Response Theory', IX + 140, Y + 58, { size: 30, weight: 800, maxW: 580 }); }, { dx: 20, dy: 0 });
+  // CAT: difficulty follows the answers
+  const LV = [2, 3, 4, 3, 4, 5, 4, 4.5], gx = i => CX + 110 + i * 82, gy = l => Y + 480 - l * 52;
+  if (t > tCA - .3) {
+    const a = p(t, tCA - .3, .4); line0(CX + 80, Y + 500, CX + 720, Y + 500, rgba(K.lineGrey, a), 2); line0(CX + 80, Y + 500, CX + 80, Y + 150, rgba(K.lineGrey, a), 2);
+    text('question difficulty', CX + 92, Y + 140, { size: 18, weight: 600, color: K.muted, alpha: a }); text('question 1 → 8', CX + 720, Y + 530, { size: 18, weight: 600, color: K.muted, align: 'right', alpha: a });
+  }
+  LV.forEach((l, i) => {
+    const t0 = tCA + i * (Math.max(.25, (tIU - tCA - .4) / LV.length)), k = p(t, t0, .25); if (k <= 0) return;
+    if (i > 0) pen(gx(i - 1), gy(LV[i - 1]), gx(i), gy(l), k, K.red, 3, 50 + i);
+    circle(gx(i), gy(l), 11 * eBack(k), '#FFFFFF', K.red, 3);
+    if (i < LV.length - 1) { const up = LV[i + 1] > l; up ? check(gx(i), gy(l) - 28, 20, p(t, t0 + .1, .2), K.red, 3) : crossMark(gx(i), gy(l) - 28, 14, p(t, t0 + .1, .2), K.navy, 3); }
+  });
+  text('adjusts to each response', CX + 40, Y + 562, { size: 26, weight: 700, alpha: p(t, tCA + .2, .5) });
+  // IRT: the chance of a correct answer by ability; difficulty sits at the middle of the curve
+  const ox = IX + 80, oy = Y + 500, pw = 640, ph = 330, curve = f => [ox + f * pw, oy - ph / (1 + Math.exp(-(f - .55) * 11))];
+  if (t > tIU - .3) {
+    const a = p(t, tIU - .3, .4); line0(ox, oy, ox + pw, oy, rgba(K.lineGrey, a), 2); line0(ox, oy, ox, oy - ph - 20, rgba(K.lineGrey, a), 2);
+    text('chance of a correct answer', ox + 12, oy - ph - 30, { size: 18, weight: 600, color: K.muted, alpha: a }); text('ability →', ox + pw, oy + 30, { size: 18, weight: 600, color: K.muted, align: 'right', alpha: a });
+    const pts = []; for (let i = 0; i <= 40; i++) pts.push(curve(i / 40)); strokePts(pts, p(t, tIU, .8), K.blue, 4);
+  }
+  const tD = Wc('l3_3', 'difficulty', .65), [dx, dy] = curve(.55);
+  if (t > tD) { line0(dx, oy, dx, dy, rgba(K.blue, p(t, tD, .4)), 2, [6, 6]); text('question difficulty', dx, oy + 30, { size: 18, weight: 700, color: K.blue, align: 'center', alpha: p(t, tD, .4) }); }
+  [[.25, 0], [.4, 0], [.62, 1], [.7, 0], [.8, 1], [.9, 1]].forEach(([f, ok], i) => { const k = p(t, Wc('l3_3', 'responses', .8, 2) + i * .08, .25), xx = ox + f * pw, yy = ok ? oy - ph - 4 : oy - 4; ok ? check(xx, yy - 10, 18, k, K.red, 3) : crossMark(xx, yy - 10, 12, k, K.navy, 3); });
+  text('difficulty + responses → ability level', IX + 40, Y + 562, { size: 26, weight: 700, alpha: p(t, tAb - .2, .5), maxW: 690 });
+  { const x0 = IX + 40 + measure('difficulty + responses → ', 26, 700); pen(x0, Y + 586, x0 + measure('ability level', 26, 700), Y + 586, p(t, tAb + .2, .4), K.red, 4, 59); }
+};
+
+// four programs, one row each, the narrated one boxed (programs → connect)
+const PROG = [
+  ['NWEA MAP Growth', 'NWEA · U.S. · 1976', 'Tracks progress through regular assessments', 'CAT + Rasch IRT', 'l3_4'],
+  ['i-Ready', 'Curriculum Associates · U.S. · 1969', 'Connects results with personalized learning', 'CAT + Rasch IRT', 'l3_5'],
+  ['IXL', 'IXL Learning · U.S. · 1998', 'Recommends activities from ongoing assessments', 'IRT · adaptive', 'l3_6'],
+  ['Star Reading', 'Renaissance · U.S. · 1986', 'Reading skills and progress tracking', 'CAT + Rasch IRT', 'l3_7'],
+];
+const PY = i => 290 + i * 120, PH = 100;
+function progStatic(t) {
+  header(t, H0('programs'), T2, 'Four U.S. programs');
+  PROG.forEach(([n, org, d, m, id], i) => enter(t, st(id) - .2, () => {
+    card(210, PY(i), 1590, PH, { r: 14 }); rr(210, PY(i) + 16, 8, PH - 32, 4, K.red);
+    text(n, 250, PY(i) + 40, { size: 32, weight: 800, maxW: 480 }); text(org, 250, PY(i) + 76, { size: 18, weight: 600, color: K.muted, maxW: 480 });
+    text(d, 760, PY(i) + PH / 2 + 1, { size: 27, weight: 600, maxW: 720 }); chip(m, 1670, PY(i) + PH / 2, { size: 18, fill: K.lightBox, color: K.muted, align: 'center' });
+  }, { dx: 24, dy: 0 }));
+}
+SC.programs = t => {
+  progStatic(t);
+  PROG.forEach(([, , , , id], i) => {
+    const out = i < 3 ? 1 - p(t, st(PROG[i + 1][4]) - .2, .3) : 1;
+    ctx.save(); ctx.globalAlpha *= out; hbox(200, PY(i) - 8, 1610, PH + 16, p(t, st(id), .5), K.red, 4, 60 + i); ctx.restore();
+  });
+};
+SC.connect = t => {
+  progStatic(t);
+  const tG = Wc('l3_8', 'goal', .1), tPr = Wc('l3_8', 'precise', .3), tPe = Wc('l3_8', 'personalized', .6), tD = Wc('l3_8', 'programs', .9);
+  hbox(196, PY(0) - 12, 1618, PY(3) + PH - PY(0) + 24, p(t, tD - .1, .7), K.red, 3, 70);
+  enter(t, tG - .2, () => {
+    rr(210, 790, 1590, 110, 16, K.ink); chip('Our goal', 250, 845, { size: 22, fill: K.red });
+    text('Precise assessment', 450, 846, { size: 36, weight: 800, color: '#FFFFFF', alpha: p(t, tPr - .1, .4) });
+    text('→', 860, 846, { size: 40, weight: 800, color: '#FFFFFF', alpha: p(t, tPe - .3, .3) });
+    text('Personalized learning', 930, 846, { size: 36, weight: 800, color: '#FFFFFF', alpha: p(t, tPe - .1, .4) });
+  });
+};
+
+// ---------- 03 current assessment by level ----------
+// questions per level by area (deck p. 4, read off the chart; totals as printed). Areas bottom → top
+const LVS = ['AA', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'];
+const AREA = ['Readiness', 'Phonics', 'Reading', 'Communication', 'Grammar', 'Information'];
+const QN = [[55, 0, 0, 0, 0, 0], [18, 22, 5, 0, 0, 0], [0, 16, 12, 0, 22, 0], [0, 2, 18, 1, 27, 4], [0, 0, 19, 0, 32, 3], [0, 0, 12, 0, 40, 2],
+  [0, 1, 18, 0, 31, 3], [0, 0, 13, 0, 41, 1], [0, 1, 9, 0, 41, 4], [0, 0, 10, 0, 102, 8], [0, 0, 14, 0, 101, 4]];
+// basic reading + Phonics = red family (1st), Grammar blue (2nd), Reading mint (3rd), the rest grey
+const ACOL = () => [K.lightRed, K.red, K.mint, K.lineGrey, K.blue, K.midGrey];
+const BASE = 850, U = 4, bx = i => 300 + i * 98, BW = 66;
+function levelsStatic(t) {
+  header(t, H0('levels'), T3, 'Assessment questions by level');
+  const tG = Wc('l4_1', 'vary', .6), a = p(t, H0('levels') + .5, .5);
+  [25, 50, 75, 100, 125].forEach(v => { line0(285, BASE - v * U, 1380, BASE - v * U, rgba(K.lineGrey, .5 * a), 1); text(String(v), 275, BASE - v * U, { size: 16, weight: 600, color: K.muted, align: 'right', alpha: a }); });
+  line0(285, BASE, 1380, BASE, rgba(K.ink, a), 2);
+  text('questions', 232, BASE - 128 * U - 26, { size: 18, weight: 600, color: K.muted, alpha: a });
+  QN.forEach((g, i) => {
+    const k = eOut(p(t, tG + i * .08, .7)); let y = BASE;
+    g.forEach((v, j) => { if (!v) return; const h = v * U * k; rr(bx(i), y - h, BW, Math.max(0, h - 1.5), 2, ACOL()[j]); y -= h; });
+    const tot = g.reduce((s, v) => s + v, 0); text(String(tot), bx(i) + BW / 2, BASE - tot * U - 20, { size: 22, weight: 800, align: 'center', alpha: p(t, tG + i * .08 + .6, .3) });
+    text(LVS[i], bx(i) + BW / 2, BASE + 30, { size: 24, weight: 700, align: 'center', alpha: a });
+  });
+  text('Level', 232, BASE + 30, { size: 18, weight: 600, color: K.muted, alpha: a });
+  [0, 1, 2, 4, 3, 5].forEach((j, n) => { const y = 330 + n * 44, aa = p(t, tG + .3 + n * .08, .4); rr(1440, y - 12, 24, 24, 5, ACOL()[j], null, 0, aa); text(AREA[j], 1478, y, { size: 22, weight: 600, alpha: aa }); });
+}
+SC.levels = t => {
+  levelsStatic(t);
+  const tL = Wc('l4_2', 'lower', .2), tP = Wc('l4_2', 'phonics', .85);
+  hbox(bx(0) - 14, BASE - 55 * U - 50, bx(2) + BW - bx(0) + 28, 55 * U + 90, p(t, tL - .1, .6), K.red, 4, 80);
+  text('basic reading + Phonics', bx(1) + BW / 2 + 40, BASE - 55 * U - 86, { size: 30, weight: 700, fam: HAND, color: K.red, align: 'center', alpha: p(t, tP - .3, .4) });
+  pen(1474, 342, 1600, 342, p(t, Wc('l4_2', 'basic', .6), .4), K.red, 3, 81); pen(1474, 386, 1580, 386, p(t, tP, .4), K.red, 3, 82);
+};
+SC.levelsCJ = t => {
+  levelsStatic(t);
+  const tC = Wc('l4_3', 'c', .15), tG = Wc('l4_3', 'grammar', .55), tR = Wc('l4_3', 'reading', .7), tIJ = Wc('l4_4', 'i', .2), tM = Wc('l4_4', 'more', .8), tRv = Wc('l4_5', 'review', .2), tO = Wc('l4_5', 'objective', .9);
+  brace(bx(3), bx(10) + BW, BASE + 62, p(t, tC, .6), K.red, 4, -1);
+  chipRow(t, [['Grammar', tG, K.blue, '#FFFFFF'], ['Reading', tR, K.mintDark, '#FFFFFF']], bx(5) + 20, BASE + 100, { size: 22 });
+  pen(1474, 474, 1580, 474, p(t, tG, .4), K.red, 3, 83); pen(1474, 430, 1580, 430, p(t, tR, .4), K.red, 3, 84);
+  penCircle(bx(9) + BW / 2, BASE - 120 * U - 20, 44, 28, p(t, tIJ - .1, .5), K.red, 4, 85); penCircle(bx(10) + BW / 2, BASE - 119 * U - 20, 44, 28, p(t, tIJ + .15, .5), K.red, 4, 86);
+  text('many more questions', bx(7) + 20, BASE - 112 * U, { size: 28, weight: 700, fam: HAND, color: K.red, align: 'center', alpha: p(t, tM - .2, .4) });
+  penArrow(bx(8) + 30, BASE - 108 * U, bx(9) - 10, BASE - 116 * U, p(t, tM, .4), K.red, 3, 87);
+  sticky(1440, 620, 360, 220, .03, p(t, tRv, .5), ['Adaptive', 'for each', 'learning objective'], { size: 30 });
+  pen(1480, 790, 1760, 788, p(t, tO, .5), K.red, 4, 88);
+};
+
+// ---------- 04 question structure ----------
+// Level D, question 16 (deck p. 5): three sub-questions on one learning objective; the learner got (3) wrong
+const SUBQ = [['(1)', 'Last night, Mr. Gray', ['is', 'was'], 1, 'reading a story about a fishing contest.', 1], ['(2)', "It's raining so hard that I can't", ['hear', 'heard'], 0, 'you.', 1], ['(3)', 'Next year, Tim', ['was', 'will'], 0, 'race with his dad.', 0]];
+function q16(t, x, y, t0, tMarks) {
+  enter(t, t0, () => {
+    card(x, y, 900, 540, { r: 14 });
+    chip('Level D · Question 16', x + 36, y + 50, { size: 18, fill: K.lightBox, color: K.ink }); text('Grammar · Verbs: agreement with sentence tense', x + 290, y + 51, { size: 19, weight: 600, color: K.muted, maxW: 580 });
+    text('16. Circle the correct verb for each sentence.', x + 36, y + 120, { size: 28, weight: 800, maxW: 830 });
+    SUBQ.forEach(([n, a, ch, pick, b], i) => {
+      const yy = y + 220 + i * 110; let xx = x + 36;
+      text(n, xx, yy, { size: 22, weight: 700, color: K.muted }); xx += 50;
+      text(a, xx, yy, { size: 22, weight: 600 }); xx += measure(a, 22, 600) + 18;
+      text('(', xx, yy, { size: 40, weight: 300, color: K.muted }); ch.forEach((c, j) => text(c, xx + 18, yy - 16 + j * 32, { size: 20, weight: 700, color: K.ink })); const cx = xx + 18;
+      penCircle(cx + measure(ch[pick], 20, 700) / 2, yy - 16 + pick * 32, measure(ch[pick], 20, 700) / 2 + 12, 16, 1, K.muted, 2.5, 90 + i);
+      xx += 18 + Math.max(...ch.map(c => measure(c, 20, 700))) + 8; text(')', xx, yy, { size: 40, weight: 300, color: K.muted }); xx += 20;
+      text(b, xx, yy, { size: 22, weight: 600, maxW: x + 790 - xx });
+    });
+  }, { dx: -20, dy: 0 });
+  SUBQ.forEach(([, , , , , ok], i) => { const yy = y + 220 + i * 110, k = p(t, tMarks[i], .35); ok ? check(x + 850, yy, 36, k, K.red, 5) : crossMark(x + 850, yy, 28, k, K.navy, 5); });
+}
+SC.structure = t => {
+  header(t, H0('structure'), T4, 'One question, several sub-questions');
+  const tS = Wc('l5_1', ['subquestions', 'sub'], .7), tO = Wc('l5_2', 'one', .2), tE = Wc('l5_2', 'entire', .5), tI = Wc('l5_2', 'incorrect', .9, 2);
+  q16(t, 210, 290, st('l5_1') - .3, [tS, tS + .3, tO]);
+  penCircle(1060, 290 + 220 + 2 * 110, 34, 34, p(t, tO + .2, .5), K.navy, 4, 95);
+  // today: one wrong sub-question makes the whole question wrong
+  const x = 1200, tC = Wc('l5_2', 'currently', .05) - .2, a = p(t, tC, .4);
+  text('Currently', x, 330, { size: 26, weight: 700, color: K.muted, alpha: a });
+  flowBox(x, 370, 600, 80, 'Question 16', a, { size: 28 });
+  ['(1)', '(2)', '(3)'].forEach((s, i) => { flowBox(x + i * 208, 500, 184, 70, s, a, { fill: K.lightBox, shadow: false, size: 24 }); const k = p(t, Math.max([tS, tS + .3, tO][i] + .1, tC + .4 + i * .3), .35); i < 2 ? check(x + i * 208 + 150, 535, 26, k, K.red, 4) : crossMark(x + i * 208 + 150, 535, 20, k, K.navy, 4); });
+  penArrow(x + 300, 600, x + 300, 670, p(t, tE - .2, .4), K.navy, 4, 96);
+  enter(t, tE, () => { rr(x, 690, 600, 110, 14, K.navyTint); xMark(x + 70, 745, 44, 1); text('Whole question', x + 130, 728, { size: 30, weight: 800, color: K.navy }); text('marked incorrect', x + 130, 768, { size: 26, weight: 700, color: K.navy }); });
+  stamp('INCORRECT', x + 420, 880, p(t, tI, .4), K.navy, -.06, 26);
+};
+
+const ROLE = [['Initial Question', 'The first check of the learning objective', 'target', 'red', 'initial'], ['Check Question', 'Checks the same objective again', 'lens', 'blue', 'check'], ['Final Check Question', 'Decides when answers are mixed', 'qmark', 'mintDark', 'final']];
+SC.roles = t => {
+  header(t, H0('roles'), T4, 'Three roles for sub-questions');
+  subline(t, 'roles', 'Each sub-question is assessed separately');
+  const tA = Wc('l5_3', 'assess', .15), tSep = Wc('l5_3', 'separately', .3);
+  enter(t, tA - .2, () => { card(560, 290, 800, 84, { r: 14 }); text('Question 16  ·  one learning objective', 960, 333, { size: 28, weight: 700, align: 'center' }); });
+  ROLE.forEach(([n, d, ic, ck, w], i) => {
+    const x = 210 + i * 540, t0 = Wc('l5_3', w, .5 + i * .15), col = K[ck];
+    if (t > tSep) { const k = eOut(p(t, tSep, .5)); line0(960, 376, lerp(960, x + 255, k), lerp(376, 458, k), K.lineGrey, 3); }
+    enter(t, t0 - .15, () => {
+      card(x, 460, 510, 290); rr(x, 460, 510, 10, [16, 16, 0, 0], col);
+      text(`(${i + 1})`, x + 36, 520, { size: 24, weight: 700, color: K.muted }); circle(x + 430, 540, 44, i === 0 ? K.redTint : i === 1 ? K.blueTint : K.mintTint); icon(ic, x + 430, 540, 24, col);
+      text(n, x + 36, 612, { size: 32, weight: 800, color: col, maxW: 440 }); para(d, x + 36, 668, 440, { size: 24, weight: 600, color: K.muted });
+    }, { pop: true, ox: x + 255, oy: 600 });
+  });
+  checkRow(t, Wc('l5_4', 'accurately', .4) - .2, 210, 830, 'Check understanding more accurately', { size: 30, w: 640 });
+  checkRow(t, Wc('l5_4', 'needs', .9) - .3, 1010, 830, 'Identify specific learning needs', { size: 30, w: 640 });
+};
+
+// ---------- 05 why English needs a different approach (mathEng → engConfirm → engSeq on one sheet) ----------
+const MX = 210, EX = 1040, CWd = 760, CY = 300;
+function mathEngStatic(t) {
+  header(t, H0('mathEng'), T5, 'Math and English, different approaches');
+  const tM = Wc('l6_1', 'math', .1), tE = Wc('l6_1', 'english', .2);
+  enter(t, tM - .2, () => { card(MX, CY, CWd, 600); chip('MATH', MX + 40, CY + 52, { size: 22, fill: K.blue }); }, { dx: -20, dy: 0 });
+  enter(t, tE - .2, () => { card(EX, CY, CWd, 600); chip('ENGLISH', EX + 40, CY + 52, { size: 22, fill: K.red }); }, { dx: 20, dy: 0 });
+  const sep = (x, y, a) => line0(x + 40, y, x + CWd - 40, y, rgba(K.lineGrey, .6 * a), 2);
+  // math
+  const tL = Wc('l6_2', 'long', .55), tR = Wc('l6_2', 'reducing', .2), tSq = Wc('l6_5', 'sequence', .8);
+  enter(t, tL - .2, () => {
+    sep(MX, CY + 100, 1); text('Long assessments', MX + 40, CY + 150, { size: 32, weight: 800 }); text('cause student fatigue', MX + 40, CY + 192, { size: 28, weight: 700 });
+    text('up to 250+ questions per level', MX + 40, CY + 240, { size: 20, weight: 600, color: K.muted });
+    for (let i = 0; i < 5; i++) sheet(MX + 630 + i * 6, CY + 180 - i * 8, 90, 110, nz(i, 3) * .08, 1, 4);
+  });
+  enter(t, tR - .2, () => { sep(MX, CY + 280, 1); text('Key goal', MX + 40, CY + 320, { size: 22, weight: 600, color: K.muted }); text('Fewer questions', MX + 40, CY + 366, { size: 36, weight: 800, color: K.blue }); text('↓', MX + 660, CY + 350, { size: 70, weight: 800, color: K.blue, align: 'center' }); });
+  enter(t, tSq - .2, () => { sep(MX, CY + 430, 1); text('Learning objectives', MX + 40, CY + 470, { size: 22, weight: 600, color: K.muted }); text('A clear sequence', MX + 40, CY + 514, { size: 32, weight: 800 }); icon('stairs', MX + 660, CY + 500, 40, K.blue); });
+  // english
+  const tCf = Wc('l6_3', 'confirming', .7), tOne = Wc('l6_4', 'incorrect', .2), tNot = Wc('l6_4', 'understand', .8), tNs = Wc('l6_5', 'not', .55), tMu = Wc('l6_6', 'multiple', .7);
+  enter(t, tCf - .2, () => { sep(EX, CY + 100, 1); text('Main challenge', EX + 40, CY + 140, { size: 22, weight: 600, color: K.muted }); text('Confirming understanding', EX + 40, CY + 186, { size: 36, weight: 800, color: K.red }); });
+  enter(t, tOne - .2, () => { xMark(EX + 62, CY + 244, 30, 1); text('one incorrect answer', EX + 96, CY + 246, { size: 24, weight: 700 }); });
+  enter(t, tNot - .2, () => { text('≠', EX + 380, CY + 246, { size: 36, weight: 800, color: K.red, align: 'center' }); text('does not understand', EX + 420, CY + 246, { size: 24, weight: 700, color: K.muted }); });
+  enter(t, tNs - .2, () => {
+    sep(EX, CY + 280, 1); text('Learning objectives', EX + 40, CY + 320, { size: 22, weight: 600, color: K.muted }); text('Not always a clear sequence', EX + 40, CY + 366, { size: 32, weight: 800, maxW: 520 });
+    [[0, -18], [44, 22], [86, -26], [128, 10]].forEach(([dx, dy], i) => circle(EX + 600 + dx, CY + 340 + dy, 14, '#FFFFFF', K.ink, 3));
+  });
+  enter(t, tMu - .2, () => {
+    sep(EX, CY + 430, 1); text('Our focus', EX + 40, CY + 470, { size: 22, weight: 600, color: K.muted }); text('Multiple questions when needed', EX + 40, CY + 514, { size: 32, weight: 800, maxW: 520 });
+    ['Q', 'Q', 'Q'].forEach((s, i) => chip(s, EX + 600 + i * 46, CY + 500, { size: 18, fill: K.redTint, color: K.crimson, pad: 12 }));
+  });
+}
+SC.mathEng = t => { mathEngStatic(t); hbox(MX - 10, CY + 100, CWd + 20, 330, p(t, Wc('l6_2', 'key', .4) - .1, .6), K.red, 4, 110); };
+SC.engConfirm = t => { mathEngStatic(t); hbox(EX - 10, CY + 100, CWd + 20, 180, p(t, Wc('l6_3', 'challenge', .5), .6), K.red, 4, 111); };
+SC.engSeq = t => { mathEngStatic(t); hbox(EX - 10, CY + 280, CWd + 20, 320, p(t, Wc('l6_6', 'therefore', .05), .6), K.red, 4, 112); check(EX + CWd - 50, CY + 560, 40, p(t, Wc('l6_6', 'needed', .9), .4)); };
+
+// ---------- 06 skill areas (areas → areas2) ----------
+const AX = 210, BX2 = 1040, AW = 760, AY = 290, AH = 600;
+const PHN = [['PHN-01', 'Letter sounds'], ['PHN-02', 'CVC words'], ['PHN-03', 'Consonant blends']];
+const RC = [['RC-01', ['Sequence']], ['RC-02', ['Cause &', 'Effect']], ['RC-03', ['Compare &', 'Contrast']], ['RC-04', ['Problem &', 'Solution']]];
+const phx = i => AX + 130 + i * 250, rcx = i => BX2 + 110 + i * 180, NY = AY + 330;
+function areasStatic(t) {
+  header(t, H0('areas'), T6, 'Different learning structures');
+  const tP = Wc('l7_2', 'phonics', .1), tD = Wc('l7_2', 'decoding', .25), tG = Wc('l7_2', 'grammar', .5), tSq = Wc('l7_2', 'sequence', .85), tR = Wc('l7_3', 'reading', .1), tF = Wc('l7_3', 'fixed', .8);
+  enter(t, tP - .3, () => { card(AX, AY, AW, AH); chip('A CLEAR SEQUENCE', AX + 40, AY + 50, { size: 20, fill: K.red }); }, { dx: -20, dy: 0 });
+  enter(t, tR - .3, () => { card(BX2, AY, AW, AH); chip('NO FIXED ORDER', BX2 + 40, AY + 50, { size: 20, fill: K.blue }); }, { dx: 20, dy: 0 });
+  chipRow(t, [['Phonics', tP, K.redTint, K.crimson], ['Decoding', tD, K.redTint, K.crimson], ['Grammar', tG, K.redTint, K.crimson]], AX + 40, AY + 120, { size: 22 });
+  chipRow(t, [['Reading Comprehension', tR, K.blueTint, K.blue]], BX2 + 40, AY + 120, { size: 22 });
+  text('e.g. Phonics question group', AX + 40, AY + 210, { size: 20, weight: 600, color: K.muted, alpha: p(t, tSq - .2, .4) });
+  PHN.forEach(([c, l], i) => { const k = eBack(p(t, tSq - .1 + i * .25, .4)); if (k <= 0) return; circle(phx(i), NY, 52 * k, '#FFFFFF', K.red, 3); text(c, phx(i), NY, { size: 18, weight: 800, color: K.crimson, align: 'center', alpha: clamp(k) }); text(l, phx(i), NY + 84, { size: 22, weight: 700, align: 'center', alpha: clamp(k) });
+    if (i < 2) penArrow(phx(i) + 62, NY, phx(i + 1) - 62, NY, p(t, tSq + .1 + i * .25, .3), K.red, 4, 120 + i); });
+  text('e.g. Reading question group', BX2 + 40, AY + 210, { size: 20, weight: 600, color: K.muted, alpha: p(t, tF - .4, .4) });
+  RC.forEach(([c, ls], i) => { const k = eBack(p(t, tF - .3 + i * .12, .4)); if (k <= 0) return; circle(rcx(i), NY, 48 * k, '#FFFFFF', K.blue, 3); text(c, rcx(i), NY, { size: 17, weight: 800, color: K.blue, align: 'center', alpha: clamp(k) });
+    ls.forEach((l, j) => text(l, rcx(i), NY + 80 + j * 28, { size: 20, weight: 700, align: 'center', alpha: clamp(k) })); });
+}
+SC.areas = t => { areasStatic(t); text('first → next → harder', AX + 380, NY + 150, { size: 28, weight: 700, fam: HAND, color: K.red, align: 'center', alpha: p(t, Wc('l7_2', 'clear', .7), .4) }); };
+SC.areas2 = t => {
+  areasStatic(t);
+  const tS = Wc('l7_4', ['stepbystep', 'step'], .3), tE = Wc('l7_5', 'each', .5), tSp = Wc('l7_5', 'separately', .9);
+  enter(t, tS - .2, () => { rr(AX + 40, AY + 490, AW - 80, 80, 14, K.redTint); icon('stairs', AX + 100, AY + 530, 24, K.red); text('Assess step by step', AX + 150, AY + 531, { size: 30, weight: 800, color: K.crimson }); });
+  pen(phx(0) - 40, NY + 120, phx(2) + 40, NY + 120, p(t, tS + .2, .6), K.red, 4, 130);
+  enter(t, tE - .2, () => { rr(BX2 + 40, AY + 490, AW - 80, 80, 14, K.blueTint); text('Check each objective separately', BX2 + 80, AY + 531, { size: 30, weight: 800, color: K.blue, maxW: 600 }); });
+  RC.forEach((r, i) => check(rcx(i), NY - 72, 30, p(t, tSp - .2 + i * .12, .3), K.red, 5));
+};
+
+// ---------- 07 assessment logic ----------
+const LX = [330, 520, 720], LRES = 820;
+SC.logic = t => {
+  header(t, H0('logic'), T7, 'Initial and Check Questions');
+  subline(t, 'logic', 'For each learning objective');
+  const tI = Wc('l8_1', 'initial', .2), tC = Wc('l8_1', 'check', .4), tB = Wc('l8_2', 'both', .2), tN = Wc('l8_2', 'next', .8), tB2 = Wc('l8_3', 'both', .2), tF = Wc('l8_3', 'further', .8), tMx = Wc('l8_4', 'mixed', .4), tFC = Wc('l8_4', 'final', .8);
+  const a = p(t, tI - .3, .4);
+  rr(210, 290, 1100, 62, 10, K.lightBox, null, 0, a);
+  [['Initial', tI], ['Check', tC], ['Final Check', tFC]].forEach(([s, t0], i) => text(s, LX[i], 321, { size: 24, weight: 800, align: 'center', color: t > t0 - .1 ? K.ink : K.muted, alpha: a }));
+  text('Result', LRES + 40, 321, { size: 24, weight: 800, alpha: a });
+  pen(LX[0] - 50, 342, LX[0] + 50, 342, p(t, tI, .4), K.red, 4, 140); pen(LX[1] - 50, 342, LX[1] + 50, 342, p(t, tC, .4), K.red, 4, 141);
+  const ROWS = [[1, 1, tB, tN], [0, 0, tB2, tF], [1, 0, tMx, tFC], [0, 1, tMx + .25, tFC]];
+  ROWS.forEach(([q1, q2, t0, t1], r) => {
+    const y = 410 + r * 112, k = p(t, t0 - .25, .4); if (k <= 0) return;
+    rr(210, y - 44, 1100, 88, 14, '#FFFFFF', LINE, 2, k);
+    [q1, q2].forEach((ok, j) => { const kk = p(t, t0 + j * .15, .3); ok ? oMark(LX[j], y, 40, kk, 150 + r * 2 + j) : xMark(LX[j], y, 40, kk); });
+    text('+', (LX[0] + LX[1]) / 2, y, { size: 30, weight: 700, color: K.muted, align: 'center', alpha: k });
+    if (r < 2) {
+      text('—', LX[2], y, { size: 28, weight: 700, color: K.lineGrey, align: 'center', alpha: k });
+      penArrow(LX[2] + 50, y, LRES + 10, y, p(t, t1 - .3, .3), K.ink, 3, 160 + r);
+      const ka = p(t, t1 - .1, .4);
+      if (r === 0) { oMark(LRES + 50, y, 36, ka, 170); text('Understood', LRES + 90, y - 14, { size: 26, weight: 800, color: K.red, alpha: ka }); text('→ next learning objective', LRES + 90, y + 18, { size: 20, weight: 600, color: K.muted, alpha: ka }); }
+      else { xMark(LRES + 50, y, 36, ka); text('Needs further learning', LRES + 90, y - 14, { size: 26, weight: 800, color: K.navy, alpha: ka, maxW: 400 }); text('→ an area to learn', LRES + 90, y + 18, { size: 20, weight: 600, color: K.muted, alpha: ka }); }
+    } else {
+      text('+', (LX[1] + LX[2]) / 2, y, { size: 30, weight: 700, color: K.muted, align: 'center', alpha: k });
+      text('?', LX[2], y + 2, { size: 44, weight: 800, color: K.mintDark, align: 'center', alpha: p(t, tFC - .1, .3) });
+      penArrow(LX[2] + 40, y, 1390, r === 2 ? 650 : 700, p(t, tFC + .1, .4), K.mintDark, 3, 162 + r);
+    }
+  });
+  enter(t, tFC + .3, () => {
+    card(1400, 570, 400, 210, { stroke: K.mintDark, lw: 3 }); text('Final Check Question', 1430, 612, { size: 24, weight: 800, color: K.mintDark, maxW: 340 });
+    oMark(1452, 670, 30, 1, 171); text('correct → understood', 1485, 670, { size: 22, weight: 700, maxW: 300 });
+    xMark(1452, 728, 30, 1); text('incorrect → further learning', 1485, 728, { size: 22, weight: 700, maxW: 300 });
+  }, { dx: 20, dy: 0 });
+};
+
+SC.logic2 = t => {
+  header(t, H0('logic2'), T7, 'Then: follow the sequence, or assess each one');
+  const tF = Wc('l8_5', 'follow', .1), tCl = Wc('l8_5', 'clear', .45), tIn = Wc('l8_5', 'independently', .75), tNt = Wc('l8_5', 'not', .95);
+  enter(t, tF - .2, () => { card(AX, AY, AW, AH); chip('WHERE THE SEQUENCE IS CLEAR', AX + 40, AY + 50, { size: 18, fill: K.red }); text('easier', AX + 60, AY + 110, { size: 20, weight: 600, color: K.muted }); text('harder', AX + 60, AY + 565, { size: 20, weight: 600, color: K.muted }); }, { dx: -20, dy: 0 });
+  line0(AX + 85, AY + 130, AX + 85, AY + 540, rgba(K.lineGrey, p(t, tF, .4)), 3);
+  const ok = [1, 1, 0, -1];
+  ok.forEach((o, i) => {
+    const y = AY + [130, 225, 320, 470][i], x = AX + 140 + i * 30, t0 = tF + .2 + i * .35, k = p(t, t0, .4); if (k <= 0) return;
+    rr(x, y, 400, 66, 12, o < 0 ? K.lightBox : '#FFFFFF', LINE, 2, k); text(`Learning objective ${i + 1}`, x + 24, y + 34, { size: 24, weight: 700, color: o < 0 ? K.midGrey : K.ink, alpha: k });
+    const km = p(t, t0 + .3, .3); if (o === 1) oMark(x + 450, y + 33, 34, km, 180 + i); if (o === 0) xMark(x + 450, y + 33, 34, km);
+  });
+  text('stop here: learning starts', AX + 470, AY + 430, { size: 28, weight: 700, fam: HAND, color: K.red, align: 'center', alpha: p(t, tCl + .2, .4) });
+  enter(t, tIn - .3, () => { card(BX2, AY, AW, AH); chip('WHERE IT IS NOT', BX2 + 40, AY + 50, { size: 18, fill: K.blue }); }, { dx: 20, dy: 0 });
+  ['A', 'B', 'C', 'D'].forEach((s, i) => {
+    const x = BX2 + 70 + i * 165, k = p(t, tIn + i * .12, .35); if (k <= 0) return;
+    rr(x, AY + 200, 140, 120, 14, '#FFFFFF', LINE, 2, k); text('Objective', x + 70, AY + 240, { size: 18, weight: 600, color: K.muted, align: 'center', alpha: k }); text(s, x + 70, AY + 284, { size: 38, weight: 800, align: 'center', alpha: k });
+    const km = p(t, tNt + i * .15, .3); i === 2 ? xMark(x + 70, AY + 380, 36, km) : oMark(x + 70, AY + 380, 36, km, 190 + i);
+  });
+  text('each one on its own', BX2 + AW / 2, AY + 490, { size: 30, weight: 700, fam: HAND, color: K.blue, align: 'center', alpha: p(t, tNt + .6, .4) });
+};
+
+// ---------- 08 why the current assessment needs improvement ----------
+SC.limits = t => {
+  header(t, H0('limits'), T8, 'Two limitations today');
+  const tF = Wc('l9_2', 'first', .05), tM = Wc('l9_2', 'mistakes', .6), tL = Wc('l9_2', 'lack', .85), tS = Wc('l9_3', 'second', .05), tDf = Wc('l9_3', 'difficulty', .7), tP = Wc('l9_3', 'patterns', .95);
+  enter(t, tF - .2, () => { card(AX, AY, AW, AH); num(1, AX + 60, AY + 60, K.navy); text('Mistake, or not understood?', AX + 110, AY + 62, { size: 32, weight: 800, maxW: 610 }); }, { dx: -20, dy: 0 });
+  if (t > tF) {
+    const k = p(t, tF + .2, .4); xMark(AX + AW / 2, AY + 200, 60, k);
+    penArrow(AX + AW / 2 - 30, AY + 250, AX + 210, AY + 350, p(t, tM - .2, .4), K.lineGrey, 3, 200); penArrow(AX + AW / 2 + 30, AY + 250, AX + AW - 210, AY + 350, p(t, tL - .2, .4), K.lineGrey, 3, 201);
+    flowBox(AX + 60, AY + 370, 300, 90, 'A simple mistake', p(t, tM - .1, .4), { fill: K.lightBox, size: 26 }); flowBox(AX + AW - 360, AY + 370, 300, 90, 'Lack of understanding', p(t, tL - .1, .4), { fill: K.lightBox, size: 24 });
+    text('?', AX + AW / 2, AY + 415, { size: 60, weight: 800, color: K.navy, align: 'center', alpha: p(t, tL + .2, .4) });
+    text('hard to tell apart', AX + AW / 2, AY + 530, { size: 30, weight: 700, fam: HAND, color: K.navy, align: 'center', alpha: p(t, tL + .4, .4) });
+  }
+  enter(t, tS - .2, () => { card(BX2, AY, AW, AH); num(2, BX2 + 60, AY + 60, K.navy); text('Limited data', BX2 + 110, AY + 62, { size: 32, weight: 800 }); }, { dx: 20, dy: 0 });
+  [['Question difficulty', tDf, [.2, 0, .35, 0, 0, .15]], ['Response patterns', tP, [0, .25, 0, 0, .1, 0]]].forEach(([s, t0, v], j) => {
+    const x = BX2 + 60 + j * 340, y = AY + 470, a = p(t, t0 - .2, .4); if (a <= 0) return;
+    rr(x, y - 300, 300, 300, 12, '#FFFFFF', LINE, 2, a); text(s, x + 150, y + 36, { size: 24, weight: 700, align: 'center', alpha: a });
+    v.forEach((h, i) => { const xx = x + 30 + i * 42; rr(xx, y - 40 - 220, 28, 220, 4, null, rgba(K.lineGrey, a), 2, 1); if (h) rr(xx, y - 40 - 220 * h * eOut(p(t, t0, .6)), 28, 220 * h * eOut(p(t, t0, .6)), 4, K.navy, null, 0, a); });
+  });
+  text('too little to analyze', BX2 + AW / 2, AY + 560, { size: 30, weight: 700, fam: HAND, color: K.navy, align: 'center', alpha: p(t, tP + .3, .4) });
+};
+
+SC.stages = t => {
+  header(t, H0('stages'), T8, 'Improving in stages');
+  const t1 = Wc('l9_4', 'first', .1), tIn = Wc('l9_4', 'individual', .6), tCo = Wc('l9_4', 'collect', .85), tLa = Wc('l9_5', 'later', .05), tIrt = Wc('l9_5', ['irt', 'i'], .4), tAc = Wc('l9_5', 'accuracy', .65), tIc = Wc('l9_5', 'incorrect', .9);
+  enter(t, t1 - .2, () => { card(210, 300, 700, 500); chip('FIRST STAGE', 250, 352, { size: 22, fill: K.red }); }, { dx: -20, dy: 0 });
+  checkRow(t, tIn - .2, 250, 470, 'Use individual responses', { size: 32, w: 600 });
+  checkRow(t, tCo - .2, 250, 560, 'Collect more data', { size: 32, w: 600 });
+  if (t > tCo) { circle(560, 700, 56, K.redTint, null, 0, p(t, tCo, .4)); icon('data', 560, 700, 30, K.red, p(t, tCo, .4)); }
+  penArrow(930, 550, 1080, 550, p(t, tLa - .1, .4), K.red, 5, 210);
+  enter(t, tLa - .1, () => { card(1100, 300, 700, 500); chip('LATER', 1140, 352, { size: 22, fill: K.blue }); }, { dx: 20, dy: 0 });
+  checkRow(t, tIrt - .2, 1140, 470, 'Methods such as IRT', { size: 32, w: 600, col: K.blue });
+  checkRow(t, tAc - .2, 1140, 560, 'More accurate assessment', { size: 32, w: 600, col: K.blue });
+  checkRow(t, tIc - .2, 1140, 650, 'Analysis of incorrect answers', { size: 32, w: 600, col: K.blue });
+};
+
+// ---------- 09 AS-IS / TO-BE (asisTobe → options) ----------
+const OPT = [['Standard sets', 'standard'], ['Sets with POD', ['pod', 'p']], ['POD only', ['podonly', 'only']], ['Online learning', 'online']];
+function asisStatic(t) {
+  header(t, H0('asisTobe'), T9, 'From fixed questions to adaptive');
+  const tCu = Wc('l10_1', 'currently', .05), tFx = Wc('l10_1', 'fixed', .3), tR = Wc('l10_1', 'results', .9), tAs = Wc('l10_1', 'assign', .6);
+  const tW = Wc('l10_2', 'adaptive', .2), tAd = Wc('l10_2', 'adjust', .5), tRs = Wc('l10_2', 'responses', .9);
+  const ax = 210, aw = 640, tx = 960, tw = 840, Y = [320, 440, 560], BH = 80;
+  text('AS-IS', ax, 300 - 20, { size: 26, weight: 800, color: K.blue, alpha: p(t, tCu - .2, .4) }); text('workbook-based assessment', ax + 100, 300 - 19, { size: 22, weight: 600, color: K.muted, alpha: p(t, tCu - .2, .4) });
+  [['Fixed questions for each level', tFx], ['All questions answered', tFx + .4], ['Results', tR - .3]].forEach(([s, t0], i) => { flowBox(ax, Y[i], aw, BH, s, p(t, t0 - .2, .4), { size: 26 }); if (i) text('↓', ax + aw / 2, Y[i] - 21, { size: 26, weight: 700, color: K.muted, align: 'center', alpha: p(t, t0 - .2, .4) }); });
+  text('↓', ax + aw / 2, Y[2] + BH + 19, { size: 26, weight: 700, color: K.muted, align: 'center', alpha: p(t, tAs - .2, .4) });
+  flowBox(ax, 700, aw, 160, 'Learning sets (workbook)', p(t, tAs - .2, .4), { fill: K.blueTint, stroke: K.blue, color: K.blue, size: 30 });
+  text('TO-BE', tx, 300 - 20, { size: 26, weight: 800, color: K.red, alpha: p(t, tW - .2, .4) }); text('online Adaptive Assessment', tx + 110, 300 - 19, { size: 22, weight: 600, color: K.muted, alpha: p(t, tW - .2, .4) });
+  flowBox(tx, Y[0], tw, BH, 'First questions and responses', p(t, tW - .1, .4), { size: 26 });
+  text('↓', tx + tw / 2, Y[1] - 21, { size: 26, weight: 700, color: K.muted, align: 'center', alpha: p(t, tAd - .2, .4) });
+  flowBox(tx, Y[1], tw, BH, 'The next question adjusts to each response', p(t, tAd - .2, .4), { fill: K.ink, color: '#FFFFFF', stroke: null, size: 26 });
+  text('↓', tx + tw / 2, Y[2] - 21, { size: 26, weight: 700, color: K.muted, align: 'center', alpha: p(t, tRs - .1, .4) });
+  flowBox(tx, Y[2], tw, BH, 'Results', p(t, tRs - .1, .4), { size: 26 });
+  // learning options (from the options page; drawn here so the sheet keeps them)
+  const tO = Wc('l10_3', 'options', .3); text('↓', tx + tw / 2, Y[2] + BH + 19, { size: 26, weight: 700, color: K.muted, align: 'center', alpha: p(t, tO - .2, .4) });
+  if (t > tO - .3) rr(tx, 690, tw, 200, 16, '#FFFFFF', LINE, 2, p(t, tO - .3, .4));
+  OPT.forEach(([s, w], i) => { const t0 = Wc('l10_3', w, .4 + i * .15), x = tx + 18 + i * 204, a = p(t, t0 - .15, .4); if (a <= 0) return;
+    rr(x, 712, 192, 110, 12, '#FFFFFF', null, 0, a); rr(x, 712, 192, 110, 12, i < 2 ? K.redTint : '#FFFFFF', i < 2 ? null : K.lineGrey, 2, a);
+    text(String.fromCharCode(65 + i), x + 20, 742, { size: 22, weight: 800, color: i < 2 ? K.crimson : K.muted, alpha: a }); text(s, x + 96, 784, { size: 24, weight: 800, align: 'center', alpha: a, maxW: 170 }); });
+}
+SC.asisTobe = t => { asisStatic(t); hbox(948, 428, 864, 104, p(t, Wc('l10_2', 'adjust', .5) + .2, .6), K.red, 4, 220); };
+SC.options = t => {
+  asisStatic(t);
+  const tF = Wc('l10_4', 'first', .1), tS = Wc('l10_4', 'standard', .6), tP = Wc('l10_4', ['pod', 'p'], .95);
+  brace(978, 978 + 396, 838, p(t, tF, .5), K.red, 4, -1); text('first stage', 978 + 198, 868, { size: 26, weight: 700, fam: HAND, color: K.red, align: 'center', alpha: p(t, tF + .2, .4) });
+  text('later', 978 + 408 + 198, 860, { size: 24, weight: 700, fam: HAND, color: K.muted, align: 'center', alpha: p(t, tP, .4) });
+  check(978 + 170, 735, 28, p(t, tS, .3), K.red, 4); check(978 + 374, 735, 28, p(t, tP, .3), K.red, 4);
+};
+
+// ---------- 10 assessment process (process → process2) ----------
+const STEP = [['Find starting points', 'Where to start?', 'A rough level narrows down the possible starting points', 'map', ['l11_2', 'first']],
+  ['Check understanding', 'What needs checking?', 'Initial and Check Questions for each learning objective', 'lens', ['l11_3', 'second']],
+  ['Additional questions', 'Did they really understand?', 'More questions when results are unclear', 'qmark', ['l11_4', 'third']],
+  ['Assign learning', 'What should they learn?', '', 'book', ['l11_5', 'finally']]];
+const SX = i => 210 + i * 410, SW = 360;
+const stepT = i => Wc(STEP[i][4][0], STEP[i][4][1], .05);
+function processStatic(t) {
+  header(t, H0('process'), T10, 'Four steps');
+  const tF = Wc('l11_1', 'four', .6);
+  STEP.forEach(([n, q, d, ic], i) => {
+    const t0 = stepT(i), x = SX(i);
+    if (t < t0 - .1) hbox(x, 300, SW, 470, p(t, tF + i * .12, .5), K.lineGrey, 2.5, 230 + i);
+    enter(t, t0 - .15, () => {
+      card(x, 300, SW, 470); rr(x, 300, SW, 10, [16, 16, 0, 0], K.ink);
+      chip(`STEP ${i + 1}`, x + 30, 356, { size: 18, fill: K.ink }); text(n, x + 30, 420, { size: 30, weight: 800, maxW: SW - 60 });
+      text(q, x + 30, 476, { size: 26, weight: 700, fam: HAND, color: K.red, maxW: SW - 60 });
+      if (d) para(d, x + 30, 530, SW - 60, { size: 21, weight: 600, color: K.muted });
+      circle(x + SW / 2, 690, 46, K.redTint); icon(ic, x + SW / 2, 690, 24, K.red);
+    }, { pop: true, ox: x + SW / 2, oy: 535 });
+    if (i < 3) penArrow(x + SW + 8, 535, x + 402, 535, p(t, stepT(i + 1) - .3, .3), K.ink, 4, 240 + i);
+  });
+  chipRow(t, [['1. Standard sets', Wc('l11_5', 'standard', .5)]], SX(3) + 30, 548, { size: 18 });
+  chipRow(t, [['2. Sets with POD', Wc('l11_5', ['pod', 'p'], .7)]], SX(3) + 30, 596, { size: 18 });
+  text("each student's needs", SX(3) + 30, 636, { size: 20, weight: 600, color: K.muted, alpha: p(t, Wc('l11_5', 'needs', .9), .4) });
+}
+const stepMark = (t, i, a = 1) => { ctx.save(); ctx.globalAlpha *= a; hbox(SX(i) - 10, 290, SW + 20, 490, p(t, stepT(i) - .1, .6), K.red, 4, 250 + i); ctx.restore(); };
+SC.process = t => { processStatic(t); stepMark(t, 0, 1 - p(t, stepT(1) - .2, .4)); stepMark(t, 1); };
+SC.process2 = t => {
+  processStatic(t); stepMark(t, 2, 1 - p(t, stepT(3) - .2, .4)); stepMark(t, 3, 1 - p(t, st('l11_6') - .2, .4));
+  enter(t, st('l11_6') - .1, () => { rr(210, 820, 1590, 90, 16, K.ink); text('Assessment results', 260, 866, { size: 32, weight: 800, color: '#FFFFFF' }); text('→', 640, 866, { size: 36, weight: 800, color: '#FFFFFF' }); text('personalized learning', 700, 866, { size: 32, weight: 800, color: '#FFFFFF' }); });
+  pen(700, 892, 700 + measure('personalized learning', 32, 800), 892, p(t, Wc('l11_6', 'personalized', .8), .5), K.red, 5, 270);
+};
+
+// ---------- closing ----------
+SC.closing = t => {
+  header(t, H0('closing'), 'CLOSING', 'Adaptive Assessment for English');
+  const tD = Wc('l12_1', 'develop', .2), tU = Wc('l12_1', 'unique', .7), tEx = Wc('l12_2', 'existing', .25), tC = Wc('l12_2', 'connect', .5), tSt = Wc('l12_2', 'standard', .85), tPod = Wc('l12_2', ['pod', 'p'], .97);
+  enter(t, tD - .2, () => { card(210, 300, 1590, 200); text('An Adaptive Assessment system', 260, 362, { size: 40, weight: 800 }); text('that reflects the unique characteristics of English learning', 260, 420, { size: 30, weight: 700, color: K.muted, maxW: 1480 }); });
+  hiLite(254, 400, measure('that reflects the unique characteristics of English learning', 30, 700) + 12, 44, p(t, tU, .6));
+  const N = [['sheet', 'Existing questions', 'improved', tEx], ['route', 'Results', 'connected', tC], ['book', 'Personalized learning', 'standard sets · POD', tSt]];
+  N.forEach(([ic, a, b, t0], i) => {
+    const x = 210 + i * 560;
+    enter(t, t0 - .2, () => { card(x, 580, 470, 260); circle(x + 90, 710, 56, K.redTint); icon(ic, x + 90, 710, 30, K.red); text(a, x + 170, 690, { size: 30, weight: 800, maxW: 280 }); text(b, x + 170, 740, { size: 26, weight: 700, fam: HAND, color: K.red, maxW: 280 }); }, { pop: true, ox: x + 235, oy: 710 });
+    if (i < 2) penArrow(x + 480, 710, x + 550, 710, p(t, N[i + 1][3] - .3, .3), K.ink, 4, 260 + i);
+  });
+  check(210 + 2 * 560 + 430, 610, 36, p(t, tPod, .4));
+};
+
+// ---------- outro ----------
+SC.outro = t => {
+  header(t, H0('outro'), 'NEXT', C.outro.title);
+  const pts = C.outro.points, tD = Wc('l12_3', 'data', .4), tA = Wc('l12_3', 'accuracy', .6), tL = Wc('l12_3', 'adaptive', .9);
+  chipRow(t, [[pts[0], tD, K.lightBox, K.ink], [pts[1], tA, K.redTint, K.crimson], [pts[2], tL, K.red, '#FFFFFF']], 210, 340, { size: 30, arrow: true });
+  enter(t, st('l12_4'), () => text(C.outro.thanks, 960, 660, { size: 130, weight: 700, fam: HAND, align: 'center' }), { pop: true, ox: 960, oy: 660 });
+  pen(760, 750, 1160, 746, p(t, st('l12_4') + .5, .6), K.red, 6, 9);
+};
+
+// ============================================================
+// compositor: slide between pages (with the whoosh), then hold still
+// ============================================================
+// pages that continue the one before on the same sheet (tools/script.py CONT): the shared picture stays put and only the
+// rest cross-fades, no page turn and no whoosh. SHARED[id](t) draws the part that stays (section tab included)
+const CONT = new Set(TL.cont || []), SHARED = {};
+Object.assign(SHARED, { connect: progStatic, levelsCJ: levelsStatic, engConfirm: mathEngStatic, engSeq: mathEngStatic, areas2: areasStatic, options: asisStatic, process2: processStatic });
+let SHARED_OFF = false;
+const PAGE_NO = TL.scenes.map((s, i) => i - TL.scenes.slice(1, i + 1).filter(x => CONT.has(x.id)).length);
+const TR = .8;
+function frame(i, t, ox) {
+  if (Math.abs(ox) >= W) return; const s = TL.scenes[i];
+  ctx.save(); ctx.translate(Math.round(ox), 0); pageFurniture(PAGE_NO[i]); SC[s.id](t); ctx.restore();
+}
+function draw(t) {
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1;
+  const SCN = TL.scenes; let i = SCN.findIndex(s => t < s.end); if (i < 0) i = SCN.length - 1;
+  const k = i > 0 ? eIO(p(t, SCN[i].start - .15, TR)) : 1, cont = i > 0 && CONT.has(SCN[i].id);
+  paper(i > 0 ? Math.round((PAGE_NO[i - 1] + (cont ? 0 : k)) * W) : 0);
+  if (cont && k < 1) {
+    pageFurniture(PAGE_NO[i]); SHARED_OFF = true;
+    ctx.save(); ctx.globalAlpha = 1 - k; SC[SCN[i - 1].id](t); ctx.restore();
+    ctx.save(); ctx.globalAlpha = k; SC[SCN[i].id](t); ctx.restore();
+    SHARED_OFF = false; (SHARED[SCN[i].id] || (() => {}))(t);
+  } else {
+    if (k < 1) frame(i - 1, t, -k * W);
+    frame(i, t, (1 - k) * W);
+  }
+  const f = p(t, DURATION - 1.2, 1.2); if (f > 0) { ctx.fillStyle = rgba(K.paper, eIO(f)); ctx.fillRect(0, 0, W, H); }
+}
+
+// ---------- preview player ----------
+const seekEl = document.getElementById('seek'), timeEl = document.getElementById('time'), playEl = document.getElementById('play');
+seekEl.max = DURATION.toFixed(2);
+let playing = false, t0 = 0, tCur = 0;
+const audio = new Audio(); if (!location.search.includes('render')) { audio.src = 'audio/mix.wav'; audio.preload = 'auto'; }   // renders and snaps need no sound
+function show(t) { tCur = t; draw(t); seekEl.value = t; timeEl.textContent = t.toFixed(2) + 's'; }
+function loop(now) { if (!playing) return; const t = (now - t0) / 1000; if (t >= DURATION) { playing = false; playEl.textContent = '▶ Play'; audio.pause(); show(DURATION); return; } show(t); requestAnimationFrame(loop); }
+playEl.onclick = () => { playing = !playing; playEl.textContent = playing ? '❚❚ Pause' : '▶ Play'; if (playing) { if (tCur >= DURATION) tCur = 0; t0 = performance.now() - tCur * 1000; try { audio.currentTime = tCur; audio.play().catch(() => {}); } catch (e) {} requestAnimationFrame(loop); } else audio.pause(); };
+seekEl.oninput = () => { show(+seekEl.value); if (playing) { t0 = performance.now() - tCur * 1000; try { audio.currentTime = tCur; } catch (e) {} } };
+
+// ---------- video editor hooks (../editor/PROTOCOL.md) ----------
+window.draw = draw; window.DURATION = DURATION;
+function merge(base, over) {
+  if (Array.isArray(base)) return Array.isArray(over) ? over.map((v, i) => base[i] !== undefined ? merge(base[i], v) : v) : base;
+  if (base && typeof base === 'object') { const o = {}; for (const k in base) o[k] = over && k in over ? merge(base[k], over[k]) : base[k]; return o; }
+  return over === undefined || over === null ? base : over;
+}
+function apply(content) { C = window.CONTENT = merge(DEFAULT_CONTENT, content); K = C.colors; }
+window.VIDEO = { schema: window.SCHEMA, defaults: DEFAULT_CONTENT, get content() { return C; }, apply, canvas: cv };
+window.ready = document.fonts.ready.then(() => {
+  if (location.search.includes('render')) document.body.classList.add('render');
+  const m = location.search.match(/[?&]t=([\d.]+)/); show(m ? +m[1] : 0); return true;
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,399 @@
+1
+00:00:02,600 --> 00:00:05,344
+We would like to share our
+plans to introduce the
+
+2
+00:00:05,400 --> 00:00:08,200
+new JEI English Online
+Adaptive Assessment system.
+
+3
+00:00:09,950 --> 00:00:12,695
+As AI and data-driven
+learning become more common,
+
+4
+00:00:12,750 --> 00:00:15,550
+parents expect more than a
+simple level assessment.
+
+5
+00:00:16,100 --> 00:00:18,749
+They want to know where their
+children struggle, where
+
+6
+00:00:18,798 --> 00:00:21,300
+they should start, and how
+much they have improved.
+
+7
+00:00:23,050 --> 00:00:26,087
+We aim to improve our assessment
+system to provide more
+
+8
+00:00:26,142 --> 00:00:29,290
+accurate starting points and
+personalized learning plans.
+
+9
+00:00:31,040 --> 00:00:34,675
+Major U.S. Adaptive Assessment
+programs adjust questions based
+
+10
+00:00:34,733 --> 00:00:38,720
+on student responses and connect
+results with personalized learning.
+
+11
+00:00:40,370 --> 00:00:44,005
+Two common methods are CAT,
+or Computerized Adaptive
+
+12
+00:00:44,074 --> 00:00:47,010
+Testing, and IRT, or Item Response Theory.
+
+13
+00:00:47,560 --> 00:00:51,905
+CAT adjusts questions based on
+student responses, while IRT
+
+14
+00:00:51,979 --> 00:00:56,840
+uses question difficulty and
+responses to estimate ability levels.
+
+15
+00:00:58,590 --> 00:01:03,230
+NWEA MAP Growth tracks student
+progress through regular assessments.
+
+16
+00:01:03,680 --> 00:01:07,040
+i-Ready connects assessment results
+with personalized learning.
+
+17
+00:01:07,490 --> 00:01:11,640
+IXL recommends learning activities
+based on ongoing assessments.
+
+18
+00:01:12,090 --> 00:01:15,580
+Star Reading focuses on reading
+skills and progress tracking.
+
+19
+00:01:17,230 --> 00:01:19,818
+Our goal is to connect
+precise assessment with
+
+20
+00:01:19,874 --> 00:01:22,350
+personalized learning,
+as these programs do.
+
+21
+00:01:24,100 --> 00:01:27,410
+Our current JEI English
+assessments vary by level.
+
+22
+00:01:27,860 --> 00:01:31,220
+Lower levels focus mainly on
+basic reading and Phonics.
+
+23
+00:01:32,870 --> 00:01:36,550
+From Level C to J, Grammar and
+Reading become the main areas.
+
+24
+00:01:37,000 --> 00:01:40,440
+Levels I and J also have
+significantly more questions.
+
+25
+00:01:41,090 --> 00:01:44,068
+We plan to review these
+differences and determine how
+
+26
+00:01:44,124 --> 00:01:47,270
+to apply Adaptive Assessment
+to each learning objective.
+
+27
+00:01:49,020 --> 00:01:53,340
+Many JEI English assessment questions
+contain several sub-questions.
+
+28
+00:01:53,790 --> 00:01:56,600
+Currently, even one incorrect
+sub-question causes
+
+29
+00:01:56,657 --> 00:01:59,410
+the entire main question
+to be marked incorrect.
+
+30
+00:02:01,160 --> 00:02:04,345
+We plan to assess sub-questions
+separately and assign
+
+31
+00:02:04,405 --> 00:02:07,710
+three roles: Initial, Check,
+and Final Check Questions.
+
+32
+00:02:08,260 --> 00:02:10,646
+This will help us check understanding more
+
+33
+00:02:10,703 --> 00:02:13,430
+accurately and identify
+specific learning needs.
+
+34
+00:02:15,180 --> 00:02:18,850
+Math and English require different
+approaches to Adaptive Assessment.
+
+35
+00:02:19,300 --> 00:02:22,141
+In Math, reducing the number
+of questions is a key
+
+36
+00:02:22,198 --> 00:02:25,380
+goal because long assessments
+can cause student fatigue.
+
+37
+00:02:27,030 --> 00:02:30,390
+In English, the main challenge
+is confirming understanding.
+
+38
+00:02:30,840 --> 00:02:34,840
+One incorrect answer may not mean a
+student does not understand a skill.
+
+39
+00:02:36,490 --> 00:02:40,490
+Also, English learning objectives do
+not always follow a clear sequence.
+
+40
+00:02:40,940 --> 00:02:43,518
+Therefore, we will focus
+on checking understanding
+
+41
+00:02:43,569 --> 00:02:45,580
+through multiple questions when needed.
+
+42
+00:02:47,330 --> 00:02:50,140
+English skill areas have
+different learning structures.
+
+43
+00:02:50,590 --> 00:02:54,430
+Phonics, Decoding, and some Grammar
+skills follow a clear sequence.
+
+44
+00:02:54,880 --> 00:02:58,320
+Reading Comprehension skills do
+not always follow a fixed order.
+
+45
+00:03:00,200 --> 00:03:03,640
+We will assess skills step by
+step where the sequence is clear.
+
+46
+00:03:04,090 --> 00:03:07,770
+For other skills, we will check
+each learning objective separately.
+
+47
+00:03:09,520 --> 00:03:11,774
+We will use an Initial
+Question and a Check
+
+48
+00:03:11,826 --> 00:03:14,080
+Question to assess each
+learning objective.
+
+49
+00:03:14,630 --> 00:03:18,390
+If both answers are correct, we move
+to the next learning objective.
+
+50
+00:03:18,840 --> 00:03:21,502
+If both are incorrect, we
+identify the objective
+
+51
+00:03:21,557 --> 00:03:23,720
+as an area that needs further learning.
+
+52
+00:03:24,170 --> 00:03:27,370
+If the answers are mixed, we
+provide a Final Check Question.
+
+53
+00:03:29,020 --> 00:03:31,885
+We will then follow the
+learning sequence where it is
+
+54
+00:03:31,939 --> 00:03:35,020
+clear or assess objectives
+independently where it is not.
+
+55
+00:03:36,770 --> 00:03:39,570
+Our current assessment
+has two main limitations.
+
+56
+00:03:40,020 --> 00:03:44,660
+First, it is difficult to distinguish simple
+mistakes from a lack of understanding.
+
+57
+00:03:45,110 --> 00:03:49,670
+Second, we have limited data to analyze
+question difficulty and response patterns.
+
+58
+00:03:51,320 --> 00:03:53,607
+In the first stage, we will improve how we
+
+59
+00:03:53,661 --> 00:03:56,220
+use individual responses
+and collect more data.
+
+60
+00:03:56,670 --> 00:04:00,073
+Later, we plan to use methods
+such as IRT to improve
+
+61
+00:04:00,138 --> 00:04:03,410
+assessment accuracy and
+analyze incorrect answers.
+
+62
+00:04:05,160 --> 00:04:08,203
+Currently, students complete
+fixed assessment questions,
+
+63
+00:04:08,257 --> 00:04:10,920
+and we assign learning
+sets based on the results.
+
+64
+00:04:11,370 --> 00:04:15,800
+With Adaptive Assessment, we will adjust
+questions based on student responses.
+
+65
+00:04:17,450 --> 00:04:21,241
+We will also expand learning
+options to include standard
+
+66
+00:04:21,308 --> 00:04:25,370
+sets, sets with POD, POD-only
+learning, and online learning.
+
+67
+00:04:25,820 --> 00:04:30,460
+In the first stage, we will focus on
+standard sets and sets combined with POD.
+
+68
+00:04:32,210 --> 00:04:34,930
+Our Adaptive Assessment
+will follow four steps.
+
+69
+00:04:35,380 --> 00:04:38,250
+First, we will identify
+possible starting points.
+
+70
+00:04:38,700 --> 00:04:42,620
+Second, we will check understanding
+using Initial and Check Questions.
+
+71
+00:04:44,170 --> 00:04:48,040
+Third, we will provide additional
+questions when results are unclear.
+
+72
+00:04:48,490 --> 00:04:51,133
+Finally, we will assign
+standard sets or sets
+
+73
+00:04:51,191 --> 00:04:54,010
+combined with POD based
+on each student's needs.
+
+74
+00:04:54,560 --> 00:04:58,720
+This process connects assessment results
+directly with personalized learning.
+
+75
+00:05:00,470 --> 00:05:03,156
+We aim to develop an Adaptive
+Assessment system that
+
+76
+00:05:03,208 --> 00:05:06,100
+reflects the unique characteristics
+of English learning.
+
+77
+00:05:06,550 --> 00:05:10,162
+We will improve our existing
+assessment questions and connect the
+
+78
+00:05:10,218 --> 00:05:13,830
+results with personalized learning
+through standard sets and POD.
+
+79
+00:05:15,580 --> 00:05:18,513
+In the future, we plan to
+use learning data to improve
+
+80
+00:05:18,567 --> 00:05:21,500
+assessment accuracy and expand
+into Adaptive Learning.
+
+81
+00:05:22,250 --> 00:05:22,810
+Thank you.
+
