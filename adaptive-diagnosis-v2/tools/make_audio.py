@@ -223,7 +223,7 @@ def main():
     for k, tt in enumerate(cues['pathDown']): v1.place(fx, tt, v1.boop() if k < 2 else v1.pop(), .7)
     for k, tt in enumerate(cues['pathUp']): v1.place(fx, tt, v1.ding() if k < 2 else v1.pop(), .7)
     v1.place(fx, cues['understood'], v1.ding(), .6); v1.place(fx, cues['notUnderstood'], v1.boop(), .6)
-    v1.place(fx, lines['l31']['start'] - .3, v1.ding(), .5)
+    v1.place(fx, lines['l31']['start'] - .55, chime(), .57)   # the single high ding sounded like a wrong answer (review 1): the rising chime of ../ai-learning-platform-v3
     mix = nar * 1.0 + fx * .5
     mix = np.tanh(mix * .95) / .95
     mix = mix / (np.abs(mix).max() + 1e-9) * .9
@@ -231,6 +231,15 @@ def main():
     sf.write(out, np.stack([mix, mix], 1).astype(np.float32), SR, subtype='PCM_16')
     print('line cuts in the take (s):', ' '.join(f'{c:.2f}' for c in cuts[1:-1]))
     print(f'done: {out} ({dur}s, {len(order)} lines)')
+
+def chime():
+    """a bright rising C–E–G–C bell arpeggio (same as ../ai-learning-platform-v3)"""
+    t_ = lambda d: np.arange(int(d * SR)) / SR
+    out = np.zeros(int(1.6 * SR))
+    for i, f in enumerate((1046.5, 1318.5, 1568.0, 2093.0)):
+        tt = t_(1.6 - i * .09); y = (np.sin(2 * np.pi * f * tt) + .25 * np.sin(2 * np.pi * 2 * f * tt) * np.exp(-tt * 6)) * np.exp(-tt * (3.2 if i == 3 else 5.5))
+        y[:int(.004 * SR)] *= np.linspace(0, 1, int(.004 * SR)); v1.place(out, i * .09, y * (.22 if i < 3 else .3))
+    return out
 
 if __name__ == '__main__':
     main()

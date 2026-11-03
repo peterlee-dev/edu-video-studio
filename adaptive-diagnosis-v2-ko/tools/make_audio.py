@@ -12,7 +12,7 @@
   ref A B   cut audio/voice_ref.wav and voice_ref.txt from the recording, A–B seconds (a clean 15–30 s stretch of whole sentences)
 
 Writes timeline.js (scenes, and every line with its spoken words and their times: index.html keys pictures to them),
-audio/mix.wav (narration + a whoosh at each page turn + a ding before DING_BEFORE, no music) and subtitles.srt (never burned in).
+audio/mix.wav (narration + a whoosh at each page turn + a soft chime at the start and a rising chime before DING_BEFORE, no music) and subtitles.srt (never burned in).
 
   uv run --with numpy python tools/make_audio.py dry
   uv run --with numpy --with mlx-whisper python tools/make_audio.py tts
@@ -22,7 +22,7 @@ import os, sys, json, re, glob, hashlib, subprocess, difflib, urllib.request, uu
 import numpy as np
 sys.dont_write_bytecode = True   # no __pycache__ next to script.py
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from script import LANGUAGE, SCENES, CONT, SCRIPT, CLONE, LEAD, GAP, SCENE_GAP, TAIL, DING_BEFORE
+from script import LANGUAGE, SCENES, CONT, SCRIPT, CLONE, LEAD, GAP, SCENE_GAP, TAIL, TURN, SPEED, DING_BEFORE
 
 SR = 48000
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
@@ -125,6 +125,26 @@ def longest_pause(db):
     return best * .01
 
 
+def f0_track(y, hop=SR // 100, win=SR // 25):
+    """rough pitch (Hz) of each 10 ms frame by autocorrelation, 70–400 Hz; 0 where unvoiced"""
+    out = []
+    for i in range(0, len(y) - win, hop):
+        f = y[i:i + win] * np.hanning(win)
+        if np.sqrt(np.mean(f ** 2)) < 10 ** (-38 / 20): out.append(0.); continue
+        ac = np.fft.irfft(np.abs(np.fft.rfft(f, 2 * win)) ** 2)[:win]
+        lo, hi = SR // 400, SR // 70; k = lo + int(np.argmax(ac[lo:hi]))
+        out.append(SR / k if ac[k] > .35 * ac[0] else 0.)
+    return np.array(out)
+
+
+def end_pitch(y):
+    """median pitch of the last 0.4 s of voice over the line's median pitch: how far the sentence end falls (< 1) or rises (> 1)"""
+    f = f0_track(y); v = np.where(f > 0)[0]
+    if len(v) < 20: return 1.
+    tail = f[v[v >= v[-1] - 40]]
+    return float(np.median(tail) / np.median(f[v]))
+
+
 def atempo(y, tempo):
     p = subprocess.run([FFMPEG, '-v', 'error', '-f', 'f64le', '-ar', str(SR), '-ac', '1', '-i', '-', '-af', f'atempo={tempo:.4f}', '-f', 'f64le', '-'], input=y.tobytes(), capture_output=True, check=True)
     return np.frombuffer(p.stdout, np.float64).copy()
@@ -165,7 +185,8 @@ def post(path, fields, files):
 
 
 def ref_id(): return h(open(REF, 'rb').read().hex()[:40000], open(REF_TXT, encoding='utf-8').read().strip())
-def takes_of(lid): return sorted(glob.glob(os.path.join(CACHE, f'{lid}_{h(ref_id(), LINE[lid][2])}_*.wav')))
+def take_key(lid): return h(ref_id(), LINE[lid][2], *([str(SPEED)] if SPEED != 1 else []))   # speed 1 keeps the earlier cache names
+def takes_of(lid): return sorted(glob.glob(os.path.join(CACHE, f'{lid}_{take_key(lid)}_*.wav')))
 
 
 def make_takes(ids, redo):
@@ -178,8 +199,8 @@ def make_takes(ids, redo):
             for f in takes_of(lid): os.remove(f); os.path.exists(f[:-4] + '.json') and os.remove(f[:-4] + '.json')
         for k in range(len(takes_of(lid)), N_TAKES if lid in redo else 3):
             print(f'TTS {lid} #{k}', read[:60], flush=True)
-            data = post('/v1/tts/clone', {'text': read, 'ref_text': ref_text, 'language': LANGUAGE, 'format': 'wav'}, {'ref_audio': ('ref.wav', ref)})
-            open(os.path.join(CACHE, f'{lid}_{h(ref_id(), read)}_{k}.wav'), 'wb').write(data)
+            data = post('/v1/tts/clone', {'text': read, 'ref_text': ref_text, 'language': LANGUAGE, 'format': 'wav', 'speed': SPEED}, {'ref_audio': ('ref.wav', ref)})
+            open(os.path.join(CACHE, f'{lid}_{take_key(lid)}_{k}.wav'), 'wb').write(data)
 
 
 def pick_takes(ids, rate=None):
@@ -193,16 +214,18 @@ def pick_takes(ids, rate=None):
             # whisper may write what was read either way ("3번" / "삼 번", "Adaptive" / "어댑티브"): the nearer of the written and the read form counts
             miss = min(0 if got == w else sum(max(i2 - i1, j2 - j1) for op, i1, i2, j1, j2 in difflib.SequenceMatcher(None, w, got, autojunk=False).get_opcodes() if op != 'equal')
                        for w in {want, flat(LINE[lid][2])})
-            cs.append({'k': k, 'tr': tr, 'y': y, 'off': off, 'miss': miss, 'rate': len(want) / (len(y) / SR), 'pause': longest_pause(db)})
+            cs.append({'k': k, 'tr': tr, 'y': y, 'off': off, 'miss': miss, 'rate': len(want) / (len(y) / SR), 'pause': longest_pause(db), 'end': end_pitch(y)})
         cands[lid] = cs
     med = rate or float(np.median([c['rate'] for cs in cands.values() for c in cs if c['miss'] == 0] or [1]))
+    # sentence ends should sound alike (review 1: some ends rose, some fell): prefer takes whose end falls like the typical take's
+    fall = float(np.median([c['end'] for cs in cands.values() for c in cs if c['miss'] == 0] or [1]))
     pick = {}
     for lid, cs in cands.items():
-        for c in cs: c['score'] = c['miss'] * 10 + abs(c['rate'] - med) / med + max(0, c['pause'] - .7) * 4
+        for c in cs: c['score'] = c['miss'] * 10 + abs(c['rate'] - med) / med + max(0, c['pause'] - .7) * 4 + abs(c['end'] - fall) * 4
         pick[lid] = c = min(cs, key=lambda c: c['score'])
-        print(f"  {lid:6s} take {c['k']}  {len(c['y']) / SR:5.2f}s  miss {c['miss']}  pause {c['pause']:.2f}s  [{' '.join(str(x['miss']) for x in cs)}]")
+        print(f"  {lid:6s} take {c['k']}  {len(c['y']) / SR:5.2f}s  miss {c['miss']}  pause {c['pause']:.2f}s  end {c['end']:.2f}  [{' '.join(str(x['miss']) for x in cs)}]")
         if c['miss']: print(f"  ! {lid}: no take reads the script word for word (best differs by {c['miss']} chars: {c['tr']['text']}) → N=8 ... --redo {lid}, or write a read form in script.py")
-    print(f'pace {med:.2f} chars/s')
+    print(f'pace {med:.2f} chars/s, sentence end {fall:.2f} × median pitch')
     return pick, med
 
 
@@ -295,7 +318,7 @@ def lay_out(clips):
     for lid in IDS:
         sc, sub, _, extra = LINE[lid]; c = clips[lid]
         if prev and sc != prev: t += SCENE_GAP
-        if sc not in scene_t: scene_t[sc] = 0 if not prev else t - .9   # the page turn lands just before its first line
+        if sc not in scene_t: scene_t[sc] = 0 if not prev else t - TURN   # the page turn settles just before its first line
         lines[lid] = {'scene': sc, 'text': sub, 'start': round(t, 3), 'end': round(t + c['dur'], 3), 'words': [[w, round(t + s, 3)] for w, s in c['words']]}
         if c['y'] is not None: voice.append((t, c['y']))
         t += c['dur'] + GAP + extra; prev = sc
@@ -324,7 +347,7 @@ def cues(lines):
         'pathDown': [word('l15', '틀리면', '틀리'), word('l15', '3번', '3', '삼'), word('l15', '1번', '1', '일')],    # 5 ✗, 3 ✗, 1 ✓
         'pathUp': [word('l16', '맞히면', '마치면', '맞'), word('l16', '7번', '7', '칠'), word('l16', '9번', '9', '구')],   # 5 ✓, 7 ✓, 9 ✗
         'understood': word('l20', '안다'), 'notUnderstood': word('l20', '모른다', '모른'),
-        'numbersOps': word('l23', '수와'),
+        'numbersOps': word('l23', '수와', '수화'),   # whisper writes 수와연산 (read without the space) as 수화연산
     }
 
 
@@ -352,10 +375,16 @@ def lp(x, a):
     y = np.empty_like(x); s = 0.
     for i, v in enumerate(x): s += a * (v - s); y[i] = s
     return y
-def whoosh():
-    x = lp(np.random.default_rng(3).standard_normal(int(.55 * SR)), .07); e = np.sin(np.pi * np.linspace(0, 1, len(x)) ** .8) ** 2; return x * e * 1.4
-def ding():
-    tt = t_(.9); return sum(np.sin(2 * np.pi * 1318.5 * k * tt) / k ** 1.5 for k in (1, 2, 3)) * np.exp(-tt * 5) * .3
+def whoosh():   # as long as the slower page slide (index.html TR)
+    x = lp(np.random.default_rng(3).standard_normal(int(.95 * SR)), .06); e = np.sin(np.pi * np.linspace(0, 1, len(x)) ** .8) ** 2; return x * e * 1.4
+def mallet(f, d=.9):   # marimba-like note: fundamental + its 4th partial, quick decay
+    tt = t_(d); return (np.sin(2 * np.pi * f * tt) + .35 * np.sin(2 * np.pi * 4 * f * tt) * np.exp(-tt * 14)) * np.exp(-tt * 4.5) * np.minimum(1, tt / .004)
+def arpeggio(notes, gap, g=.3):
+    x = np.zeros(int((gap * len(notes) + 1) * SR))
+    for i, f in enumerate(notes): y = mallet(f); o = int(i * gap * SR); x[o:o + len(y)] += y
+    return x * g
+def chime(): return arpeggio([523.25, 659.25, 783.99, 1046.5], .09)   # end: bright rising C–E–G–C (replaces the ding that sounded like a wrong answer, review 1)
+def intro(): return arpeggio([783.99, 1046.5], .11, .22)              # start: two soft rising notes, so the video does not open in silence (review 1)
 def tone(f, d, g=.3, dec=6): tt = t_(d); return np.sin(2 * np.pi * f * tt) * np.exp(-tt * dec) * np.minimum(1, tt / .005) * g
 def pop(): x = tone(880, .12, .25, 30); x[:int(.1 * SR)] += tone(1320, .1, .12, 40); return x
 def right(): x = tone(1046.5, .5, .25, 7); y = tone(1568, .42, .22, 7); o = int(.08 * SR); x[o:o + len(y)] += y[:len(x) - o]; return x   # correct
@@ -371,7 +400,8 @@ def mix(scenes, lines, voice, dur):
     nar *= .9 / (np.abs(nar).max() + 1e-9)
     for s in scenes[1:]:   # the page slides sideways at the same time (index.html draw); CONT pages do not turn
         if s['id'] not in CONT: place(fx, s['start'] - .15, whoosh(), .3)
-    if DING_BEFORE: place(fx, lines[DING_BEFORE]['start'] - .3, ding(), .35)
+    place(fx, .15, intro(), .35)
+    if DING_BEFORE: place(fx, lines[DING_BEFORE]['start'] - .55, chime(), .35)
     c = cues(lines)   # the same effects as ../adaptive-diagnosis-v2, on the words they belong to
     for k, tt in enumerate(c['pathDown']): place(fx, tt, wrong() if k < 2 else pop(), .35)
     for k, tt in enumerate(c['pathUp']): place(fx, tt, right() if k < 2 else pop(), .35)

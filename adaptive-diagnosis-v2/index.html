@@ -282,10 +282,10 @@ SC.adaptive = t => {
   });
 };
 
-// 5. necessary — a worksheet of 20 questions; the pen keeps 5 and crosses out the rest
+// 5. necessary — a worksheet of 20 questions; the pen keeps 8 and crosses out the rest
 SC.necessary = t => {
   header(t, H0('necessary'), '02  ·  THE NEW APPROACH', 'Only the questions that matter');
-  const keep = [3, 9, 12, 14, 16], cut = st('l9', .45);
+  const keep = [3, 9, 12, 14, 16, 18, 19, 20], cut = st('l9', .45);
   enter(t, H0('necessary') + .2, () => card(210, 260, 900, 600, { r: 8 }));
   for (let i = 0; i < 20; i++) {
     const r = Math.floor(i / 5), c = i % 5, x = 250 + c * 170, y = 300 + r * 140, on = keep.includes(i + 1), k = p(t, H0('necessary') + .3 + i * .03, .4);
@@ -295,8 +295,8 @@ SC.necessary = t => {
     if (on) penCircle(x + 75, y + 56, 64, 44, p(t, cut + keep.indexOf(i + 1) * .15, .4), K.red, 4, 40 + i);
     else { const j = i - keep.filter(q => q <= i).length; crossMark(x + 75, y + 56, 60, p(t, cut + .4 + j * .04, .25), K.grey, 4); }
   }
-  const n = Math.round(lerp(20, 5, eOut(p(t, cut, 1.4))));
-  enter(t, H0('necessary') + .4, () => { text(String(n), 1460, 520, { size: 200, weight: 800, color: n === 5 ? K.red : K.ink, align: 'center' }); text('questions to answer', 1460, 660, { size: 32, weight: 600, color: K.muted, align: 'center' }); });
+  const n = Math.round(lerp(20, keep.length, eOut(p(t, cut, 1.4))));
+  enter(t, H0('necessary') + .4, () => { text(String(n), 1460, 520, { size: 200, weight: 800, color: n === keep.length ? K.red : K.ink, align: 'center' }); text('questions to answer', 1460, 660, { size: 32, weight: 600, color: K.muted, align: 'center' }); });
   text('based on each response', 1460, 720, { size: 32, weight: 700, fam: HAND, color: K.red, align: 'center', alpha: p(t, cut + 1, .5) });
 };
 

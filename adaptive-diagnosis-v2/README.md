@@ -6,7 +6,7 @@
 - 선생님 펜 표시: 빨간 동그라미·체크·가위표·밑줄, 형광펜, 도장(UNDERSTOOD / NOT UNDERSTOOD)
 - 색(2026-10-22, `수학 영상 컬러 개선.pdf`): 흰 바탕 위에 레드 `#E5303A` 하나를 메인으로(정답·긍정·상승·체크, 섹션 태그·핵심 숫자, 선생님 펜), 네이비 `#0F2F57`는 오답·부정·하락, 블루 `#2C64C8`·민트 `#32C2AD`는 비교 2·3번째(진단 단계 2·3, 고리의 나머지 영역, check this one), 나머지는 그레이. 글자 `#383838`, 형광펜은 연한 블러시. 팔레트는 `content.js`의 `colors`
 - 되풀이되는 그림: **난이도 사다리 1~9** — 맞히면 위로, 틀리면 아래로
-- 1920×1080, 30fps. 글꼴은 macOS 시스템 글꼴 Avenir Next(본문)·Noteworthy(손글씨), 한글은 Noto Sans KR로 대신 그려요. 배경음악 없음 (내레이션 + 정답·오답·장면 전환 효과음)
+- 1920×1080, 30fps. 글꼴은 macOS 시스템 글꼴 Avenir Next(본문)·Noteworthy(손글씨), 한글은 Noto Sans KR로 대신 그려요. 배경음악 없음 (내레이션 + 정답·오답·장면 전환 효과음, 끝인사 앞의 올라가는 차임 — `../ai-learning-platform-v3` 와 같은 소리)
 - 화면에 자막은 넣지 않아요 (내레이션만)
 
 | p. | 장면 | 구성 |
@@ -15,7 +15,7 @@
 | 2 | What is a diagnostic assessment? | 1 ASSESS(take an assessment) → 2 DIAGNOSE → 3 PRESCRIBE(Personalized program) 카드 |
 | 3 | The problem today | 쌓이는 문제지와 91문항 카운터, 정확도↑ BUT 부담↑, Effectiveness↓ 막대(finding the starting point) |
 | 4 | Adaptive Diagnostic Assessment | 문제 카드 28×70 → "correctly"에 맞음(레드 ○) 위쪽 더 어려운 419×58, "incorrectly"에 틀림(네이비 ✗) 아래쪽 더 쉬운 34×8 |
-| 5 | Only the questions that matter | 20문항 문제지에서 5문항만 동그라미, 나머지 가위표, 20 → 5 |
+| 5 | Only the questions that matter | 20문항 문제지에서 8문항(Q3 · 9 · 12 · 14 · 16 · 18 · 19 · 20)만 동그라미, 나머지 가위표, 20 → 8 |
 | 6 | What it improves | 효율·신뢰도↑, 진단 시간↓ 막대, "Less burden. A precise starting point." |
 | 7 | One simple rule | 큰 질문 → 사다리: 정답이면 위로(move UP to find how far they know), 오답이면 아래로 |
 | 8 | Each answer narrows the range | 1~9 사다리. 오답: 5 ✗ → 6~9 ✗(no need to ask) → 펜 화살표 → 3 ✗ → 4 ✗ → 화살표 → 1 ✓. 정답 설명이 시작되면 사다리를 처음 상태로 지우고: 5 ✓ → 1~4 ✓ → 화살표 → 7 ✓ → 6 ✓ → 화살표 → 9 ✗. 문항 번호를 읽는 단어에 효과음과 같은 시각 |
@@ -39,5 +39,5 @@ python3 -m venv .venv && .venv/bin/pip install numpy soundfile   # 한 번만 (.
 .venv/bin/python tools/make_audio.py                             # timeline.js, audio/mix.wav
 export FFMPEG=$(python3 -c "import imageio_ffmpeg as i; print(i.get_ffmpeg_exe())")
 export CHROMIUM="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"   # macOS
-node render.mjs --workers 4   # out/adaptive_diagnosis_v2.mp4 (브라우저 4개가 나눠 그려요)
+node render.mjs --workers 3   # out/adaptive_diagnosis_v2.mp4 (GPU 렌더, 브라우저 3개가 나눠 그려요. GPU 가 없으면 --cpu --workers 6)
 ```

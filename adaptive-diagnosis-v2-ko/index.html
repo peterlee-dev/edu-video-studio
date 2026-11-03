@@ -34,7 +34,7 @@
 // crosses, highlighter, sticky notes, stamps. The difficulty ladder (1–9) is the recurring picture of how it works.
 // Timing: timeline.js, written by tools/make_audio.py from the Qwen3-TTS narration (tools/script.py; Wd(line, word) finds a spoken word). draw(t) is a pure function of time.
 // Sound cues baked into audio/mix.wav sit on spoken words (TL.cues): path scene pathDown / pathUp, validate understood /
-// notUnderstood, outro l31 −0.3.
+// notUnderstood, a soft chime at 0.15 s and a rising chime at outro l31 −0.55.
 // ------------------------------------------------------------
 const W = 1920, H = 1080, TL = window.TL, DURATION = TL.duration;
 const cv = document.getElementById('c'), ctx = cv.getContext('2d');
@@ -207,29 +207,28 @@ SC.intro = t => {
 SC.what = t => {
   header(t, H0('what'), '01  ·  기획 배경', '진단평가란?');
   const times = [st('l3', 0), Wd('l3', '학습자의', .3) - .2, Wd('l3', '개인별', .6) - .2];
-  const lab = [['학습을 시작하기 전', '평가를 보고'], ['학습자의', '수준을 파악해'], ['개인별 맞춤', '프로그램 처방']], head = ['평가', '진단', '처방'], cols = [K.red, K.blue, K.mint], heads = [K.red, K.blue, K.mintDark];
+  const lab = ['학습 시작 전 평가 실시', '학습자의 수준 파악', '개인별 맞춤 프로그램 처방'], head = ['평가', '진단', '처방'], cols = [K.red, K.blue, K.mint], heads = [K.red, K.blue, K.mintDark];
   times.forEach((t0, i) => {
     const x = 210 + i * 560;
     enter(t, t0, () => {
       card(x, 300, 480, 470);
       circle(x + 60, 360, 30, cols[i]); text(String(i + 1), x + 60, 362, { size: 32, weight: 700, color: '#FFFFFF', align: 'center' });
       text(head[i], x + 110, 362, { size: 26, weight: 800, color: heads[i], spacing: 3 });
-      lab[i].forEach((s, j) => text(s, x + 40, 650 + j * 44, { size: 32, weight: 700, maxW: 400 }));
+      text(lab[i], x + 240, 672, { size: 32, weight: 700, align: 'center', maxW: 420 });
       if (i === 0) { sheet(x + 240, 510, 150, 180, -.04); }
       if (i === 1) { [3, 5, 7, 9].forEach((h, j) => rr(x + 150 + j * 50, 600 - h * 18, 34, h * 18, [6, 6, 0, 0], j === 2 ? K.blue : K.blueSoft)); }
       if (i === 2) { rr(x + 160, 420, 160, 190, 8, '#FFFFFF', K.mint, 3); for (let j = 0; j < 3; j++) { rr(x + 182, 452 + j * 50, 24, 24, 4, null, K.mint, 3); line0(x + 222, 464 + j * 50, x + 296, 464 + j * 50, BAR, 5); } }
     });
-    if (i === 1) penCircle(x + 317, 438, 34, 34, p(t, t0 + .6, .5), K.red, 4, 11);
     if (i === 2) [0, 1, 2].forEach(j => check(x + 194, 464 + j * 50, 26, p(t, t0 + .5 + j * .2, .3), K.mint, 5));
     if (i) penArrow(x - 70, 535, x - 12, 535, p(t, t0 - .2, .4), K.ink, 4, 12 + i);
   });
 };
 
-// 3. problem — a pile of 91 identical questions; accuracy ↑ (light red) BUT burden ↑ (red), effectiveness ↓ (navy)
+// 3. problem — a pile of 91 identical questions; accuracy ↑ (light red), burden ↑ (red), effectiveness ↓ (navy)
 function meter(x, y, h, v, col, label, sub, a, up) {
   if (a <= 0) return; ctx.save(); ctx.globalAlpha *= a;
   rr(x - 44, y - h, 88, h, 12, '#FFFFFF', LINE, 2); rr(x - 32, y - 12 - (h - 24) * v, 64, (h - 24) * v, 8, col);
-  text(label, x, y + 40, { size: 30, weight: 700, align: 'center', maxW: 240 }); text(sub, x, y + 78, { size: 22, weight: 500, color: K.muted, align: 'center', maxW: 250 });
+  text(sub, x, y + 36, { size: 22, weight: 500, color: K.muted, align: 'center', maxW: 250 }); text(label, x, y + 74, { size: 30, weight: 700, align: 'center', maxW: 240 });
   text(up ? '↑' : '↓', x + 72, y - 12 - (h - 24) * v, { size: 44, weight: 800, color: col, align: 'center' });
   ctx.restore();
 }
@@ -245,9 +244,7 @@ SC.problem = t => {
   const tBur = Wd('l5', '그만큼', .45);
   meter(1060, 760, 380, accV, K.redLight, '정확도', '문항이 많을수록', p(t, st('l5', 0), .5), true);
   meter(1360, 760, 380, burV, K.red, '부담', '아이들이 느끼는', p(t, tBur - .05, .5), true);
-  meter(1660, 760, 380, effV, K.navy, '효율성', '학습 출발점 파악', p(t, st('l6', 0), .5), false);
-  const bk = p(t, tBur - .1, .4);
-  text('하지만', 1210, 332 + inkDy('하지만', 44, 700, HAND), { size: 44, weight: 700, fam: HAND, color: K.navy, align: 'center', alpha: bk }); penCircle(1210, 332, 68, 36, p(t, tBur - .05, .5), K.navy, 4, 21);
+  meter(1660, 760, 380, effV, K.navy, '효율성', '학습 출발점 파악하는', p(t, st('l6', 0), .5), false);
 };
 
 // 4. adaptive — one question card; a correct answer leads up to a harder question, an incorrect one down to an easier one
@@ -289,10 +286,10 @@ SC.adaptive = t => {
   });
 };
 
-// 5. necessary — a worksheet of 20 questions; the pen keeps 5 and crosses out the rest
+// 5. necessary — a worksheet of 20 questions; the pen keeps 8 and crosses out the rest
 SC.necessary = t => {
   header(t, H0('necessary'), '02  ·  새로운 방식', '필요한 문항만 제시');
-  const keep = [3, 9, 12, 14, 16], cut = Wd('l9', '필요한', .55);
+  const keep = [3, 9, 12, 14, 16, 18, 19, 20], cut = Wd('l9', '필요한', .55);
   enter(t, H0('necessary') + .2, () => card(210, 260, 900, 600, { r: 8 }));
   for (let i = 0; i < 20; i++) {
     const r = Math.floor(i / 5), c = i % 5, x = 250 + c * 170, y = 300 + r * 140, on = keep.includes(i + 1), k = p(t, H0('necessary') + .3 + i * .03, .4);
@@ -302,8 +299,8 @@ SC.necessary = t => {
     if (on) penCircle(x + 75, y + 56, 64, 44, p(t, cut + keep.indexOf(i + 1) * .15, .4), K.red, 4, 40 + i);
     else { const j = i - keep.filter(q => q <= i).length; crossMark(x + 75, y + 56, 60, p(t, cut + .4 + j * .04, .25), K.grey, 4); }
   }
-  const n = Math.round(lerp(20, 5, eOut(p(t, cut, 1.4))));
-  enter(t, H0('necessary') + .4, () => { text(String(n), 1460, 520, { size: 200, weight: 800, color: n === 5 ? K.red : K.ink, align: 'center' }); text('풀어야 할 문항', 1460, 660, { size: 34, weight: 600, color: K.muted, align: 'center' }); });
+  const n = Math.round(lerp(20, keep.length, eOut(p(t, cut, 1.4))));
+  enter(t, H0('necessary') + .4, () => { text(String(n), 1460, 520, { size: 200, weight: 800, color: n === keep.length ? K.red : K.ink, align: 'center' }); text('풀어야 할 문항', 1460, 660, { size: 34, weight: 600, color: K.muted, align: 'center' }); });
   text('응답에 따라 실시간으로', 1460, 724, { size: 38, weight: 700, fam: HAND, color: K.red, align: 'center', alpha: p(t, cut + 1, .5) });
 };
 
@@ -352,7 +349,6 @@ SC.how = t => {
 // wiped back to its starting state.
 const RX = 640, RY = i => 880 - (i - 1) * 72;
 function steps(id, a, b) { const l = L(id); return [0, 1, 2].map(k => lerp(l.start + a, l.end - b, k / 2)); }   // fallback without cues
-const moveWin = (ready, cue) => { const m0 = Math.max(ready, cue - .75); return [m0, Math.max(.35, cue - .05 - m0)]; };   // pencil mark arrives on the cue
 SC.path = t => {
   const dn = CUE.pathDown || steps('l15', .6, .8), up = CUE.pathUp || steps('l16', 1.2, .8);
   const upT = st('l16', 0) - .2, caseUp = t > upT, clear = 1 - p(t, upT - .45, .4), sum = eOut(p(t, st('l17', .3), .8));
@@ -389,20 +385,24 @@ SC.path = t => {
   const g = ruled[0], nk = p(t, I[g[0]], .4) * (caseUp ? 1 - sum : clear);
   if (nk > 0) { const yA = RY(Math.min(...g)) + 14, yB = RY(Math.max(...g)) - 14, bx = RX + 84;
     strokePts([[bx, yA], [bx + 12, yA], [bx + 12, yB], [bx, yB]], 1, iCol, 3, nk); text('풀지 않아도 돼요', bx + 32, (yA + yB) / 2, { size: 36, weight: 700, fam: HAND, color: iCol, alpha: nk }); }
-  // the learner's pencil mark moves rung to rung along a pen arrow, after the ruled-out rungs are marked
-  const hops = caseUp ? [[5, 7, c[1], I[1]], [7, 9, c[2], I[6]]] : [[5, 3, c[1], I[9]], [3, 1, c[2], I[4]]];
-  const startT = Wd('l14', '핵심이', .65) - .1; let pos = 5;
-  hops.forEach(([from, to, cue, ready]) => {
-    const [m0, d] = moveWin(ready + .35, cue), k = p(t, m0, d); if (k <= 0) return;
+  // the learner's pencil mark glides rung to rung along a pen arrow and lands on the spoken number; each hop starts after the
+  // answer before it and takes at least 0.6 s, so going up looks like going down even when the numbers are said quickly
+  const hops = caseUp ? [[5, 7, c[1]], [7, 9, c[2]]] : [[5, 3, c[1]], [3, 1, c[2]]];
+  const startT = Wd('l14', '핵심이', .65) - .1; let pos = 5, free = c[0] + .25;
+  hops.forEach(([from, to, cue]) => {
+    const m0 = Math.max(free, cue - .7), d = Math.max(.6, cue - m0); free = m0 + d + .1;
+    const k = p(t, m0, d); if (k <= 0) return;
     pos = lerp(from, to, eIO(k));
     penCurve(RX - 100, RY(from), RX - 180, (RY(from) + RY(to)) / 2, RX - 100, RY(to), k, K.grey, 4, a, true);
   });
   const last = caseUp ? [9, 8] : [1, 2], lk = eIO(p(t, c[2] + .45, .5)); if (lk > 0) pos = lerp(last[0], last[1], lk);
   const orbA = p(t, startT, .3) * (caseUp ? p(t, upT, .3) : clear);
   if (t > startT) circle(RX - 70, lerp(RY(1), RY(9), (pos - 1) / 8), 15, K.red, null, 0, orbA);
-  if (t > startT && t < dn[0]) { const ka = p(t, startT, .4); text('시작: 핵심이 되는 대표 문항', RX + 84, RY(5) - 64, { size: 36, weight: 700, fam: HAND, color: K.red, alpha: ka }); }
+  if (t > startT && t < dn[0]) { const ka = p(t, startT, .4); text('시작: 핵심이 되는 대표 문항', RX + 84, RY(5), { size: 36, weight: 700, fam: HAND, color: K.red, alpha: ka }); }
   // brackets appear with the result cue and fade out only when the summary comes in
   const bracket = (a, b, label, bk) => { if (bk <= 0) return; const yA = RY(a), yB = RY(b), bx = RX + 330; strokePts([[bx - 14, yA], [bx, yA], [bx, yB], [bx - 14, yB]], 1, K.red, 4, bk); text(label, bx + 24, (yA + yB) / 2, { size: 28, weight: 700, color: K.red, alpha: bk, maxW: 560 }); };
+  // which rungs are representative questions: under No. 1, from the words 대표 문항 on
+  text('대표 문항: 1, 3, 5, 7, 9', RX, RY(1) + 64, { size: 26, weight: 600, color: K.muted, align: 'center', alpha: p(t, Wd('l14', '대표', .8), .5) });
   if (!caseUp) bracket(1, 2, '결손이 시작되는 지점', eOut(p(t, dn[2], .4)) * clear);
   else bracket(8, 9, '어디까지 알고 있는지', eOut(p(t, up[2], .4)) * (1 - sum));
   ctx.restore();
@@ -415,8 +415,7 @@ SC.path = t => {
   if (sum > 0) { card(1100, 360, 700, 400, { a: sum });
     enter(t, Wd('l17', '문항', .3) - .1, () => text('문항 수는 최소로,', 1450, 480, { size: 56, weight: 800, align: 'center' }));
     enter(t, Wd('l17', '아이의', .6) - .1, () => text('실력 위치는 정확하게.', 1450, 580, { size: 56, weight: 800, color: K.red, align: 'center', maxW: 640 }));
-    pen(1190, 622, 1710, 618, p(t, st('l17', .7), .5), K.blue, 5, 95);
-    text('대표 문항: 1, 3, 5, 7, 9', 1450, 690, { size: 26, weight: 500, color: K.muted, align: 'center', alpha: p(t, st('l17', .75), .5) }); }
+    pen(1190, 622, 1710, 618, p(t, st('l17', .7), .5), K.blue, 5, 95); }
 };
 
 // 9. validate — representative + 2 similar items; 2 of 3 → stamped. Stamps land on the words "Understood" / "Not" (the ding / boop in the mix)
@@ -439,7 +438,7 @@ SC.validate = t => {
   if (sw > 0) {
     ctx.save(); ctx.globalAlpha *= eOut(sw);
     const a0 = CUE.understood ?? st('l20', 0) + .8, b0 = CUE.notUnderstood ?? st('l20', 0) + 3.4;
-    [['o', 'x', 'o', a0, '안다', K.red, 400, '세 문항 중 두 문항 정답'], ['o', 'x', 'x', b0, '모른다', K.navy, 660, '정답이 두 문항 미만']].forEach(([r1, r2, r3, ts, word, col, y, note]) => {
+    [['o', 'x', 'o', a0, '안다', K.red, 400, '정답이 두 문항 이상'], ['o', 'x', 'x', b0, '모른다', K.navy, 660, '정답이 두 문항 미만']].forEach(([r1, r2, r3, ts, word, col, y, note]) => {
       [r1, r2, r3].forEach((r, i) => miniSheet(380 + i * 220, y, labs[i], r, p(t, ts - .7 + i * .2, .3)));
       text('=', 1080, y, { size: 64, weight: 700, color: K.grey, align: 'center', alpha: p(t, ts - .1, .3) });
       stamp(word, 1430, y - 6, p(t, ts, .35), col, -.06, 40);
@@ -466,7 +465,6 @@ SC.quick = t => {
     ctx.restore();
     text('수와 연산', cx, cy - 6, { size: 48, weight: 800, align: 'center', alpha: k0 });
     text('우선 진단', cx, cy + 62, { size: 38, weight: 700, fam: HAND, color: K.red, align: 'center', alpha: p(t, st('l23', .1), .5) });
-    text('다른 영역은 이어서…', cx + R - 10, cy + R + 30, { size: 34, weight: 700, color: K.blue, alpha: p(t, restT + .9, .5) });
   }
   const tRep = Wd('l23', '리포트', .75) - .4, rk = eOut(p(t, tRep, .7));
   if (rk > 0) { const x = lerp(1900, 1080, rk); card(x, 290, 680, 320, { r: 8 }); chip('간편 리포트', x + 40, 340, { size: 20, fill: K.red, spacing: 2 }); text('수와 연산', x + 40, 402, { size: 34, weight: 800, maxW: 600 });
@@ -499,9 +497,9 @@ SC.effects = t => {
     // once the count stops at 40: 51 (ink) skipped (grey)
     enter(t, tCnt + 1.6, () => { const a = '51', b = '문항 생략', w = measure(a, 36, 800) + measure(b, 32, 700), x = 530 - w / 2;
       text(a, x, 752, { size: 36, weight: 800, color: K.ink }); text(b, x + measure(a, 36, 800), 752, { size: 32, weight: 700, color: K.muted }); }, { d: .5, dy: 14, ox: 530, oy: 752 });
-    const bar = (y, label, sub, v, col, track, upA, a) => { if (a <= 0) return; text(label, 960, y - 44, { size: 34, weight: 800, alpha: a }); text(sub, 960, y - 4, { size: 24, weight: 500, color: K.muted, alpha: a }); rr(960, y + 26, 680, 34, 17, track, null, 0, a); rr(960, y + 26, 680 * v, 34, 17, col, null, 0, a); text(upA ? '↑' : '↓', 1690, y + 42, { size: 44, weight: 800, color: col, align: 'center', alpha: a }); };
-    bar(420, '진단 부담', '회원과 선생님 모두', lerp(.9, .35, eOut(p(t, st('l27', .4), 1.5))), K.navy, K.navySoft, false, p(t, st('l27', .05), .5));
-    bar(640, '상담 · 수업 운영 효율', '그만큼 높아져요', lerp(.4, .92, eOut(p(t, st('l28', .3), 1.5))), K.red, K.redSoft, true, p(t, st('l28', .05), .5));
+    const bar = (y, label, v, col, track, upA, a) => { if (a <= 0) return; text(label, 960, y - 12, { size: 34, weight: 800, alpha: a }); rr(960, y + 26, 680, 34, 17, track, null, 0, a); rr(960, y + 26, 680 * v, 34, 17, col, null, 0, a); text(upA ? '↑' : '↓', 1690, y + 42, { size: 44, weight: 800, color: col, align: 'center', alpha: a }); };
+    bar(420, '진단 부담', lerp(.9, .35, eOut(p(t, st('l27', .4), 1.5))), K.navy, K.navySoft, false, p(t, st('l27', .05), .5));
+    bar(640, '상담 · 수업 운영 효율', lerp(.4, .92, eOut(p(t, st('l28', .3), 1.5))), K.red, K.redSoft, true, p(t, st('l28', .05), .5));
     ctx.restore();
   }
   if (hubOn > 0) {
@@ -527,7 +525,7 @@ SC.outro = t => {
 // ============================================================
 // compositor: slide between pages (with the whoosh), then hold still
 // ============================================================
-const TR = .8;
+const TR = 1.3;   // slide time (review 1: turns felt too fast); tools/script.py TURN starts the turn early enough
 function frame(i, t, ox) {
   if (Math.abs(ox) >= W) return; const s = TL.scenes[i];
   ctx.save(); ctx.translate(Math.round(ox), 0); pageFurniture(i); SC[s.id](t); ctx.restore();
