@@ -1,0 +1,1337 @@
+1
+00:00:02,600 --> 00:00:05,388
+We would like to share our
+development strategy and
+
+2
+00:00:05,443 --> 00:00:08,340
+direction for the new JEI
+English program in the U.S.
+
+3
+00:00:10,090 --> 00:00:15,010
+We aim to develop a new JEI English
+program centered on literacy development.
+
+4
+00:00:15,460 --> 00:00:20,760
+What sets the new JEI English program
+apart is not simply more literacy content.
+
+5
+00:00:21,210 --> 00:00:25,695
+While our current program already develops
+foundational language and basic literacy
+
+6
+00:00:25,749 --> 00:00:30,073
+skills, the new program will integrate
+literacy instruction, precise assessment,
+
+7
+00:00:30,127 --> 00:00:34,720
+personalized learning, and progress tracking
+into one integrated learning experience.
+
+8
+00:00:36,370 --> 00:00:40,210
+More specifically, we want students
+to go beyond reading English.
+
+9
+00:00:40,660 --> 00:00:45,370
+We want them to understand texts, make
+decisions, and express their own ideas.
+
+10
+00:00:47,020 --> 00:00:49,535
+Through precise assessment,
+we will identify each
+
+11
+00:00:49,586 --> 00:00:52,460
+student's current level and
+areas that need improvement.
+
+12
+00:00:52,910 --> 00:00:55,369
+We will then provide a
+personalized learning path and
+
+13
+00:00:55,415 --> 00:00:57,920
+use learning results to track
+each student's progress.
+
+14
+00:00:59,570 --> 00:01:03,110
+In U.S. education, literacy means
+more than reading comprehension.
+
+15
+00:01:03,560 --> 00:01:05,630
+It goes beyond understanding texts.
+
+16
+00:01:06,080 --> 00:01:08,997
+Literacy also includes
+understanding complex texts,
+
+17
+00:01:09,054 --> 00:01:12,200
+using evidence to make
+decisions, and expressing ideas.
+
+18
+00:01:13,850 --> 00:01:17,000
+These skills also support learning
+across different subjects.
+
+19
+00:01:17,450 --> 00:01:20,781
+For our new program, we plan to
+connect basic language skills, such
+
+20
+00:01:20,831 --> 00:01:24,460
+as Phonics, Vocabulary, and Grammar,
+with Reading, Writing, and Thinking.
+
+21
+00:01:24,910 --> 00:01:28,025
+Our goal is to help students move
+beyond reading comprehension
+
+22
+00:01:28,076 --> 00:01:30,940
+to deeper understanding,
+decision-making, and expression.
+
+23
+00:01:32,690 --> 00:01:36,233
+We also reviewed NCTE's major
+education directions over the past
+
+24
+00:01:36,288 --> 00:01:39,720
+ten years and their possible
+direction for the next ten years.
+
+25
+00:01:40,170 --> 00:01:43,154
+Over the past decade, digital
+and media literacy, along
+
+26
+00:01:43,209 --> 00:01:46,410
+with critical literacy, have
+been important areas of focus.
+
+27
+00:01:46,860 --> 00:01:50,417
+These areas emphasize reading
+and evaluating texts critically,
+
+28
+00:01:50,474 --> 00:01:53,400
+making independent decisions,
+and expressing ideas.
+
+29
+00:01:55,050 --> 00:01:57,602
+Looking ahead, the growing
+use of AI agents is
+
+30
+00:01:57,657 --> 00:02:00,320
+expected to make new skills
+even more important.
+
+31
+00:02:00,770 --> 00:02:04,453
+These include understanding and
+using AI critically, human-centered
+
+32
+00:02:04,508 --> 00:02:08,300
+writing, digital citizenship, and
+expressing ideas in different ways.
+
+33
+00:02:09,950 --> 00:02:12,514
+Based on these findings,
+our English team plans
+
+34
+00:02:12,569 --> 00:02:15,460
+to develop a program that
+goes beyond basic literacy.
+
+35
+00:02:15,910 --> 00:02:18,158
+We want students to evaluate information
+
+36
+00:02:18,214 --> 00:02:20,800
+and express their ideas
+clearly and logically.
+
+37
+00:02:22,550 --> 00:02:26,179
+According to the 2024 NAEP
+results, reading achievement
+
+38
+00:02:26,245 --> 00:02:29,280
+in the U.S. remains below
+pre-pandemic levels.
+
+39
+00:02:29,730 --> 00:02:32,411
+Only about 30% of Grade
+4 and Grade 8 students
+
+40
+00:02:32,469 --> 00:02:34,800
+reached the Proficient level in reading.
+
+41
+00:02:36,450 --> 00:02:39,444
+Both grades also showed a five-point drop
+
+42
+00:02:39,517 --> 00:02:42,730
+in average reading scores
+from 2019 to 2024.
+
+43
+00:02:43,180 --> 00:02:45,800
+These results show a
+continued need to improve
+
+44
+00:02:45,857 --> 00:02:48,250
+reading comprehension and literacy skills.
+
+45
+00:02:50,000 --> 00:02:54,480
+Parents increasingly want personalized
+learning and clear evidence of progress.
+
+46
+00:02:54,930 --> 00:02:58,338
+JEI already has strong assessment
+and learning systems, but our
+
+47
+00:02:58,392 --> 00:03:01,800
+strengths and learning results
+are not always clear to parents.
+
+48
+00:03:03,450 --> 00:03:07,021
+To address this, we plan to use
+online Adaptive Assessment to better
+
+49
+00:03:07,074 --> 00:03:10,750
+identify each student's current level
+and areas that need improvement.
+
+50
+00:03:11,200 --> 00:03:13,610
+We will then provide a
+personalized learning
+
+51
+00:03:13,665 --> 00:03:16,020
+roadmap that parents
+can easily understand.
+
+52
+00:03:16,470 --> 00:03:20,247
+We also plan to improve our reports
+so parents can clearly see progress
+
+53
+00:03:20,300 --> 00:03:24,290
+and achievement for each learning
+objective, supported by learning results.
+
+54
+00:03:26,040 --> 00:03:29,260
+We also reviewed opportunities
+in the U.S. education market.
+
+55
+00:03:29,710 --> 00:03:32,416
+Although the market is already
+well developed, we found
+
+56
+00:03:32,465 --> 00:03:35,270
+that parents continue to show
+demand for extra education.
+
+57
+00:03:35,720 --> 00:03:37,830
+They are also still
+willing to spend money on
+
+58
+00:03:37,877 --> 00:03:40,080
+additional learning support
+for their children.
+
+59
+00:03:40,530 --> 00:03:45,020
+This shows that there are still opportunities
+for JEI in the U.S. education market.
+
+60
+00:03:46,770 --> 00:03:49,822
+We reviewed major competitors
+to understand how each brand
+
+61
+00:03:49,875 --> 00:03:53,190
+is positioned in the market and
+what direction JEI should take.
+
+62
+00:03:53,640 --> 00:03:57,240
+Kumon is known for repeated practice
+and building learning habits.
+
+63
+00:03:57,690 --> 00:04:00,860
+Eye Level focuses on level-based
+personalized learning.
+
+64
+00:04:01,310 --> 00:04:04,470
+Best Brains focuses on instruction
+by qualified teachers.
+
+65
+00:04:04,920 --> 00:04:09,490
+Huntington focuses on test preparation
+and improving academic results.
+
+66
+00:04:11,140 --> 00:04:14,227
+We believe JEI has limited
+opportunities to stand out if
+
+67
+00:04:14,282 --> 00:04:17,590
+we compete only on repeated
+practice, test scores, or price.
+
+68
+00:04:18,040 --> 00:04:21,660
+Instead, we need to build on our
+strength in precise assessment.
+
+69
+00:04:23,310 --> 00:04:26,313
+We want to clearly show what
+each student's learning problems
+
+70
+00:04:26,362 --> 00:04:29,660
+are, what they need to learn next,
+and how much they have improved.
+
+71
+00:04:30,110 --> 00:04:33,150
+In other words, we want to
+connect assessment, personalized
+
+72
+00:04:33,201 --> 00:04:35,520
+learning paths, and clear
+evidence of growth.
+
+73
+00:04:37,170 --> 00:04:40,140
+Our goal is to build a clear
+position around the message:
+
+74
+00:04:40,690 --> 00:04:42,710
+Accurate Assessment and Clear Growth.
+
+75
+00:04:44,360 --> 00:04:45,730
+Think about hospitals.
+
+76
+00:04:46,180 --> 00:04:49,749
+Almost all of them have CT
+and MRI scans, but patients
+
+77
+00:04:49,815 --> 00:04:53,450
+only trust a select few as
+true diagnostic specialists.
+
+78
+00:04:53,900 --> 00:04:57,467
+That's the kind of authority JEI
+should have: a learning program
+
+79
+00:04:57,523 --> 00:05:00,700
+recognized for precise diagnosis
+and real student growth.
+
+80
+00:05:02,450 --> 00:05:04,870
+We also conducted a 3C analysis.
+
+81
+00:05:05,320 --> 00:05:09,170
+Our findings show that parents expect
+more than basic English learning.
+
+82
+00:05:09,620 --> 00:05:12,585
+They want stronger literacy
+skills, learning that matches
+
+83
+00:05:12,637 --> 00:05:15,550
+each student's level, and
+clear evidence of improvement.
+
+84
+00:05:16,000 --> 00:05:19,370
+They also want their children to gain
+confidence through learning success.
+
+85
+00:05:21,020 --> 00:05:24,790
+When we look at competitors, each has
+already developed its own strengths.
+
+86
+00:05:25,240 --> 00:05:28,210
+Kumon focuses on repeated
+practice and self-learning.
+
+87
+00:05:28,660 --> 00:05:31,150
+Eye Level provides
+literacy learning across
+
+88
+00:05:31,208 --> 00:05:33,640
+reading, writing, grammar, and vocabulary.
+
+89
+00:05:34,090 --> 00:05:38,260
+Sylvan and Huntington focus on
+assessment-based tutoring and test results.
+
+90
+00:05:38,710 --> 00:05:42,170
+Best Brains provides small-group
+Language Arts instruction.
+
+91
+00:05:43,820 --> 00:05:46,450
+JEI also has important strengths.
+
+92
+00:05:46,900 --> 00:05:49,893
+These include small-step
+learning, a spiral curriculum,
+
+93
+00:05:49,947 --> 00:05:52,940
+structured content, and
+assessment-based self-learning.
+
+94
+00:05:53,390 --> 00:05:57,610
+However, these strengths and learning results
+are not yet clearly shown to parents.
+
+95
+00:05:59,260 --> 00:06:01,890
+Therefore, we want to
+maintain JEI's strengths
+
+96
+00:06:01,947 --> 00:06:04,120
+in small-step and structured learning.
+
+97
+00:06:04,570 --> 00:06:07,918
+At the same time, we plan to
+strengthen literacy education and
+
+98
+00:06:07,972 --> 00:06:11,320
+use precise assessment to provide
+personalized learning paths.
+
+99
+00:06:11,770 --> 00:06:15,490
+We also want to make each student's
+progress and results easier to see.
+
+100
+00:06:15,940 --> 00:06:18,710
+This will help us build a
+stronger position in the market.
+
+101
+00:06:20,460 --> 00:06:24,970
+We reviewed the main approaches and strengths
+of major literacy programs in the U.S.
+
+102
+00:06:25,420 --> 00:06:29,350
+Amplify builds background knowledge
+to support reading comprehension.
+
+103
+00:06:29,800 --> 00:06:33,630
+Lexia uses learning data to identify
+skills that need improvement.
+
+104
+00:06:34,080 --> 00:06:37,410
+i-Ready connects assessment results
+with personalized learning.
+
+105
+00:06:37,860 --> 00:06:41,130
+IXL tracks progress
+across individual skills.
+
+106
+00:06:42,780 --> 00:06:45,650
+We want to learn from these
+programs and their strengths.
+
+107
+00:06:46,100 --> 00:06:50,580
+However, our goal is not to make
+literacy itself our only key difference.
+
+108
+00:06:51,030 --> 00:06:54,135
+Instead, we want to combine
+literacy learning with precise
+
+109
+00:06:54,189 --> 00:06:57,240
+assessment, personalized
+learning, and progress tracking.
+
+110
+00:06:57,690 --> 00:07:01,280
+Through this approach, we aim to offer
+a different learning experience.
+
+111
+00:07:02,930 --> 00:07:07,500
+Our English team is continuing to study
+major U.S. literacy programs in more detail.
+
+112
+00:07:07,950 --> 00:07:10,825
+Based on this research, we are
+working to define the unique
+
+113
+00:07:10,874 --> 00:07:14,090
+strengths of JEI English and prepare
+a more detailed product plan.
+
+114
+00:07:15,840 --> 00:07:18,070
+We also conducted a SWOT analysis.
+
+115
+00:07:18,520 --> 00:07:21,770
+First, JEI has several internal strengths.
+
+116
+00:07:22,220 --> 00:07:26,810
+Our precise assessment system allows us to
+provide personalized learning roadmaps.
+
+117
+00:07:27,260 --> 00:07:30,044
+Our learning content is
+based on JEI's educational
+
+118
+00:07:30,100 --> 00:07:32,550
+philosophy and programmed
+learning approach.
+
+119
+00:07:33,000 --> 00:07:35,890
+It follows a small-step and
+spiral learning structure.
+
+120
+00:07:36,340 --> 00:07:39,117
+This structure helps
+students learn independently
+
+121
+00:07:39,173 --> 00:07:41,270
+and work toward mastering each skill.
+
+122
+00:07:42,920 --> 00:07:45,639
+However, one weakness is
+that parents may not clearly
+
+123
+00:07:45,690 --> 00:07:48,050
+see changes or improvements
+in a short period.
+
+124
+00:07:48,500 --> 00:07:51,140
+We need better measures and
+reports that help parents
+
+125
+00:07:51,190 --> 00:07:53,830
+understand exactly what their
+children have improved.
+
+126
+00:07:55,480 --> 00:07:58,014
+Looking at external
+opportunities, demand for
+
+127
+00:07:58,070 --> 00:08:00,660
+literacy and personalized
+learning is growing.
+
+128
+00:08:01,110 --> 00:08:04,090
+AI and digital education
+are also expanding.
+
+129
+00:08:04,540 --> 00:08:06,724
+As a result, parents increasingly expect
+
+130
+00:08:06,778 --> 00:08:09,180
+to see learning progress
+through clear data.
+
+131
+00:08:10,830 --> 00:08:15,210
+At the same time, strong competitors with
+well-known brands remain a challenge.
+
+132
+00:08:15,660 --> 00:08:19,560
+Competition based on price and
+convenience is another possible risk.
+
+133
+00:08:21,210 --> 00:08:24,720
+Based on this analysis, we want
+to strengthen JEI's position by
+
+134
+00:08:24,776 --> 00:08:28,509
+connecting our assessment and
+learning system with literacy-focused
+
+135
+00:08:28,564 --> 00:08:32,130
+learning, Adaptive personalization,
+and clear progress tracking.
+
+136
+00:08:33,880 --> 00:08:36,358
+Based on the Ansoff
+Matrix, we believe product
+
+137
+00:08:36,412 --> 00:08:38,620
+development should be our first priority.
+
+138
+00:08:39,070 --> 00:08:41,633
+We could focus on increasing
+sales of existing
+
+139
+00:08:41,689 --> 00:08:44,140
+products through
+advertising and promotions.
+
+140
+00:08:44,590 --> 00:08:48,029
+While this may work in the short
+term, it does not address the need
+
+141
+00:08:48,080 --> 00:08:51,570
+to strengthen our product competitiveness
+and attract new customers.
+
+142
+00:08:53,220 --> 00:08:55,941
+JEI already has a presence
+in key U.S. markets,
+
+143
+00:08:55,999 --> 00:08:59,010
+so market development is
+not our immediate priority.
+
+144
+00:08:59,460 --> 00:09:02,825
+Instead, we plan to build on our
+existing content, assessment,
+
+145
+00:09:02,879 --> 00:09:06,570
+and learning systems to develop a
+new personalized literacy program.
+
+146
+00:09:07,020 --> 00:09:09,854
+This is not simply an update
+to our existing product,
+
+147
+00:09:09,907 --> 00:09:12,260
+but a new approach to
+personalized learning.
+
+148
+00:09:14,010 --> 00:09:17,690
+Our new program will target students
+from Pre-K through Grade 9.
+
+149
+00:09:18,140 --> 00:09:22,680
+For the first development and testing
+phase, we plan to focus on Grades 3 to 6.
+
+150
+00:09:24,330 --> 00:09:27,075
+At this stage, students
+move from basic reading to
+
+151
+00:09:27,130 --> 00:09:30,260
+deeper understanding, vocabulary,
+and written expression.
+
+152
+00:09:30,710 --> 00:09:32,640
+Learning gaps also become clearer.
+
+153
+00:09:33,090 --> 00:09:35,744
+We believe this is a good
+stage to test our precise
+
+154
+00:09:35,796 --> 00:09:38,190
+assessment and personalized
+learning approach.
+
+155
+00:09:39,940 --> 00:09:41,890
+We also developed a positioning map.
+
+156
+00:09:42,340 --> 00:09:45,631
+We compared major competitors
+based on two factors: the level
+
+157
+00:09:45,685 --> 00:09:48,760
+of assessment detail and how
+learning paths are adjusted.
+
+158
+00:09:50,410 --> 00:09:53,177
+The horizontal axis shows
+the difference between
+
+159
+00:09:53,234 --> 00:09:55,540
+basic assessment and precise assessment.
+
+160
+00:09:55,990 --> 00:09:58,780
+Basic assessment identifies
+a student's starting point.
+
+161
+00:09:59,230 --> 00:10:02,240
+Precise assessment goes further
+by identifying the student's
+
+162
+00:10:02,291 --> 00:10:05,050
+current level and specific
+areas that need improvement.
+
+163
+00:10:06,700 --> 00:10:09,107
+The vertical axis shows
+the difference between
+
+164
+00:10:09,159 --> 00:10:11,880
+a fixed learning path and
+an Adaptive Learning path.
+
+165
+00:10:12,330 --> 00:10:14,880
+A fixed path follows a set learning order.
+
+166
+00:10:15,330 --> 00:10:18,910
+An Adaptive path changes based on
+each student's learning results.
+
+167
+00:10:20,560 --> 00:10:23,690
+Currently, JEI English is
+in the fourth quadrant.
+
+168
+00:10:24,140 --> 00:10:28,800
+We use assessment to identify strengths and
+learning needs in different skill areas.
+
+169
+00:10:29,250 --> 00:10:31,370
+We also set personalized learning paths.
+
+170
+00:10:31,820 --> 00:10:36,270
+However, students mainly continue
+learning through a fixed learning path.
+
+171
+00:10:37,920 --> 00:10:39,690
+Kumon is in the third quadrant.
+
+172
+00:10:40,140 --> 00:10:43,270
+It uses assessment to identify
+a suitable starting point.
+
+173
+00:10:43,720 --> 00:10:46,233
+Students then follow a
+set learning path, with
+
+174
+00:10:46,288 --> 00:10:48,910
+adjustments to their pace
+and repeated practice.
+
+175
+00:10:50,560 --> 00:10:53,530
+The education market is now
+moving one step further.
+
+176
+00:10:53,980 --> 00:10:56,348
+It is no longer enough to simply identify
+
+177
+00:10:56,406 --> 00:10:59,120
+a starting point or adjust
+each student's pace.
+
+178
+00:10:59,570 --> 00:11:02,681
+It is becoming more important to
+understand each student's learning
+
+179
+00:11:02,727 --> 00:11:06,070
+needs accurately and change what they
+learn next based on their results.
+
+180
+00:11:07,720 --> 00:11:10,100
+Therefore, our goal is to move JEI English
+
+181
+00:11:10,157 --> 00:11:12,820
+from the fourth quadrant
+to the first quadrant.
+
+182
+00:11:13,270 --> 00:11:15,577
+We want to use precise
+assessment to identify
+
+183
+00:11:15,629 --> 00:11:18,090
+each student's current
+level and learning needs.
+
+184
+00:11:18,540 --> 00:11:20,873
+We will then continue
+to adjust personalized
+
+185
+00:11:20,926 --> 00:11:23,100
+learning paths based on learning results.
+
+186
+00:11:23,550 --> 00:11:27,590
+Finally, we want to clearly show
+how much each student has improved.
+
+187
+00:11:29,240 --> 00:11:30,530
+This is what we mean by:
+
+188
+00:11:31,080 --> 00:11:32,980
+Accurate Assessment, Clear Growth.
+
+189
+00:11:33,630 --> 00:11:37,206
+We aim to make precise assessment,
+personalized Adaptive Learning,
+
+190
+00:11:37,260 --> 00:11:40,620
+and clear progress tracking one
+connected learning experience.
+
+191
+00:11:41,070 --> 00:11:44,630
+This will be the key position
+of the new JEI English program.
+
+192
+00:11:46,380 --> 00:11:48,874
+We reviewed the customer
+journey from first
+
+193
+00:11:48,932 --> 00:11:51,310
+interest in JEI English to re-enrollment.
+
+194
+00:11:51,760 --> 00:11:55,116
+Parents need clear reasons to
+choose JEI, easy-to-understand
+
+195
+00:11:55,172 --> 00:11:58,080
+assessment results, and
+personalized learning plans.
+
+196
+00:11:58,530 --> 00:12:00,790
+They also want to see
+their children's progress.
+
+197
+00:12:02,440 --> 00:12:05,136
+We plan to improve consultation,
+learning roadmaps,
+
+198
+00:12:05,189 --> 00:12:07,990
+and progress reports throughout
+the customer journey.
+
+199
+00:12:08,440 --> 00:12:12,840
+Our goal is to make the value of
+JEI English clear at every stage.
+
+200
+00:12:14,590 --> 00:12:18,940
+Our 4P strategy focuses on Product,
+Price, Place, and Promotion.
+
+201
+00:12:19,390 --> 00:12:21,987
+For Product, we will provide
+personalized English
+
+202
+00:12:22,040 --> 00:12:24,690
+and literacy learning based
+on precise assessment.
+
+203
+00:12:25,140 --> 00:12:28,383
+For Price, we will consider the
+full learning value, including
+
+204
+00:12:28,435 --> 00:12:31,940
+assessment, personalized learning,
+coaching, and progress tracking.
+
+205
+00:12:33,590 --> 00:12:37,050
+For Place, we will connect center
+learning with self-learning at home.
+
+206
+00:12:37,500 --> 00:12:41,760
+For Promotion, we will clearly show the
+learning journey from assessment to growth.
+
+207
+00:12:43,510 --> 00:12:47,900
+We plan to develop our Personalized
+Blended Learning program in two steps.
+
+208
+00:12:48,350 --> 00:12:52,467
+In Step 1, we will provide personalized
+POD workbooks based on Adaptive
+
+209
+00:12:52,525 --> 00:12:56,700
+Assessment results and connect them
+with existing JEI English workbooks.
+
+210
+00:12:58,350 --> 00:13:01,050
+In Step 2, we will
+introduce online learning.
+
+211
+00:13:01,500 --> 00:13:05,980
+Students will be able to choose online
+learning, POD workbooks, or both.
+
+212
+00:13:06,430 --> 00:13:08,518
+We also plan to connect learning results
+
+213
+00:13:08,571 --> 00:13:10,920
+and adjust each student's
+next learning path.
+
+214
+00:13:12,670 --> 00:13:15,090
+We plan to use AI in four areas.
+
+215
+00:13:15,540 --> 00:13:20,360
+First, an AI Tutor will provide hints and
+additional explanations during learning.
+
+216
+00:13:20,810 --> 00:13:25,900
+Second, AI will help analyze answers,
+learning processes, and student progress.
+
+217
+00:13:27,550 --> 00:13:30,660
+Third, we plan to scan POD
+worksheets and connect
+
+218
+00:13:30,724 --> 00:13:33,390
+offline results with online learning data.
+
+219
+00:13:33,840 --> 00:13:36,775
+Finally, we will use AI to
+support content development,
+
+220
+00:13:36,828 --> 00:13:39,870
+with our researchers reviewing
+and improving the content.
+
+221
+00:13:40,320 --> 00:13:42,678
+Our goal is to improve
+personalized learning
+
+222
+00:13:42,732 --> 00:13:45,090
+and make content
+development more efficient.
+
+223
+00:13:46,840 --> 00:13:50,762
+Our goal is to develop a new JEI
+English program that builds literacy
+
+224
+00:13:50,819 --> 00:13:54,230
+skills through precise assessment
+and personalized learning.
+
+225
+00:13:54,680 --> 00:13:56,893
+As we explained earlier,
+this is not simply
+
+226
+00:13:56,944 --> 00:13:59,260
+about improving our
+existing English content.
+
+227
+00:13:59,710 --> 00:14:03,949
+The key is to bring literacy learning,
+precise assessment, personalized
+
+228
+00:14:04,009 --> 00:14:07,890
+learning, and clear evidence of
+progress together in one program.
+
+229
+00:14:09,540 --> 00:14:12,065
+To achieve this, we plan
+to design a program
+
+230
+00:14:12,123 --> 00:14:14,820
+structure that can cover
+Pre-K through Grade 9.
+
+231
+00:14:15,270 --> 00:14:18,246
+We will use precise assessment
+to identify each student's
+
+232
+00:14:18,298 --> 00:14:20,700
+current level and areas
+that need improvement.
+
+233
+00:14:21,150 --> 00:14:24,730
+Based on the results, we will provide
+a personalized learning path.
+
+234
+00:14:26,380 --> 00:14:29,748
+We will also organize Vocabulary,
+Grammar, Phonics, Reading,
+
+235
+00:14:29,804 --> 00:14:32,610
+and Writing into a structured
+literacy curriculum.
+
+236
+00:14:33,060 --> 00:14:36,308
+This will help students develop
+skills in understanding,
+
+237
+00:14:36,366 --> 00:14:39,730
+making inferences, making
+decisions, and expressing ideas.
+
+238
+00:14:40,180 --> 00:14:43,010
+In addition, we plan to
+improve our learning reports.
+
+239
+00:14:43,460 --> 00:14:46,027
+We want parents and students
+to easily understand
+
+240
+00:14:46,079 --> 00:14:48,960
+and use information about
+learning progress and growth.
+
+241
+00:14:50,610 --> 00:14:54,216
+To summarize, our final direction
+is to develop a new program that
+
+242
+00:14:54,270 --> 00:14:58,040
+builds literacy through precise
+assessment and personalized learning.
+
+243
+00:14:58,490 --> 00:15:01,990
+We also want to make learning results
+and progress clearly visible.
+
+244
+00:15:03,740 --> 00:15:07,302
+To put our product strategy into practice,
+we first need to connect national
+
+245
+00:15:07,349 --> 00:15:10,630
+and state education standards with
+our learning system and assessment.
+
+246
+00:15:11,080 --> 00:15:14,930
+However, education standards
+vary across U.S. states.
+
+247
+00:15:15,380 --> 00:15:19,295
+Among the 50 states, 39 use
+either modified versions
+
+248
+00:15:19,370 --> 00:15:23,360
+of the CCSS or independently
+developed ELA standards.
+
+249
+00:15:25,010 --> 00:15:28,992
+We reviewed ELA standards across
+all 50 U.S. states, including
+
+250
+00:15:29,056 --> 00:15:32,460
+California, New Jersey, New
+York, Florida, and Texas.
+
+251
+00:15:32,910 --> 00:15:36,825
+Our plan is to build a common ELA and
+Literacy structure while reflecting
+
+252
+00:15:36,879 --> 00:15:40,580
+each state's standards in assessment
+and personalized learning paths.
+
+253
+00:15:41,030 --> 00:15:43,717
+This will help us design
+assessments and learning
+
+254
+00:15:43,772 --> 00:15:46,130
+paths that match local
+education standards.
+
+255
+00:15:47,880 --> 00:15:50,450
+We are also considering
+how to turn this product
+
+256
+00:15:50,504 --> 00:15:52,860
+strategy into an actual
+learning experience.
+
+257
+00:15:53,310 --> 00:15:57,000
+Students will select their program,
+country, state, and language.
+
+258
+00:15:57,450 --> 00:16:00,974
+Based on this information, they will
+take an online Adaptive Assessment
+
+259
+00:16:01,024 --> 00:16:04,200
+that reflects local education
+standards and learning conditions.
+
+260
+00:16:05,850 --> 00:16:09,360
+We will then use the assessment results
+to provide personalized learning.
+
+261
+00:16:09,810 --> 00:16:13,267
+Students will be able to choose
+POD workbooks, online learning,
+
+262
+00:16:13,322 --> 00:16:16,120
+or a combination of both,
+depending on their needs.
+
+263
+00:16:16,570 --> 00:16:18,786
+In the long term, we aim to expand this
+
+264
+00:16:18,843 --> 00:16:21,400
+into a global personalized
+learning platform.
+
+265
+00:16:23,150 --> 00:16:26,840
+We plan to provide personalized
+learning through three main steps.
+
+266
+00:16:27,290 --> 00:16:29,689
+First, we will set
+learning standards based
+
+267
+00:16:29,745 --> 00:16:32,200
+on each student's country,
+state, and grade.
+
+268
+00:16:32,650 --> 00:16:35,396
+Second, we will use Adaptive
+Assessment to identify
+
+269
+00:16:35,450 --> 00:16:37,980
+the student's current
+level and learning needs.
+
+270
+00:16:38,430 --> 00:16:40,967
+Third, we will design a
+personalized learning
+
+271
+00:16:41,023 --> 00:16:43,560
+path and adjust it based
+on learning results.
+
+272
+00:16:45,210 --> 00:16:48,044
+This will lead to Adaptive
+Learning, where each student's
+
+273
+00:16:48,094 --> 00:16:50,630
+next learning steps change
+based on their progress.
+
+274
+00:16:52,480 --> 00:16:52,990
+Thank you.
+
