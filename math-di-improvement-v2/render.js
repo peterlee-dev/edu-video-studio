@@ -1,6 +1,7 @@
 // 사용: node render.js stills 3,12.5,40        → stills/*.png
 //       node render.js video out.mp4 [workers]  → 병렬 렌더 후 오디오 합성
 //       node render.js patch base.mp4 out.mp4 44-60,84-91.6  → 그 구간(초)만 다시 렌더해 base 에 끼움
+//       끝에 --cpu → 예전 방식(SwiftShader 소프트웨어 그리기 + libx264). 기본은 GPU(Metal 그리기 + VideoToolbox 하드웨어 H.264)
 const puppeteer = require("puppeteer-core");
 const ffmpeg = require("ffmpeg-static");
 const { spawn } = require("child_process");
@@ -10,6 +11,11 @@ const path = require("path");
 const CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const URL = "file://" + path.join(__dirname, "index.html");
 const FPS = 30;
+const GPU = !process.argv.includes("--cpu");
+const CHROME_ARGS = GPU ? ["--use-angle=metal", "--enable-gpu", "--enable-gpu-rasterization", "--ignore-gpu-blocklist"]
+  : ["--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"];
+const VIDEO_ARGS = GPU ? ["-c:v", "h264_videotoolbox", "-profile:v", "high", "-b:v", "20M", "-pix_fmt", "yuv420p", "-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709"]
+  : ["-c:v", "libx264", "-preset", "medium", "-crf", "18", "-pix_fmt", "yuv420p"];
 
 async function openPage(browser) {
   const page = await browser.newPage();
@@ -22,7 +28,7 @@ async function openPage(browser) {
   return page;
 }
 
-const launch = () => puppeteer.launch({ executablePath: CHROME, headless: true, args: ["--allow-file-access-from-files", "--force-color-profile=srgb", "--hide-scrollbars"] });
+const launch = () => puppeteer.launch({ executablePath: CHROME, headless: true, args: ["--allow-file-access-from-files", "--force-color-profile=srgb", "--hide-scrollbars", ...CHROME_ARGS] });
 
 function run(cmd, args, opts = {}) {
   return new Promise((res, rej) => {
@@ -55,7 +61,7 @@ async function renderChunk(from, to, out, id) {
   const browser = await launch();
   const page = await openPage(browser);
   const ff = spawn(ffmpeg, ["-y", "-f", "image2pipe", "-framerate", String(FPS), "-c:v", "png", "-i", "-",
-    "-c:v", "libx264", "-preset", "medium", "-crf", "18", "-pix_fmt", "yuv420p", "-r", String(FPS), out], { stdio: ["pipe", "ignore", "pipe"] });
+    ...VIDEO_ARGS, "-r", String(FPS), out], { stdio: ["pipe", "ignore", "pipe"] });
   let err = ""; ff.stderr.on("data", d => (err += d));
   const done = new Promise((res, rej) => ff.on("close", c => (c === 0 ? res() : rej(new Error(err.slice(-1500))))));
   const t0 = Date.now();
@@ -70,7 +76,8 @@ async function renderChunk(from, to, out, id) {
 }
 
 (async () => {
-  const [mode, a1, a2] = process.argv.slice(2);
+  const argv = process.argv.slice(2).filter(a => a !== "--cpu");
+  const [mode, a1, a2] = argv;
   const browser = await launch();
   if (mode === "stills") {
     fs.mkdirSync(path.join(__dirname, "stills"), { recursive: true });
@@ -103,7 +110,7 @@ async function renderChunk(from, to, out, id) {
   } else if (mode === "patch") {
     // 바뀐 구간만 다시 렌더해 기존 영상에 끼운다(오디오는 기존 영상 것을 그대로 씀)
     // node render.js patch base.mp4 out.mp4 44-60,84-91.6
-    const [base, out, spans] = [a1, a2, process.argv[5]];
+    const [base, out, spans] = [a1, a2, argv[3]];
     const page = await openPage(browser);
     const total = Math.ceil((await page.evaluate(() => window.DURATION)) * FPS);
     await page.close();
@@ -119,7 +126,7 @@ async function renderChunk(from, to, out, id) {
     });
     if (cur < total) segs.push(`[0:v]trim=start_frame=${cur}:end_frame=${total},setpts=PTS-STARTPTS[s${segs.length}]`);
     const fc = segs.join(";") + ";" + segs.map((_, i) => `[s${i}]`).join("") + `concat=n=${segs.length}:v=1:a=0[v]`;
-    await run(ffmpeg, ["-y", ...inputs, "-filter_complex", fc, "-map", "[v]", "-map", "0:a", "-c:v", "libx264", "-preset", "medium", "-crf", "18", "-pix_fmt", "yuv420p", "-r", String(FPS), "-c:a", "copy", "-movflags", "+faststart", out]);
+    await run(ffmpeg, ["-y", ...inputs, "-filter_complex", fc, "-map", "[v]", "-map", "0:a", ...VIDEO_ARGS, "-r", String(FPS), "-c:a", "copy", "-movflags", "+faststart", out]);
     console.log("done:", out, R.map(([a, b]) => `${(a / FPS).toFixed(2)}–${(b / FPS).toFixed(2)}s`).join(", "));
     await run("python3", [path.join(__dirname, "check_frames.py"), out], { stdio: ["ignore", "inherit", "inherit"] });
   }

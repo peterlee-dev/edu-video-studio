@@ -715,6 +715,7 @@ window.EDITOR = {
   get project() { return project; }, get total() { return TOTAL; }, get ready() { return !!project && $('busy').hidden; }, get sel() { return sel; },
   seek, selectClip, loadProject: async j => { await loadProjectJSON(j); }, fps: FPS,
   frame: t => { peek = null; renderFrame(t); return view.toDataURL('image/png'); }, wavBase64,
+  draw: t => { peek = null; renderFrame(t); },   // 저장소 GPU 렌더링용: #view 에 그리기만 (editor/render.mjs)
 };
 (async () => {
   setControls(false);

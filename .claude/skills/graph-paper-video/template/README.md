@@ -28,6 +28,9 @@ uv run --with numpy --with mlx-whisper python tools/make_audio.py <tts|take>   #
 
 ```bash
 node tools/snap.mjs out/snaps --ends            # 장면마다 다 그려진 때의 정지 화면 + 못 찾은 큐 단어
-node render.mjs --workers 6                      # out/<폴더_이름>.mp4
-node render.mjs --workers 6 --only 99-115,217-end   # 고친 구간(초)만 다시 그리고 나머지는 기존 영상에서 가져와요
+node render.mjs --workers 3                      # out/<폴더_이름>.mp4 (GPU)
+node render.mjs --workers 3 --only 99-115,217-end   # 고친 구간(초)만 다시 그리고 나머지는 기존 영상에서 가져와요
+node render.mjs --cpu --workers 6                # GPU 가 없을 때: 예전 CPU 방식
 ```
+
+`render.mjs` 는 GPU 로 렌더해요: Chrome 이 Metal 로 캔버스를 그리고, 브라우저 안의 하드웨어 H.264 인코더(WebCodecs → VideoToolbox)로 바로 압축해 조각을 다시 인코딩하지 않고 이어 붙여요(`jei-english-adaptive-diagnosis` 에서 가져옴). 예전 CPU 방식(SwiftShader + PNG + libx264)보다 훨씬 빠르고 메모리도 덜 써요. GPU 가 없는 컴퓨터는 `--cpu`.
