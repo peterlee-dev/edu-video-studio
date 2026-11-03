@@ -1,5 +1,6 @@
 // 편집기에서 고를 수 있는 영상 (폴더 이름 = id). 각 폴더는 editor/PROTOCOL.md 를 따름
 window.VIDEOS = [
+ { id: 'jei-english-us-strategy', title: 'JEI English 미주 개발 방향 및 전략 (모눈종이 워크북)' },
  { id: 'jei-english-adaptive-diagnosis', title: 'JEI English 미주 Online Adaptive 진단 (모눈종이 워크북)' },
  { id: 'jei-english-us-plan', title: 'JEI English 미주 신상품 기획(안) (모눈종이 워크북)' },
  { id: 'ai-learning-platform-v3-ko', title: 'JEI Math AI 개인 맞춤형 학습플랫폼 (한국어, 30쪽)' },
