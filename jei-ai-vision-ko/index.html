@@ -1,0 +1,836 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>JEI AI 전환 비전</title>
+<style>
+  @font-face { font-family: 'Noto Sans KR'; src: url('fonts/NotoSansKR.ttf') format('truetype'); font-weight: 100 900; font-display: block; }
+  @font-face { font-family: 'Gaegu'; src: url('fonts/Gaegu-Bold.ttf') format('truetype'); font-weight: 100 900; font-display: block; }
+  html, body { margin: 0; background: #0E1424; }
+  body { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 12px; font-family: 'Avenir Next', 'Noto Sans KR', sans-serif; color: #ddd; }
+  canvas { width: min(100%, 1280px); aspect-ratio: 16 / 9; display: block; background: #FEFFFF; }
+  .bar { display: flex; gap: 12px; align-items: center; width: min(100%, 1280px); }
+  .bar input { flex: 1; }
+  body.render { padding: 0; gap: 0; }
+  body.render canvas { width: 1920px; height: 1080px; }
+  body.render .bar { display: none; }
+</style>
+</head>
+<body>
+<script src="timeline.js"></script>
+<script src="content.js"></script>
+<script src="schema.js"></script>
+<canvas id="c" width="1920" height="1080"></canvas>
+<div class="bar">
+  <button id="play">▶ Play</button>
+  <input id="seek" type="range" min="0" max="300" step="0.01" value="0">
+  <span id="time">0.00s</span>
+</div>
+<script>
+// ------------------------------------------------------------
+// JEI AI 전환 비전: JEI Knowledge Map 기반 AI 개인화 학습 플랫폼 — the 12-page deck JEI_AI플랫폼_동영상장면.pptx.pdf redrawn in the
+// design system of ../ai-learning-platform-v3-ko: one continuous sheet of graph paper, each PDF page a workbook page (long pages told in
+// several scenes on the same sheet, tools/script.py CONT). The camera slides sideways between pages (in time with the whoosh in the mix)
+// and stays still while the page is read.
+// Teacher's-pen marks: circles, checks, boxes, arrows, highlighter, sticky notes, stamps.
+// Timing: timeline.js, written by tools/make_audio.py from the real narration. Pictures follow spoken words
+// (W(line, word) looks the word up in TL.lines[line].words). draw(t) is a pure function of time.
+// ------------------------------------------------------------
+const W = 1920, H = 1080, TL = window.TL, DURATION = TL.duration;
+const cv = document.getElementById('c'), ctx = cv.getContext('2d');
+const DEFAULT_CONTENT = JSON.parse(JSON.stringify(window.CONTENT));
+let C = window.CONTENT, K = C.colors;
+const SANS = "'Avenir Next', 'Noto Sans KR', 'Helvetica Neue', sans-serif";
+const HAND = "'Gaegu', 'Noto Sans KR', cursive";   // Korean handwriting (Gaegu Bold, OFL)
+const LINE = '#E2E4E8';   // card outline (neutral). Boxes, highlighter and sticky notes take K.lightBox / K.blush (colour rules: ../README.md)
+
+// ---------- basics ----------
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const lerp = (a, b, k) => a + (b - a) * k;
+const p = (t, s, d) => clamp((t - s) / d);
+const eOut = x => 1 - Math.pow(1 - x, 3), eIO = x => x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+const eBack = x => { const c1 = 1.7, c3 = c1 + 1; return x <= 0 ? 0 : 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2); };
+const nz = (i, s = 1) => { const v = Math.sin(i * 12.9898 + s * 78.233) * 43758.5453; return v - Math.floor(v) - .5; };   // fixed jitter (no flicker)
+function rgba(hex, a) { const n = parseInt(hex.slice(1), 16); return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`; }
+const L = id => TL.lines[id] || { start: 0, end: 0, words: [] };
+const S = id => TL.scenes.find(s => s.id === id) || { start: 0, end: 0 };
+const st = (id, f = 0) => L(id).start + (L(id).end - L(id).start) * f;   // f: 0 = start of the narration line, 1 = end
+const en = (id, d = 0) => L(id).end + d;
+// time a word is spoken in a line (one of several spellings, the nth time it occurs); falls back to a fraction of the line.
+// Korean words carry their particles ("효율을", "AI는"), so a cue matches the start of a spoken word
+const norm = s => String(s).toLowerCase().replace(/[^a-z0-9가-힣]/g, '');
+const MISS = window.CUE_MISS = new Set();
+function Wd(id, words, f = 0, nth = 1) {
+  const want = (Array.isArray(words) ? words : [words]).map(norm); let n = 0;
+  for (const [w, s] of L(id).words || []) if (want.some(c => norm(w).startsWith(c)) && ++n === nth) return s;
+  MISS.add(`${id}:${want.join('|')}`); return st(id, f);
+}
+const cueCache = {};
+const Wc = (id, words, f, nth) => { const k = id + '|' + words + '|' + nth; return k in cueCache ? cueCache[k] : (cueCache[k] = Wd(id, words, f, nth)); };
+
+function rr(x, y, w, h, r, fill, stroke, lw = 2, a = 1) { if (a <= 0) return; ctx.save(); ctx.globalAlpha *= a; ctx.beginPath(); ctx.roundRect(x, y, w, h, r); if (fill) { ctx.fillStyle = fill; ctx.fill(); } if (stroke) { ctx.lineWidth = lw; ctx.strokeStyle = stroke; ctx.stroke(); } ctx.restore(); }
+function circle(x, y, r, fill, stroke, lw = 3, a = 1) { if (r <= 0 || a <= 0) return; ctx.save(); ctx.globalAlpha *= a; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); if (fill) { ctx.fillStyle = fill; ctx.fill(); } if (stroke) { ctx.lineWidth = lw; ctx.strokeStyle = stroke; ctx.stroke(); } ctx.restore(); }
+function line0(x1, y1, x2, y2, c, lw = 3, dash) { ctx.save(); ctx.strokeStyle = c; ctx.lineWidth = lw; if (dash) ctx.setLineDash(dash); ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke(); ctx.restore(); }
+function card(x, y, w, h, { fill = '#FFFFFF', stroke = LINE, r = 16, a = 1, shadow = true, lw = 2 } = {}) {
+  if (a <= 0) return; ctx.save(); ctx.globalAlpha *= a;
+  if (shadow) { ctx.shadowColor = 'rgba(30,30,30,.08)'; ctx.shadowBlur = 22; ctx.shadowOffsetY = 8; }
+  ctx.beginPath(); ctx.roundRect(x, y, w, h, r); ctx.fillStyle = fill; ctx.fill(); ctx.shadowColor = 'transparent';
+  if (stroke) { ctx.lineWidth = lw; ctx.strokeStyle = stroke; ctx.stroke(); } ctx.restore();
+}
+function measure(str, size, weight = 600, fam = SANS) { ctx.save(); ctx.font = `${weight} ${size}px ${fam}`; const w = ctx.measureText(str).width; ctx.restore(); return w; }
+function text(str, x, y, { size = 36, weight = 600, fam = SANS, color = K.ink, align = 'left', alpha = 1, maxW, spacing = 0 } = {}) {
+  if (alpha <= 0 || !str) return; ctx.save(); ctx.globalAlpha *= alpha;
+  let sz = size; if (maxW) { const w = measure(str, size, weight, fam) + spacing * str.length; if (w > maxW) sz = size * maxW / w; }
+  ctx.font = `${weight} ${sz}px ${fam}`; ctx.textAlign = align; ctx.textBaseline = 'middle'; ctx.fillStyle = color;
+  if (spacing) ctx.letterSpacing = spacing + 'px';
+  ctx.fillText(str, x, y); ctx.restore();
+}
+// word-wrapped paragraph; returns the number of lines
+function wrapLines(str, maxW, size, weight) {
+  const out = []; let cur = '';
+  for (const w of str.split(' ')) { const nxt = cur ? cur + ' ' + w : w; if (cur && measure(nxt, size, weight) > maxW) { out.push(cur); cur = w; } else cur = nxt; }
+  if (cur) out.push(cur); return out;
+}
+function para(str, x, y, maxW, { size = 22, weight = 500, color = K.ink, lh = 1.32, alpha = 1, align = 'left' } = {}) {
+  const ls = wrapLines(str, maxW, size, weight); ls.forEach((l, i) => text(l, x, y + i * size * lh, { size, weight, color, alpha, align })); return ls.length;
+}
+// entrance: fade + rise (+ optional pop around ox, oy). Moves only while entering, then stays put
+function enter(t, t0, fn, { d = .55, dy = 26, dx = 0, pop = false, ox = 960, oy = 540 } = {}) {
+  const k = p(t, t0, d); if (k <= 0) return 0;
+  ctx.save(); ctx.globalAlpha *= clamp(k * 1.5);
+  if (pop) { const s = lerp(.5, 1, eBack(k)); ctx.translate(ox, oy); ctx.scale(s, s); ctx.translate(-ox, -oy); }
+  else ctx.translate((1 - eOut(k)) * dx, (1 - eOut(k)) * dy);
+  fn(k); ctx.restore(); return k;
+}
+
+// ---------- teacher's pen ----------
+function strokePts(pts, k, color, lw = 5, a = 1, dash) {
+  if (k <= 0 || a <= 0 || pts.length < 2) return;
+  let tot = 0; const seg = []; for (let i = 1; i < pts.length; i++) { const d = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); seg.push(d); tot += d; }
+  let left = tot * clamp(k);
+  ctx.save(); ctx.globalAlpha *= a; ctx.strokeStyle = color; ctx.lineWidth = lw; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; if (dash) ctx.setLineDash(dash);
+  ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]);
+  for (let i = 1; i < pts.length && left > 0; i++) { const f = Math.min(1, left / seg[i - 1]); ctx.lineTo(lerp(pts[i - 1][0], pts[i][0], f), lerp(pts[i - 1][1], pts[i][1], f)); left -= seg[i - 1]; }
+  ctx.stroke(); ctx.restore();
+}
+function wobble(x1, y1, x2, y2, seed = 1, amp = 1.6, n = 14) {
+  const dx = x2 - x1, dy = y2 - y1, len = Math.hypot(dx, dy) || 1, nx = -dy / len, ny = dx / len, pts = [];
+  for (let i = 0; i <= n; i++) { const f = i / n, j = (i === 0 || i === n) ? 0 : nz(i, seed) * amp * 2; pts.push([x1 + dx * f + nx * j, y1 + dy * f + ny * j]); }
+  return pts;
+}
+const pen = (x1, y1, x2, y2, k, c = K.red, lw = 5, seed = 1, a = 1, dash) => strokePts(wobble(x1, y1, x2, y2, seed), k, c, lw, a, dash);
+function penCircle(cx, cy, rx, ry, k, c = K.red, lw = 5, seed = 1, a = 1) {
+  const pts = [], a0 = -2.3 + nz(1, seed) * .4, n = 56;
+  for (let i = 0; i <= n; i++) { const ang = a0 + (i / n) * Math.PI * 2.12, r = 1 + nz(i, seed) * .05 + (i / n) * .06; pts.push([cx + Math.cos(ang) * rx * r, cy + Math.sin(ang) * ry * r]); }
+  strokePts(pts, k, c, lw, a);
+}
+function arrowHead(x2, y2, ang, hk, c, lw, a = 1, s = 16 + lw) {
+  if (hk <= 0) return;
+  pen(x2, y2, x2 - Math.cos(ang - .5) * s, y2 - Math.sin(ang - .5) * s, hk, c, lw, 3, a);
+  pen(x2, y2, x2 - Math.cos(ang + .5) * s, y2 - Math.sin(ang + .5) * s, hk, c, lw, 5, a);
+}
+function penArrow(x1, y1, x2, y2, k, c = K.red, lw = 5, seed = 1, a = 1, dash) {
+  pen(x1, y1, x2, y2, clamp(k / .8), c, lw, seed, a, dash);
+  arrowHead(x2, y2, Math.atan2(y2 - y1, x2 - x1), clamp((k - .75) / .25), c, lw, a);
+}
+function penCurve(x1, y1, cx, cy, x2, y2, k, c = K.red, lw = 5, a = 1, arrow = false) {
+  const pts = []; for (let i = 0; i <= 30; i++) { const f = i / 30; pts.push([(1 - f) * (1 - f) * x1 + 2 * (1 - f) * f * cx + f * f * x2, (1 - f) * (1 - f) * y1 + 2 * (1 - f) * f * cy + f * f * y2]); }
+  strokePts(pts, arrow ? clamp(k / .85) : k, c, lw, a);
+  if (arrow) arrowHead(x2, y2, Math.atan2(y2 - cy, x2 - cx), clamp((k - .8) / .2), c, lw, a);
+}
+function check(x, y, s, k, c = K.red, lw = 7) { strokePts([[x - s * .5, y], [x - s * .12, y + s * .38], [x + s * .55, y - s * .45]], k, c, lw); }
+function crossMark(x, y, s, k, c = K.red, lw = 6) { pen(x - s / 2, y - s / 2, x + s / 2, y + s / 2, clamp(k * 2), c, lw, 2); pen(x + s / 2, y - s / 2, x - s / 2, y + s / 2, clamp(k * 2 - 1), c, lw, 4); }
+function hiLite(x, y, w, h, k, c = K.blush) { if (k <= 0) return; const e = eOut(k); ctx.save(); ctx.globalCompositeOperation = 'multiply'; ctx.fillStyle = c;   // multiply: text under the marker stays readable
+  ctx.beginPath(); ctx.moveTo(x, y + 4); ctx.lineTo(x + w * e, y); ctx.lineTo(x + w * e - 6, y + h); ctx.lineTo(x - 4, y + h - 3); ctx.closePath(); ctx.fill(); ctx.restore(); }
+function hbox(x, y, w, h, k, c = K.red, lw = 4, seed = 3) { strokePts([...wobble(x, y, x + w, y, seed, 1), ...wobble(x + w, y, x + w, y + h, seed + 1, 1).slice(1), ...wobble(x + w, y + h, x, y + h, seed + 2, 1).slice(1), ...wobble(x, y + h, x, y, seed + 3, 1).slice(1)], k, c, lw); }
+function sticky(x, y, w, h, rot, k, lines, { size = 32, color = K.ink } = {}) {
+  if (k <= 0) return; const s = lerp(.6, 1, eBack(k));
+  ctx.save(); ctx.globalAlpha *= clamp(k * 2); ctx.translate(x + w / 2, y + h / 2); ctx.rotate(rot); ctx.scale(s, s);
+  ctx.shadowColor = 'rgba(30,30,30,.14)'; ctx.shadowBlur = 16; ctx.shadowOffsetY = 8; ctx.fillStyle = K.lightBox; ctx.fillRect(-w / 2, -h / 2, w, h); ctx.shadowColor = 'transparent';
+  ctx.fillStyle = rgba(K.lineGrey, .45); ctx.fillRect(-w / 2, -h / 2, w, 26);
+  lines.forEach((l, i) => text(l, 0, (i - (lines.length - 1) / 2) * size * 1.25 + 8, { size, weight: 700, fam: HAND, color, align: 'center', maxW: w - 30 }));
+  ctx.restore();
+}
+// rectangular rubber stamp, lands from a bigger size
+function stamp(str, x, y, k, c, rot = -.08, size = 34) {
+  if (k <= 0) return; const s = lerp(1.8, 1, eOut(k)), w = measure(str, size, 800) + 2 * str.length + 60;
+  ctx.save(); ctx.globalAlpha *= clamp(k * 3) * .92; ctx.translate(x, y); ctx.rotate(rot); ctx.scale(s, s);
+  ctx.strokeStyle = c; ctx.lineWidth = 6; ctx.strokeRect(-w / 2, -size, w, size * 2); ctx.lineWidth = 2.5; ctx.strokeRect(-w / 2 + 8, -size + 8, w - 16, size * 2 - 16);
+  text(str, 0, 2, { size, weight: 800, color: c, align: 'center', spacing: 2 }); ctx.restore();
+}
+function chip(str, x, y, { size = 22, fill = K.blue, color = '#FFFFFF', a = 1, pad = 16, weight = 700, spacing = 1.5, align = 'left' } = {}) {
+  if (a <= 0) return 0; const w = measure(str, size, weight) + spacing * str.length + pad * 2, h = size * 1.8, x0 = align === 'center' ? x - w / 2 : x;
+  rr(x0, y - h / 2, w, h, h / 2, '#FFFFFF', null, 0, a); rr(x0, y - h / 2, w, h, h / 2, fill, null, 0, a); text(str, x0 + pad, y + 1, { size, weight, color, alpha: a, spacing }); return w;   // white underneath: tinted labels never show the grid
+}
+// project code tag: dark rounded box "P-01" (+ optional name after it); returns its width
+function code(str, x, y, { a = 1, fill = K.ink, size = 18, name, nameSize = 20, nameColor = K.ink } = {}) {
+  if (a <= 0) return 0; const w = measure(str, size, 700) + 26, h = size * 1.75;
+  rr(x, y - h / 2, w, h, 7, fill, null, 0, a); text(str, x + 13, y + 1, { size, weight: 700, color: '#FFFFFF', alpha: a });
+  if (!name) return w;
+  text(name, x + w + 12, y + 1, { size: nameSize, weight: 700, color: nameColor, alpha: a }); return w + 12 + measure(name, nameSize, 700);
+}
+function sheet(x, y, w, h, rot = 0, a = 1, lines = 5) {
+  if (a <= 0) return; ctx.save(); ctx.globalAlpha *= a; ctx.translate(x, y); ctx.rotate(rot);
+  ctx.shadowColor = 'rgba(30,30,30,.10)'; ctx.shadowBlur = 12; ctx.shadowOffsetY = 5; ctx.fillStyle = '#FFFFFF'; ctx.fillRect(-w / 2, -h / 2, w, h); ctx.shadowColor = 'transparent';
+  ctx.strokeStyle = LINE; ctx.lineWidth = 2; ctx.strokeRect(-w / 2, -h / 2, w, h);
+  ctx.strokeStyle = rgba(K.lineGrey, .7); ctx.lineWidth = 4; for (let i = 0; i < lines; i++) { const yy = -h / 2 + h * .2 + i * h * .7 / lines; ctx.beginPath(); ctx.moveTo(-w / 2 + w * .14, yy); ctx.lineTo(w / 2 - w * (i % 2 ? .3 : .14), yy); ctx.stroke(); }
+  ctx.restore();
+}
+// dark statement bar across the page (the slides' closing line)
+function bar(str, y, a, { x = 210, w = 1590, h = 84, size = 28 } = {}) {
+  if (a <= 0) return; rr(x, y, w, h, 14, K.ink, null, 0, a); text(str, x + 36, y + h / 2 + 1, { size, weight: 700, color: '#FFFFFF', alpha: a, maxW: w - 72 });
+}
+// small line icons drawn with the pen (s ≈ half size)
+function icon(kind, x, y, s, c, a = 1) {
+  if (a <= 0) return; ctx.save(); ctx.globalAlpha *= a; ctx.strokeStyle = c; ctx.fillStyle = c; ctx.lineWidth = 4; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  const B = () => ctx.beginPath(), Sk = () => ctx.stroke();
+  if (kind === 'bars') { [.45, .8, .6].forEach((v, i) => rr(x - s + i * s * .72, y + s - 2 * s * v, s * .5, 2 * s * v, 4, i === 1 ? c : rgba(c, .35))); }
+  if (kind === 'target') { [1, .62, .25].forEach((r, i) => { B(); ctx.arc(x, y, s * r, 0, 7); i === 2 ? ctx.fill() : Sk(); }); }
+  if (kind === 'spark') { [[0, 0, 1], [s * .9, -s * .8, .45], [-s * .85, s * .75, .35]].forEach(([dx, dy, r]) => { const R = s * r; B(); ctx.moveTo(x + dx, y + dy - R); ctx.quadraticCurveTo(x + dx, y + dy, x + dx + R, y + dy); ctx.quadraticCurveTo(x + dx, y + dy, x + dx, y + dy + R); ctx.quadraticCurveTo(x + dx, y + dy, x + dx - R, y + dy); ctx.quadraticCurveTo(x + dx, y + dy, x + dx, y + dy - R); ctx.fill(); }); }
+  if (kind === 'lens') { B(); ctx.arc(x - s * .2, y - s * .2, s * .62, 0, 7); Sk(); B(); ctx.moveTo(x + s * .25, y + s * .25); ctx.lineTo(x + s * .9, y + s * .9); ctx.lineWidth = 7; Sk(); }
+  if (kind === 'print') { rr(x - s * .55, y - s, s * 1.1, s * .7, 3, null, c, 4); rr(x - s, y - s * .35, s * 2, s * .95, 8, rgba(c, .2), c, 4); rr(x - s * .55, y + s * .2, s * 1.1, s * .85, 3, '#FFFFFF', c, 4); }
+  if (kind === 'data') { [0, 1, 2].forEach(i => { B(); ctx.ellipse(x, y - s * .55 + i * s * .55, s * .8, s * .28, 0, 0, 7); i === 0 ? Sk() : (ctx.stroke()); }); B(); ctx.moveTo(x - s * .8, y - s * .55); ctx.lineTo(x - s * .8, y + s * .55); ctx.moveTo(x + s * .8, y - s * .55); ctx.lineTo(x + s * .8, y + s * .55); Sk(); }
+  if (kind === 'route') { B(); ctx.moveTo(x - s, y + s * .7); ctx.bezierCurveTo(x - s * .2, y + s * .7, x + s * .2, y - s * .7, x + s, y - s * .7); ctx.setLineDash([7, 7]); Sk(); ctx.setLineDash([]); circle(x - s, y + s * .7, s * .2, c); circle(x + s, y - s * .7, s * .26, null, c, 4); }
+  if (kind === 'screen') { rr(x - s, y - s * .75, s * 2, s * 1.3, 6, null, c, 4); B(); ctx.moveTo(x - s * .4, y + s * .85); ctx.lineTo(x + s * .4, y + s * .85); Sk(); check(x - s * .05, y - s * .1, s * .7, 1, c, 4); }
+  if (kind === 'clock') { B(); ctx.arc(x, y, s, 0, 7); Sk(); B(); ctx.moveTo(x, y - s * .6); ctx.lineTo(x, y); ctx.lineTo(x + s * .45, y + s * .25); Sk(); }
+  if (kind === 'bulb') { B(); ctx.arc(x, y - s * .25, s * .62, Math.PI * .8, Math.PI * 2.2); ctx.lineTo(x + s * .3, y + s * .55); ctx.lineTo(x - s * .3, y + s * .55); ctx.closePath(); Sk(); B(); ctx.moveTo(x - s * .26, y + s * .82); ctx.lineTo(x + s * .26, y + s * .82); Sk(); }
+  if (kind === 'retry') { B(); ctx.arc(x, y, s * .8, -Math.PI * .1, Math.PI * 1.55); Sk(); const ang = Math.PI * 1.55; arrowHead(x + Math.cos(ang) * s * .8, y + Math.sin(ang) * s * .8, ang + Math.PI / 2, 1, c, 4, 1, 14); }
+  if (kind === 'book') { B(); ctx.moveTo(x, y - s * .6); ctx.quadraticCurveTo(x - s * .5, y - s * .9, x - s, y - s * .7); ctx.lineTo(x - s, y + s * .7); ctx.quadraticCurveTo(x - s * .5, y + s * .5, x, y + s * .8); ctx.quadraticCurveTo(x + s * .5, y + s * .5, x + s, y + s * .7); ctx.lineTo(x + s, y - s * .7); ctx.quadraticCurveTo(x + s * .5, y - s * .9, x, y - s * .6); ctx.lineTo(x, y + s * .8); Sk(); }
+  if (kind === 'ox') { circle(x - s * .45, y, s * .3, null, K.red, 5); crossMark(x + s * .55, y, s * .55, 1, K.navy, 5); }
+  if (kind === 'student') { B(); ctx.arc(x, y - s * .45, s * .4, 0, 7); Sk(); B(); ctx.arc(x, y + s * .95, s * .85, Math.PI * 1.15, Math.PI * 1.85); Sk(); }
+  if (kind === 'teacher') { B(); ctx.arc(x - s * .2, y - s * .45, s * .4, 0, 7); Sk(); B(); ctx.arc(x - s * .2, y + s * .95, s * .85, Math.PI * 1.15, Math.PI * 1.85); Sk(); B(); ctx.moveTo(x + s * .45, y + s * .1); ctx.lineTo(x + s * 1.05, y - s * .55); Sk(); }
+  ctx.restore();
+}
+
+// ---------- page furniture ----------
+function paper(cam) {
+  ctx.fillStyle = K.paper; ctx.fillRect(0, 0, W, H);
+  const minor = ((cam % 40) + 40) % 40, major = ((cam % 200) + 200) % 200;
+  [[40, minor, K.grid], [200, major, K.gridMajor]].forEach(([step, off, col]) => {
+    ctx.lineWidth = 1; ctx.strokeStyle = col; ctx.beginPath();
+    for (let x = -off; x <= W; x += step) { ctx.moveTo(Math.round(x) + .5, 0); ctx.lineTo(Math.round(x) + .5, H); }
+    for (let y = 0; y <= H; y += step) { ctx.moveTo(0, y + .5); ctx.lineTo(W, y + .5); }
+    ctx.stroke();
+  });
+}
+function pageFurniture(i) {
+  ctx.save(); ctx.strokeStyle = K.margin; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(150, 0); ctx.lineTo(150, H); ctx.stroke(); ctx.restore();
+  text(`p. ${i + 1}`, 1800, 92, { size: 30, weight: 700, fam: HAND, color: K.muted, align: 'right' });
+}
+// section tab + title (top-left). Slides in once, then stays still
+function header(t, t0, tab, title, col = K.red) {
+  const k1 = eOut(p(t, t0, .5)), k2 = eOut(p(t, t0 + .15, .6));
+  if (k1 > 0 && !SHARED_OFF) { ctx.save(); ctx.translate((1 - k1) * -30, 0); chip(tab, 210, 92, { size: 20, fill: col, a: k1, spacing: 1.5 }); ctx.restore(); }
+  if (k2 > 0) { ctx.save(); ctx.translate((1 - k2) * -30, 0); text(title, 210, 160, { size: 54, weight: 700, alpha: k2, maxW: 1560 }); ctx.restore(); }
+}
+const H0 = id => S(id).start + .15;   // header time for a scene
+const subline = (t, id, str, d = .45) => text(str, 210, 228, { size: 26, weight: 500, color: K.muted, alpha: p(t, H0(id) + d, .5), maxW: 1590 });
+
+// ============================================================
+// scenes (absolute time t) — one or more per PDF page (tools/script.py SCRIPT says which page each line is on)
+// ============================================================
+const SC = {};
+
+// extra line icons (from ../ai-learning-platform-v3-ko)
+function icon2(kind, x, y, s, c, a = 1) {
+  if (a <= 0) return; ctx.save(); ctx.globalAlpha *= a; ctx.strokeStyle = c; ctx.fillStyle = c; ctx.lineWidth = 5; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  const B = () => ctx.beginPath(), Sk = () => ctx.stroke();
+  if (kind === 'globe') { B(); ctx.arc(x, y, s, 0, 7); Sk(); B(); ctx.ellipse(x, y, s * .45, s, 0, 0, 7); Sk(); B(); ctx.moveTo(x - s, y); ctx.lineTo(x + s, y); ctx.moveTo(x - s * .85, y - s * .5); ctx.lineTo(x + s * .85, y - s * .5); ctx.moveTo(x - s * .85, y + s * .5); ctx.lineTo(x + s * .85, y + s * .5); Sk(); }
+  if (kind === 'growth') { B(); ctx.moveTo(x - s, y - s); ctx.lineTo(x - s, y + s); ctx.lineTo(x + s, y + s); Sk(); B(); ctx.moveTo(x - s * .75, y + s * .55); ctx.lineTo(x - s * .25, y + s * .1); ctx.lineTo(x + s * .15, y + s * .3); ctx.lineTo(x + s * .8, y - s * .6); Sk(); arrowHead(x + s * .8, y - s * .6, -.9, 1, c, 5, 1, 20); }
+  if (kind === 'stairs') { B(); ctx.moveTo(x - s, y + s); for (let i = 0; i < 4; i++) { ctx.lineTo(x - s + i * s / 2, y + s - (i + 1) * s / 2); ctx.lineTo(x - s + (i + 1) * s / 2, y + s - (i + 1) * s / 2); } ctx.lineTo(x + s, y + s); ctx.closePath(); Sk(); }
+  if (kind === 'doc') { [2, 1, 0].forEach(i => { const ox = x - s * .7 + i * s * .18, oy = y - s + i * s * .14; rr(ox, oy, s * 1.3, s * 1.65, 6, '#FFFFFF', c, 4); if (!i) for (let j = 0; j < 4; j++) { B(); ctx.moveTo(ox + s * .22, oy + s * .4 + j * s * .3); ctx.lineTo(ox + s * (j % 2 ? .8 : 1.05), oy + s * .4 + j * s * .3); ctx.lineWidth = 3; Sk(); } }); }
+  if (kind === 'pencil') { ctx.save(); ctx.translate(x, y); ctx.rotate(-.7); rr(-s, -s * .2, s * 1.6, s * .4, 3, null, c, 4); B(); ctx.moveTo(s * .6, -s * .2); ctx.lineTo(s, 0); ctx.lineTo(s * .6, s * .2); Sk(); ctx.restore(); }
+  ctx.restore();
+}
+
+// more line icons for this video
+function icon3(kind, x, y, s, c, a = 1) {
+  if (a <= 0) return; ctx.save(); ctx.globalAlpha *= a; ctx.strokeStyle = c; ctx.fillStyle = c; ctx.lineWidth = 5; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  const B = () => ctx.beginPath(), Sk = () => ctx.stroke();
+  if (kind === 'gear') { for (let i = 0; i < 8; i++) { const an = i * Math.PI / 4; B(); ctx.moveTo(x + Math.cos(an) * s * .62, y + Math.sin(an) * s * .62); ctx.lineTo(x + Math.cos(an) * s, y + Math.sin(an) * s); ctx.lineWidth = s * .32; Sk(); } ctx.lineWidth = 5; B(); ctx.arc(x, y, s * .66, 0, 7); Sk(); B(); ctx.arc(x, y, s * .26, 0, 7); Sk(); }
+  if (kind === 'net') { const P = [[-.7, -.5], [.6, -.65], [.1, .1], [-.55, .7], [.75, .55]]; [[0, 2], [1, 2], [2, 3], [2, 4], [0, 1]].forEach(([i, j]) => { B(); ctx.moveTo(x + P[i][0] * s, y + P[i][1] * s); ctx.lineTo(x + P[j][0] * s, y + P[j][1] * s); ctx.lineWidth = 4; Sk(); }); P.forEach(([u, v], i) => circle(x + u * s, y + v * s, s * (i === 2 ? .26 : .18), c)); }
+  ctx.restore();
+}
+// icon in a filled circle (white icon on a colour, or a colour icon on a tint)
+function badge(x, y, r, fill, kind, col = '#FFFFFF', a = 1) {
+  if (a <= 0) return; circle(x, y, r, fill, null, 0, a);
+  const f = ['globe', 'growth', 'stairs', 'doc', 'pencil'].includes(kind) ? icon2 : ['gear', 'net'].includes(kind) ? icon3 : icon; f(kind, x, y, r * .5, col, a);
+}
+// section tab + title of a page told in several scenes: drawn once by the page's shared part (stays still through the CONT scenes)
+function pageHead(t, id, tab, title) { if (SHARED_OFF) return; header(t, H0(id), tab, title); }
+// bullet row: small dot + text (wrapped); returns its height
+function bullet(t, t0, x, y, str, { size = 26, w = 600, col = K.red, color = K.ink, weight = 600, lh = 1.3 } = {}) {
+  const n = wrapLines(str, w, size, weight).length;
+  enter(t, t0, () => { circle(x + 6, y, 6, col); para(str, x + 26, y, w, { size, weight, color, lh }); }, { dx: 18, dy: 0 });
+  return n * size * lh;
+}
+// a scattered field of objectives (a cloud of dots and links), fixed per seed. Dots appear from the centre outward between t0 and t0 + d
+function cloud(seed, n, w, h, link = 30) {
+  const pts = [];
+  for (let i = 0; i < n; i++) { const a = (nz(i, seed) + .5) * Math.PI * 2, r = Math.pow(nz(i, seed + 1) + .5, .7); pts.push([Math.cos(a) * r * w / 2, Math.sin(a) * r * h / 2, r]); }
+  const edges = []; pts.forEach((p0, i) => pts.map((q, j) => [Math.hypot(p0[0] - q[0], p0[1] - q[1]), j]).filter(([d, j]) => j > i && d < link).sort((u, v) => u[0] - v[0]).slice(0, 2).forEach(([, j]) => edges.push([i, j])));
+  return { pts, edges };
+}
+const CLOUDS = {};
+function drawCloud(key, cx, cy, w, h, n, t, t0, d, col, { r = 3.2, link = 30, edge = .35, seed = 5 } = {}) {
+  const c = CLOUDS[key] || (CLOUDS[key] = cloud(seed, n, w, h, link)); if (t < t0) return;
+  const at = q => clamp((t - t0 - q * d * .8) / (d * .2 + .01));
+  c.edges.forEach(([i, j]) => { const a = c.pts[i], b = c.pts[j], k = Math.min(at(a[2]), at(b[2])); if (k > 0) line0(cx + a[0], cy + a[1], cx + lerp(a[0], b[0], k), cy + lerp(a[1], b[1], k), rgba(col, edge), 1.2); });
+  c.pts.forEach(([x, y, q]) => { const k = at(q); if (k > 0) circle(cx + x, cy + y, r * eBack(k), col); });
+}
+
+// ============================================================
+// p. 1  cover
+// ============================================================
+// a small knowledge map that grows on the cover and the closing page: the 50 years of assets (grey dots) joined by AI (lines, red)
+const CN = (() => { const out = []; for (let i = 0; i < 40; i++) { const a = (nz(i, 21) + .5) * Math.PI * 2, r = Math.sqrt(nz(i, 22) + .5); out.push([Math.cos(a) * r * 290, Math.sin(a) * r * 200]); }
+  const e = []; out.forEach((p0, i) => out.map((q, j) => [Math.hypot(p0[0] - q[0], p0[1] - q[1]), j]).filter(([d, j]) => j > i && d < 130).sort((u, v) => u[0] - v[0]).slice(0, 2).forEach(([, j]) => e.push([i, j]))); return { pts: out, e }; })();
+function constellation(t, cx, cy, tDots, tLink, tRed, a = 1) {
+  if (a <= 0 || t < tDots) return; ctx.save(); ctx.globalAlpha *= a;
+  CN.e.forEach(([i, j], n) => { const k = eOut(p(t, tLink + n * .02, .5)); if (k <= 0) return; const [x1, y1] = CN.pts[i], [x2, y2] = CN.pts[j]; line0(cx + x1, cy + y1, cx + lerp(x1, x2, k), cy + lerp(y1, y2, k), (i + j) % 3 === 0 && t > tRed ? rgba(K.red, .55) : K.lineGrey, 2); });
+  CN.pts.forEach(([x, y], i) => { const k = eBack(p(t, tDots + i * .03, .35)); if (k <= 0) return; const red = i % 3 === 0 && t > tRed + i * .02; circle(cx + x, cy + y, (red ? 9 : 7) * k, red ? K.red : t > tLink + i * .02 ? K.ink : K.midGrey, '#FFFFFF', 2); });
+  ctx.restore();
+}
+SC.title = t => {
+  chip(C.title.kicker, 210, 262, { size: 20, fill: K.red, a: eOut(p(t, .3, .5)), spacing: 1.5 });
+  enter(t, .55, () => text(C.title.words[0], 212, 352, { size: 44, weight: 700, color: K.ink, maxW: 860 }));
+  hiLite(200, 412, measure(C.title.words[1], 96, 800) + 22, 78, p(t, Wc('l1_3', '개인화', .7), .7));
+  [1, 2].forEach(i => enter(t, .6 + i * .25, () => text(C.title.words[i], 210, 344 + i * 108, { size: 96, weight: 800, color: i === 1 ? K.red : K.ink, maxW: 900 })));
+  C.title.sub.forEach((s, i) => enter(t, 1.5 + i * .2, () => text(s, 214, 690 + i * 50, { size: 34, weight: 600, color: K.muted, maxW: 820 })));
+  // "50 years of learning design" is the sub line's first words: the pen circles them as they are said
+  const y50 = Wc('l1_1', ['50', '오십'], .3), as = Wc('l1_1', '자산', .8);
+  penCircle(214 + measure('50년', 34, 600) / 2, 690, measure('50년', 34, 600) / 2 + 16, 30, p(t, y50, .5), K.red, 4, 11);
+  const sw = measure('50년의 ', 34, 600); pen(214 + sw, 716, 214 + measure('50년의 학습설계 자산', 34, 600), 714, p(t, as, .5), K.red, 4, 12);
+  // the map: assets (dots) → AI joins them → one learner, a new standard
+  const ai = Wc('l1_2', 'ai', .1), one = Wc('l1_2', '한', .3), opt = Wc('l1_2', '최적화', .45), std = Wc('l1_2', '표준', .85);
+  enter(t, st('l1_1', .1), () => card(1150, 290, 650, 470, { r: 16, fill: K.lightBox, stroke: null, shadow: false }));
+  constellation(t, 1475, 520, st('l1_1', .2), ai, ai + .6);
+  text('50년의 학습설계 자산', 1185, 320, { size: 22, weight: 700, color: K.muted, alpha: p(t, as - .2, .4) });
+  enter(t, ai - .1, () => { chip('+ AI 기술', 1700, 320, { size: 22, fill: K.red, align: 'center' }); }, { pop: true, ox: 1720, oy: 320 });
+  const [ox, oy] = CN.pts[9]; penCircle(1475 + ox, 520 + oy, 26, 26, p(t, one, .5), K.red, 4, 13);
+  chip('한 명 한 명', 1475 + ox + 40, 520 + oy + 40, { size: 20, fill: '#FFFFFF', color: K.crimson, a: eBack(p(t, one + .2, .4)) });
+  enter(t, opt - .1, () => { rr(1150, 790, 650, 56, 12, K.redTint); text('학생 한 명 한 명에게 최적화된 학습', 1175, 819, { size: 24, weight: 800, color: K.crimson, maxW: 600 }); }, { dx: 20, dy: 0 });
+  enter(t, std - .1, () => { rr(1150, 860, 650, 56, 12, K.ink); text('글로벌 수학 AI 학습의 새로운 표준', 1175, 889, { size: 24, weight: 800, color: '#FFFFFF', maxW: 600 }); }, { dx: 20, dy: 0 });
+};
+
+// ============================================================
+// p. 2  why: beyond efficiency
+// ============================================================
+SC.why = t => {
+  header(t, H0('why'), '왜 하는가', '업무 효율화를 넘어, 상품과 서비스의 전환');
+  const g0 = st('l2_1', .02), b = [Wc('l2_1', '도입', .3), Wc('l2_1', '생산성', .6), Wc('l2_1', '효율성', .75)];
+  enter(t, g0, () => { rr(210, 300, 700, 560, 18, K.lightBox); badge(290, 390, 46, K.blueTint, 'gear', K.blue); text('일반적인 AX', 360, 368, { size: 24, weight: 700, color: K.blue }); text('업무 생산성 향상', 360, 412, { size: 40, weight: 800, maxW: 520 }); });
+  ['사람이 하던 업무에 AI를 적용', '반복 업무 자동화', '업무 시간 단축'].forEach((s, i) => bullet(t, b[i] - .1, 250, 540 + i * 80, s, { size: 28, w: 600, col: K.blue, color: K.muted }));
+  // JEI: the products and services themselves change
+  const be = Wc('l2_2', '넘어', .3), j0 = Wc('l2_2', '재능교육', .05), dv = Wc('l2_2', '발전', .85);
+  penArrow(925, 580, 1065, 580, p(t, be - .2, .5), K.red, 6, 31);
+  text('넘어', 995, 535, { size: 36, weight: 700, fam: HAND, color: K.red, align: 'center', alpha: p(t, be, .4) });
+  enter(t, j0, () => { card(1080, 300, 720, 560, { r: 18, stroke: K.red, lw: 3 }); badge(1160, 390, 46, K.red, 'bulb'); text('JEI의 AI 전환', 1230, 368, { size: 24, weight: 700, color: K.crimson }); text('상품·서비스 자체의 전환', 1230, 412, { size: 40, weight: 800, maxW: 540 }); });
+  hiLite(1222, 392, measure('상품·서비스 자체의 전환', 40, 800) + 16, 42, p(t, dv, .6));
+  const tb = Wc('l2_3', '플랫폼', .2), cn = Wc('l2_3', '연결', .5), fl = Wc('l2_3', '유연', .85), sp = Wc('l2_4', '신속', .45), sy = Wc('l2_4', '체계', .9);
+  [['교재와 학습 시스템에 AI를 더함', tb], ['교재 + 온라인 학습 + POD가 연결된 상품', cn], ['콘텐츠·서비스를 더 빠르고 다양하게 개발', sp]].forEach(([s, t0], i) => {
+    bullet(t, t0 - .1, 1120, 540 + i * 100, s, { size: 28, w: 560 }); check(1755, 540 + i * 100, 30, p(t, t0 + .4, .3), K.red, 5); });
+  // what the narration adds under the card: products offered more flexibly, then a system that turns them into new services
+  text('학습자에게 필요한 상품을 더 유연하게', 1440, 905, { size: 34, weight: 700, fam: HAND, color: K.red, align: 'center', alpha: p(t, fl, .4) * (1 - p(t, sy - .3, .3)), maxW: 720 });
+  text('새로운 서비스로 연결하는 체계', 1440, 905, { size: 34, weight: 700, fam: HAND, color: K.red, align: 'center', alpha: p(t, sy - .1, .4), maxW: 720 });
+};
+
+// ============================================================
+// p. 3  why a knowledge map (three scenes on one page)
+// ============================================================
+const KDN = [[605, 244], [700, 290], [865, 255], [645, 395], [795, 370], [575, 490], [725, 475], [880, 455]].map(([x, y]) => [900 + (x - 530) / 410 * 530, 350 + (y - 195) / 360 * 500]);
+// [a, b, type]: type 0 = 선수·후속 (red, thick), 1 = 개념 공유 (blue), 2 = mint, 3 = weak (grey)
+const KDE = [[0, 1, 1], [1, 2, 0], [1, 3, 0], [3, 5, 0], [1, 4, 3], [3, 6, 3], [5, 6, 3], [4, 6, 2], [4, 7, 2], [2, 4, 1]];
+const KD = () => ({ tScat: Wc('l3_3', '흩어져', .2), tLink: Wc('l3_3', '연결', .4), tDot: Wc('l3_4', '점은', .15), tLine: Wc('l3_4', '선은', .55), tPre: Wc('l3_4', '선수', .7), tCol: Wc('l3_5', '색상', .3), tW: Wc('l3_5', '굵기', .45) });
+function kmapPage(t) {
+  if (SHARED_OFF) return; pageHead(t, 'kmapList', '왜 지식맵인가', '학습목표를 점으로, 관계를 선으로');
+  const c = KD(), l0 = st('l3_1', .05);
+  text('지금 · 목록 형태', 210, 300, { size: 26, weight: 700, color: K.muted, alpha: p(t, l0, .4) });
+  for (let i = 0; i < 5; i++) enter(t, l0 + .1 + i * .12, () => { rr(210, 335 + i * 84, 560, 64, 12, K.lightBox, LINE, 2); text('학습목표 ' + (i + 1), 240, 368 + i * 84, { size: 26, weight: 600, color: K.muted }); }, { dx: -20, dy: 0 });
+  text('AI에게는 서로 독립된 항목의 집합', 214, 790, { size: 32, weight: 700, fam: HAND, color: K.muted, alpha: p(t, Wc('l3_2', '각각', .4), .5) });
+  // the map: scattered stars, then joined into one system
+  const pk = p(t, c.tScat - .3, .5); if (pk <= 0) return;
+  text('JEI 지식맵 · 점과 선', 880, 300, { size: 26, weight: 700, alpha: pk });
+  rr(880, 335, 560, 525, 14, '#FFFFFF', LINE, 2, pk);
+  penArrow(785, 590, 862, 590, p(t, c.tLink - .3, .4), K.red, 6, 41);
+  const typeCol = [K.red, K.blue, K.mint, K.lineGrey], typeW = [7, 4, 4, 2.5], ck = eOut(p(t, c.tCol, .6)), wk = eOut(p(t, c.tW, .6));
+  KDE.forEach(([a, b, ty], i) => { const k = eOut(p(t, c.tLink + i * .1, .5)); if (k <= 0) return; const [x1, y1] = KDN[a], [x2, y2] = KDN[b];
+    line0(x1, y1, lerp(x1, x2, k), lerp(y1, y2, k), K.lineGrey, lerp(3, typeW[ty], wk));
+    if (ck > 0 && ty < 3) { ctx.save(); ctx.globalAlpha *= ck; line0(x1, y1, lerp(x1, x2, k), lerp(y1, y2, k), typeCol[ty], lerp(3, typeW[ty], wk)); ctx.restore(); } });
+  KDN.forEach(([x, y], i) => { const k = eBack(p(t, c.tScat + i * .12, .4)); if (k <= 0) return; const big = i === 4, bk = big ? eBack(p(t, c.tDot, .5)) : 0;
+    const jx = (1 - eOut(p(t, c.tLink + .2, .8))) * nz(i, 41) * 60, jy = (1 - eOut(p(t, c.tLink + .2, .8))) * nz(i, 42) * 60;   // scattered, then pulled into place as they are joined
+    circle(x + jx, y + jy, lerp(14, 22, bk) * k, bk > 0 ? K.red : K.ink, '#FFFFFF', 3); });
+  // legend cards
+  enter(t, c.tDot - .1, () => { rr(1470, 335, 330, 250, 14, K.lightBox); circle(1510, 385, 18, K.red); text('점 = 학습목표', 1542, 386, { size: 28, weight: 800, maxW: 240 });
+    para('내용·설명·교재·난이도·학습 단계 등 정보를 담는 단위', 1495, 450, 285, { size: 22, weight: 500, color: K.muted, lh: 1.4 }); }, { dx: 20, dy: 0 });
+  enter(t, c.tLine - .1, () => { rr(1470, 610, 330, 250, 14, K.lightBox); line0(1494, 660, 1528, 660, K.red, 7); text('선 = 관계', 1542, 661, { size: 28, weight: 800, maxW: 240 });
+    para('선수·후속, 개념 공유 등', 1495, 725, 285, { size: 22, weight: 500, color: K.muted, lh: 1.4 }); }, { dx: 20, dy: 0 });
+  text('굵기·색상으로 유형과 강도 표현', 1495, 800, { size: 22, weight: 500, color: K.muted, alpha: p(t, c.tCol - .1, .4), maxW: 290 });
+  hiLite(1490, 782, measure('굵기·색상', 22, 500) + 10, 34, p(t, c.tW + .2, .5));
+}
+SC.kmapList = t => {
+  kmapPage(t);
+  const f0 = Wc('l3_1', '가장', .3), mk = Wc('l3_1', '지식맵', .7), rel = Wc('l3_2', '관계', .55), ord = Wc('l3_2', '순서', .7), und = Wc('l3_2', '이해', .85);
+  enter(t, f0 - .1, () => { rr(880, 335, 920, 170, 16, K.redTint); text('가장 먼저 해야 할 일', 920, 385, { size: 28, weight: 700, color: K.crimson }); text('재능교육 고유의 지식맵 만들기', 920, 448, { size: 44, weight: 800, maxW: 840 }); }, { dx: 24, dy: 0 });
+  pen(920, 480, 920 + measure('재능교육 고유의 지식맵', 44, 800), 478, p(t, mk, .5), K.red, 5, 43);
+  // the list gives AI no relations and no order
+  penCurve(780, 367, 880, 535, 780, 703, p(t, rel - .2, .6), K.red, 4, 1, true);
+  text('어떤 관계?', 900, 590, { size: 40, weight: 700, fam: HAND, color: K.red, alpha: p(t, rel, .4) });
+  text('어떤 순서?', 900, 660, { size: 40, weight: 700, fam: HAND, color: K.red, alpha: p(t, ord, .4) });
+  enter(t, und - .1, () => { rr(880, 730, 920, 100, 16, '#FFFFFF', K.lineGrey, 2); text('AI가 이해할 수 있어야', 920, 781, { size: 34, weight: 800, maxW: 840 }); }, { dx: 24, dy: 0 });
+};
+SC.kmapDots = t => {
+  kmapPage(t);
+  const c = KD();
+  const [x, y] = KDN[4]; penCircle(x, y, 40, 40, p(t, c.tDot + .3, .5), K.red, 4, 44);
+  chip('학습목표 하나', x + 38, y - 2, { size: 20, fill: '#FFFFFF', color: K.crimson, a: eBack(p(t, c.tDot + .5, .4)) });
+  const [ax, ay] = KDN[1], [bx, by] = KDN[3]; penArrow(ax - 26, ay - 6, bx - 30, by - 14, p(t, c.tPre, .5), K.red, 4, 45);
+};
+SC.kmapAI = t => {
+  kmapPage(t);
+  const s0 = st('l3_6', .05), all = Wc('l3_6', '전체', .35), sup = Wc('l3_6', '보충학습', .6), nx = Wc('l3_6', '다음', .75), jd = Wc('l3_6', '판단', .9);
+  // where a student is now, what to make up, where to go next
+  const [cx, cy] = KDN[6];
+  enter(t, s0, () => { circle(cx, cy, 30, null, K.red, 4); }, { pop: true, ox: cx, oy: cy });
+  hbox(890, 345, 540, 505, p(t, all - .2, .6), K.red, 3, 46);
+  const [px, py] = KDN[5]; penArrow(cx - 26, cy + 10, px + 20, py + 6, p(t, sup - .1, .5), K.navy, 5, 47, 1, [10, 9]);
+  chip('보충학습', px - 30, py + 55, { size: 22, fill: K.navyTint, color: K.navy, a: eBack(p(t, sup + .2, .4)) });
+  const [qx, qy] = KDN[4], [rx, ry] = KDN[2]; penArrow(cx + 8, cy - 26, qx - 6, qy + 26, p(t, nx - .1, .4), K.red, 5, 48); penArrow(qx + 14, qy - 22, rx - 10, ry + 22, p(t, nx + .3, .4), K.red, 5, 49);
+  chip('다음 학습경로', rx - 80, ry - 50, { size: 22, fill: K.redTint, color: K.crimson, a: eBack(p(t, nx + .6, .4)) });
+  text('AI가 전체 구조를 바탕으로 판단', 900, 900, { size: 34, weight: 700, fam: HAND, color: K.red, alpha: p(t, jd - .3, .5) });
+};
+
+// ============================================================
+// p. 4  JEI Math Universe
+// ============================================================
+SC.universe = t => {
+  header(t, H0('universe'), 'JEI Math Universe', '국내·미주 자산과 국내외 교육과정을 하나의 공통맵으로');
+  const a0 = Wc('l4_1', '학습철학', .1), a1 = Wc('l4_1', ['교재', '미주교재'], .3), a2 = Wc('l4_1', '학습목표', .45);
+  enter(t, a0 - .1, () => { rr(210, 300, 620, 250, 18, K.lightBox); badge(280, 365, 40, K.red, 'book'); text('JEI 학습 설계 자산', 340, 366, { size: 32, weight: 800, maxW: 460 }); }, { dx: -20, dy: 0 });
+  bullet(t, a1 - .1, 250, 450, '미주·국내 재능수학 교재', { size: 26, color: K.muted, w: 540 });
+  bullet(t, a2 - .1, 250, 500, '학습목표 · 커리큘럼 · 콘텐츠 등', { size: 26, color: K.muted, w: 540 });
+  const b0 = Wc('l4_2', '국내외', .1), b1 = Wc('l4_2', ['씨씨', 'ccss', '미국'], .25), ag = Wc('l4_2', 'ai', .45), an = Wc('l4_2', '분석', .55), cn = Wc('l4_2', '연결', .9);
+  enter(t, b0 - .1, () => { rr(210, 590, 620, 250, 18, K.lightBox); badge(280, 655, 40, K.blue, 'globe'); text('국내외 교육과정·학습자료', 340, 656, { size: 32, weight: 800, maxW: 460 }); }, { dx: -20, dy: 0 });
+  bullet(t, b0 + .3, 250, 740, '교과서·참고서, 영국·호주·뉴질랜드 등', { size: 26, color: K.muted, w: 540, col: K.blue });
+  bullet(t, b1 - .1, 250, 790, '미국 CCSS·주별 기준, 국내 교육과정', { size: 26, color: K.muted, w: 540, col: K.blue });
+  penArrow(845, 570, 935, 570, p(t, ag - .1, .5), K.red, 6, 51);
+  enter(t, ag, () => { circle(890, 470, 40, '#FFFFFF', K.red, 3); icon('spark', 890, 470, 18, K.red); }, { pop: true, ox: 890, oy: 470 });
+  text('비교·분석', 893, 625, { size: 28, weight: 700, fam: HAND, color: K.red, align: 'center', alpha: p(t, an - .2, .4) });
+  // the common map
+  const m0 = an + .2, u = Wc('l4_3', ['제이이아이', 'jei', '유니버스', 'universe'], .85, 2), nd = Wc('l4_3', '종속', .2);
+  text('JEI-Math Knowledge Map (JEI Math Universe)', 960, 300, { size: 30, weight: 800, alpha: p(t, m0 - .3, .5), maxW: 840 });
+  enter(t, m0 - .2, () => { rr(960, 335, 840, 400, 16, rgba(K.redTint, .55), null, 0); ctx.save(); ctx.setLineDash([12, 9]); rr(960, 335, 840, 400, 16, null, K.red, 2.5); ctx.restore(); });
+  drawCloud('uni', 1380, 545, 760, 330, 240, t, m0, Math.max(1.5, cn - m0 + .5), K.red, { r: 3.4, link: 40, edge: .3, seed: 7 });
+  chip('공통 학습목표 지식맵', 1380, 368, { size: 22, fill: '#FFFFFF', color: K.crimson, a: eBack(p(t, cn - .2, .4)), align: 'center', pad: 18 });
+  const uw = measure('(JEI Math Universe)', 30, 800), ux = 960 + measure('JEI-Math Knowledge Map ', 30, 800);
+  penCircle(ux + uw / 2, 300, uw / 2 + 18, 27, p(t, u, .6), K.red, 4, 52);
+  enter(t, nd - .2, () => text('어떤 교육과정에도 종속되지 않는 JEI 고유의 수학 학습 체계', 960, 790, { size: 30, weight: 800, maxW: 840 }));
+  pen(960 + measure('어떤 교육과정에도 종속되지 않는 ', 30, 800), 815, 960 + measure('어떤 교육과정에도 종속되지 않는 JEI 고유의 수학 학습 체계', 30, 800), 813, p(t, nd + .3, .5), K.red, 4, 53);
+};
+
+// ============================================================
+// p. 5  from the common map to national maps (two scenes)
+// ============================================================
+const CY = () => ({ s0: H0('country') + .4, j: Wc('l5_1', ['제이이아이', 'jei'], .05), nat: Wc('l5_1', '국가별', .2), fast: Wc('l5_1', '빠르게', .7),
+  scr: Wc('l5_2', '처음부터', .2), base: Wc('l5_2', '바탕으로', .45), std: Wc('l5_2', ['성취기준', '성취'], .6), mk: Wc('l5_2', '구성', .9),
+  lr: Wc('l5_3', '학습자', .1), know: Wc('l5_3', '알고', .4), lack: Wc('l5_3', '부족', .55), trk: Wc('l5_3', '추적', .85), spd: Wc('l5_4', '속도', .4), ind: Wc('l5_4', '개개인', .7) });
+function mapBox(x, y, w, h, col, tint, lab, key, n, t, t0, { dash = false, labRight = false } = {}) {
+  const a = eOut(p(t, t0, .5)); if (a <= 0) return;
+  rr(x, y, w, h, 12, tint, null, 0, a);
+  if (dash) { ctx.save(); ctx.globalAlpha *= a; ctx.setLineDash([10, 8]); rr(x, y, w, h, 12, null, col, 2.5); ctx.restore(); } else rr(x, y, w, h, 12, null, rgba(col, .8), 2, a);
+  drawCloud(key, x + w / 2, y + h / 2 - 6, w - 50, h - 50, n, t, t0 + .1, 1, col, { r: 2.6, link: 30, edge: .35, seed: key.length * 3 + 1 });
+  if (lab) { const lw = measure(lab, 18, 700) + 20; rr(labRight ? x + w - lw - 12 : x + 12, y + h - 36, lw, 28, 6, '#FFFFFF', null, 0, a); text(lab, labRight ? x + w - lw - 2 : x + 22, y + h - 21, { size: 18, weight: 700, color: col === K.midGrey ? K.muted : col, alpha: a }); }
+}
+function countryPage(t) {
+  if (SHARED_OFF) return; pageHead(t, 'country', '국가별 지식맵', '공통맵에서 국가별 지식맵으로');
+  const c = CY();
+  text('현행 학습목표 체계 · 지금 가진 것', 605, 298, { size: 20, weight: 700, color: K.muted, align: 'center', alpha: p(t, c.s0, .4) });
+  mapBox(210, 318, 380, 150, K.midGrey, K.lightBox, '미주용 933개 · 55개 영역', 'us0', 70, t, c.s0);
+  mapBox(620, 318, 380, 150, K.midGrey, K.lightBox, '국내용', 'kr0', 60, t, c.s0 + .2, { labRight: true });
+  penCurve(400, 474, 430, 520, 520, 528, p(t, c.j - .2, .5), K.red, 4, 1, true); penCurve(810, 474, 780, 520, 690, 528, p(t, c.j - .1, .5), K.red, 4, 1, true);
+  text('① AI 비교·분석', 605, 498, { size: 22, weight: 800, color: K.crimson, align: 'center', alpha: p(t, c.j, .4) });
+  mapBox(290, 530, 630, 190, K.red, rgba(K.redTint, .6), '공통 학습목표 지식맵', 'common', 150, t, c.j, { dash: true });
+  penCurve(420, 726, 330, 740, 300, 772, p(t, c.nat - .1, .5), K.blue, 4, 1, true); penCurve(790, 726, 880, 740, 910, 772, p(t, c.nat, .5), K.mintDark, 4, 1, true);
+  text('② 국가별 커리큘럼 대응', 605, 748, { size: 22, weight: 800, color: K.crimson, align: 'center', alpha: p(t, c.nat, .4) });
+  mapBox(210, 778, 380, 135, K.blue, rgba(K.blueTint, .8), '미주 — CCSS 대응', 'us1', 70, t, c.nat + .2);
+  mapBox(620, 778, 380, 135, K.mintDark, rgba(K.mintTint, .8), '국내 — 2022 개정 대응', 'kr1', 60, t, c.nat + .4, { labRight: true });
+  // the three steps
+  [['AI 비교·분석', '국내·미주 학습목표 체계를 비교·분석해 JEI 공통 수학 지식맵 구축', c.j],
+   ['국가별 커리큘럼 대응', '공통맵의 개념 단위를 각 나라 성취기준에 다시 연결 (미주 CCSS · 국내 교육과정)', c.nat],
+   ['학습자 상태 관리의 기준', '국가별 지식맵 위에서 학습자별 상태를 연결하고 추적', c.lr]].forEach(([h, d, t0], i) =>
+    enter(t, t0 - .1, () => { const y = 330 + i * 150; circle(1095, y + 4, 30, K.red); text(String(i + 1), 1095, y + 5, { size: 28, weight: 800, color: '#FFFFFF', align: 'center' });
+      text(h, 1150, y, { size: 32, weight: 800, maxW: 640 }); para(d, 1150, y + 48, 640, { size: 23, weight: 500, color: K.muted, lh: 1.5 }); }, { dx: 24, dy: 0 }));
+}
+SC.country = t => {
+  countryPage(t);
+  const c = CY();
+  pen(1150, 545, 1150 + measure('공통맵의 개념 단위를 각 나라 성취기준에 다시 연결', 23, 500), 543, p(t, c.std, .6), K.red, 4, 61);
+  // a new country: not from scratch
+  sticky(1150, 615, 460, 110, .02, p(t, c.scr - .1, .5), ['처음부터 학습체계를 새로'], { size: 32 });
+  crossMark(1665, 668, 34, p(t, c.scr + .5, .4), K.navy, 5);
+};
+SC.countryTrack = t => {
+  countryPage(t);
+  const c = CY(), B = CLOUDS.us1; if (!B) return;
+  // a learner's results on the U.S. map: known (red), lacking (navy)
+  B.pts.forEach(([x, y], i) => { if (i % 5) return; const gap = i % 15 === 0, k = eBack(p(t, (gap ? c.lack : c.know) + (i % 7) * .05, .35)); if (k > 0) circle(400 + x, 839 + y, (gap ? 7 : 6) * k, gap ? K.navy : K.red, '#FFFFFF', 1.5); });
+  hbox(204, 772, 392, 147, p(t, c.trk, .6), K.red, 3, 62);
+  text('학습 상태 추적', 400, 945, { size: 30, weight: 700, fam: HAND, color: K.red, align: 'center', alpha: p(t, c.trk + .3, .4) });
+  text('국가별 상품 개발 속도 ↑', 1430, 850, { size: 40, weight: 700, fam: HAND, color: K.red, align: 'center', alpha: p(t, c.spd, .4) });
+};
+
+// ============================================================
+// p. 6  three layers, built from the bottom (four scenes)
+// ============================================================
+const LY = { service: 300, agent: 500, knowledge: 700 }, LYH = 170;
+const LYD = {
+  knowledge: ['지식 계층', 'net', ['학습목표·콘텐츠·지식맵을', 'AI가 활용할 수 있는 JEI 지식맵으로 구축'], [['P-01', '지식그래프'], ['P-04', '공통·국가별 지식맵'], ['P-06', 'LLM Wiki']]],
+  agent: ['AI 에이전트 계층', 'spark', ['JEI 지식맵을 바탕으로 콘텐츠 생성', '학습 결과 분석, 설명·힌트·보충학습 제공'], [['P-02', '콘텐츠 자동생성'], ['P-04', '학습 추정/보정 엔진'], ['P-05', 'AI 보조선생님']]],
+  service: ['서비스 계층', 'student', ['POD와 온라인으로 학습자에게 콘텐츠 제공', '학습 결과를 다음 학습에 반영'], [['P-03', 'POD 서비스'], ['P-07', 'AI 온라인 학습 플랫폼']]],
+};
+const LYT = () => ({ three: Wc('l6_1', ['세', '3개', '3'], .2), up: Wc('l6_1', '아래에서부터', .6), k: Wc('l6_2', '학습자료', .35), kc: Wc('l6_2', ['제이이아이', 'jei', '지식맵'], .7),
+  a: Wc('l6_3', '바탕으로', .35), ac: Wc('l6_3', '분석', .8), s: Wc('l6_4', ['피오디', 'pod'], .4), sc: Wc('l6_4', '제공', .85),
+  st: Wc('l6_5', '안정적', .35), fl: Wc('l6_5', '유연', .8) });
+function layerPage(t) {
+  if (SHARED_OFF) return; pageHead(t, 'layers', '전체 구조', '지식 → AI → 서비스, 3개의 층을 아래부터 쌓는다');
+  const c = LYT(), col = { knowledge: K.blush, agent: K.lightRed, service: K.red }, ic = { knowledge: K.crimson, agent: '#FFFFFF', service: '#FFFFFF' };
+  // the arrow: built upward
+  const ak = eOut(p(t, c.up - .2, 1.2));
+  if (ak > 0) { ctx.save(); ctx.fillStyle = K.lightBox; const top = lerp(870, 300, ak); ctx.fillRect(214, top + 34, 26, 870 - top - 34); ctx.beginPath(); ctx.moveTo(204, top + 34); ctx.lineTo(227, top); ctx.lineTo(250, top + 34); ctx.closePath(); ctx.fill(); ctx.restore(); }
+  ['knowledge', 'agent', 'service'].forEach((id, i) => {
+    const [name, icn, desc, codes] = LYD[id], y = LY[id], cy = y + LYH / 2, td = [c.k, c.a, c.s][i], tc = [c.kc, c.ac, c.sc][i];
+    enter(t, c.three + i * .3 - .1, () => { rr(280, y, 1300, LYH, 16, K.lightBox); rr(280, y, 12, LYH, 6, col[id]); badge(370, cy, 50, col[id], icn, ic[id]); text(name, 445, cy + 1, { size: 36, weight: 800, maxW: 300 }); }, { dx: -30, dy: 0 });
+    desc.forEach((d, j) => text(d, 770, cy - 20 + j * 40, { size: 25, weight: 600, color: K.muted, alpha: p(t, td - .1 + j * .3, .4), maxW: 470 }));
+    codes.forEach(([cd, nm], j) => { const a = eOut(p(t, tc - .2 + j * .15, .4)); if (a > 0) code(cd, 1262, cy - (codes.length - 1) * 22 + j * 44, { a, size: 17, fill: K.ink, name: nm, nameSize: 19 }); });
+  });
+}
+function layerNote(t, id, t0, lines, col = K.red) { const y = LY[id] + LYH / 2 - (lines.length - 1) * 19; lines.forEach((l, i) => text(l, 1700, y + i * 38, { size: 30, weight: 700, fam: HAND, color: col, align: 'center', alpha: p(t, t0 + i * .2, .4), maxW: 200 })); }
+const layerMark = (t, id, t0, seed) => hbox(274, LY[id] - 6, 1312, LYH + 12, p(t, t0, .7), K.red, 3, seed);
+SC.layers = t => { layerPage(t); const c = LYT(); layerMark(t, 'knowledge', c.k - .3, 71); layerNote(t, 'knowledge', c.kc, ['가장 아래', '기반부터']); };
+SC.layerAgent = t => { layerPage(t); const c = LYT(); layerMark(t, 'agent', st('l6_3', 0), 72); layerNote(t, 'agent', c.ac, ['생성하고', '분석하고']); };
+SC.layerService = t => { layerPage(t); const c = LYT(); layerMark(t, 'service', st('l6_4', 0), 73); layerNote(t, 'service', c.sc, ['학습자에게', '제공']); };
+SC.layerPace = t => {
+  layerPage(t); const c = LYT();
+  layerNote(t, 'knowledge', c.st, ['한 번 구축하면', '안정적 유지'], K.blue);
+  layerNote(t, 'service', c.fl, ['빠르고', '유연하게 발전'], K.red);
+  stamp('안정', 540, LY.knowledge + 134, p(t, c.st + .2, .35), K.blue, -.06, 22);
+  stamp('유연', 540, LY.service + 134, p(t, c.fl + .1, .35), K.red, .06, 22);
+};
+
+// ============================================================
+// p. 7  roadmap: seven projects, two phases (four scenes)
+// ============================================================
+const PJ = { 'P-01': [0, ['학습목표', '지식그래프 구축'], 9], 'P-02': [0, ['프로그램식 콘텐츠', '자동생성 에이전트'], 10], 'P-03': [0, ['개인별 맞춤', 'POD 제작·제공'], 11.5, true],
+  'P-04': [1, ['학습자 상태 분석', '학습경로 갱신'], 10], 'P-05': [1, ['AI 보조선생님', '에이전트'], 10], 'P-07': [1, ['AI 온라인', '학습 플랫폼'], 12.5, true] };
+const PCX = { 'P-01': 230, 'P-02': 475, 'P-03': 720, 'P-04': 1060, 'P-05': 1305, 'P-07': 1550 }, PCY = 380, PCW = 230, PCH = 220;
+const phaseCol = ph => [K.red, K.blue, K.mintDark][ph];
+const RD = () => ({ s0: H0('roadmap') + .3, sev: Wc('l7_1', ['일곱', '7'], .3), two: Wc('l7_1', '두', .65),
+  p1k: Wc('l7_2', ['제이이아이', 'jei', '지식맵'], .3), p1c: Wc('l7_2', '자동생성', .6), p1p: Wc('l7_3', ['피오디', 'pod'], .85), p1f: Wc('l7_3', '제공', .95),
+  p2s: Wc('l7_4', '상태', .2), p2a: Wc('l7_4', ['보조선생님', '보조'], .45), p2o: Wc('l7_4', '온라인', .7), p2f: Wc('l7_5', '실시간', .7),
+  wk: Wc('l7_6', ['엘엘엠', 'llm', '위키', 'wiki'], .2), wo: Wc('l7_6', '정리', .45), wa: Wc('l7_6', '공통으로', .75) });
+function roadmapPage(t) {
+  if (SHARED_OFF) return; pageHead(t, 'roadmap', '추진 로드맵', '7개 프로젝트, 두 단계로 확장');
+  const c = RD();
+  [['Phase 1', '2026.10 ~ 2027', 210, 775, 'Knowledge Map + 콘텐츠 생성 → 개인별 POD로 검증', c.p1f], ['Phase 2', '2028.01 ~', 1040, 760, '학습자 상태 분석 + AI 지원 → 온라인 개인화 플랫폼', c.p2f]].forEach(([h, d, x, w, f, tf], i) => {
+    enter(t, c.s0 + i * .25, () => { rr(x, 270, w, 450, 18, K.lightBox); rr(x, 270, w, 10, 5, phaseCol(i)); text(h, x + 26, 326, { size: 34, weight: 800, color: phaseCol(i) }); text(d, x + 26 + measure(h, 34, 800) + 22, 327, { size: 28, weight: 600 }); });
+    text(f, x + 26, 680, { size: 23, weight: 800, color: i ? K.blue : K.crimson, alpha: p(t, tf - .2, .5), maxW: w - 50 });
+  });
+  penArrow(990, 490, 1030, 490, p(t, c.two, .4), K.red, 6, 81);
+  Object.entries(PJ).forEach(([cd, [ph, nm, mo, key]], i) => enter(t, c.sev + i * .1, () => { const x = PCX[cd];
+    card(x, PCY, PCW, PCH, { r: 12, stroke: key ? phaseCol(ph) : LINE, lw: key ? 3 : 2 });
+    code(cd, x + 16, PCY + 34, { size: 17, fill: phaseCol(ph) }); if (key) text('핵심 서비스', x + PCW - 16, PCY + 35, { size: 18, weight: 800, color: phaseCol(ph) === K.red ? K.crimson : K.blue, align: 'right' });
+    nm.forEach((s, j) => text(s, x + 16, PCY + 92 + j * 32, { size: 22, weight: key ? 800 : 700, maxW: PCW - 28 }));
+    text(mo + '개월', x + 16, PCY + PCH - 26, { size: 20, weight: 700, color: K.muted }); }, { pop: true, ox: PCX[cd] + PCW / 2, oy: PCY + PCH / 2 }));
+  enter(t, c.sev + .65, () => { rr(210, 760, 1590, 110, 18, K.mintTint); badge(270, 815, 34, K.mintDark, 'book'); code('P-06', 325, 815, { size: 20, fill: K.mintDark, name: 'LLM Wiki', nameSize: 30, nameColor: K.mintDark });
+    text('JEI의 교육지식을 정리·갱신해 모든 프로젝트에 공급하는 공통 지식베이스', 610, 816, { size: 25, weight: 600, maxW: 1160 }); });
+}
+const pjMark = (t, cd, t0) => check(PCX[cd] + PCW - 36, PCY + PCH - 32, 34, p(t, t0, .35), K.red, 6);
+SC.roadmap = t => {
+  roadmapPage(t); const c = RD();
+  penCircle(210 + measure('7', 54, 700) / 2, 160, 34, 40, p(t, c.sev, .5), K.red, 4, 82);
+};
+SC.phase1 = t => {
+  roadmapPage(t); const c = RD();
+  hbox(204, 264, 787, 462, p(t, st('l7_2', 0), .7), K.red, 3, 83);
+  pjMark(t, 'P-01', c.p1k, 84); pjMark(t, 'P-02', c.p1c, 85);
+  stamp('핵심', PCX['P-03'] + 165, PCY + 158, p(t, c.p1p, .35), K.red, -.1, 22);
+  text('프로그램식 학습원리로 학생별 맞춤 콘텐츠', 597, 638, { size: 28, weight: 700, fam: HAND, color: K.red, align: 'center', alpha: p(t, Wc('l7_3', '프로그램식', .3), .4), maxW: 740 });
+};
+SC.phase2 = t => {
+  roadmapPage(t); const c = RD();
+  hbox(1034, 264, 772, 462, p(t, st('l7_4', 0), .7), K.red, 3, 86);
+  pjMark(t, 'P-04', c.p2s, 87); pjMark(t, 'P-05', c.p2a, 88);
+  stamp('핵심', PCX['P-07'] + 165, PCY + 158, p(t, c.p2o, .35), K.blue, -.1, 22);
+  text('학습경로를 실시간으로 조정', 1420, 638, { size: 30, weight: 700, fam: HAND, color: K.blue, align: 'center', alpha: p(t, Wc('l7_5', ['학습경로', '경로'], .6), .4), maxW: 720 });
+};
+SC.wiki = t => {
+  roadmapPage(t); const c = RD();
+  hbox(204, 754, 1602, 122, p(t, c.wk - .2, .7), K.mintDark, 3, 89);
+  ['P-01', 'P-02', 'P-03', 'P-04', 'P-05', 'P-07'].forEach((cd, i) => penArrow(PCX[cd] + PCW / 2, 756, PCX[cd] + PCW / 2, 724, p(t, c.wa - .3 + i * .1, .35), K.mintDark, 4, 90 + i));
+  text('모든 프로젝트에서 공통으로', 1500, 920, { size: 30, weight: 700, fam: HAND, color: K.mintDark, align: 'center', alpha: p(t, c.wa + .4, .4) });
+};
+
+// ============================================================
+// p. 8  P-03 personalized POD (two scenes)
+// ============================================================
+const PODS = [['doc', '진단·학습 이력', ''], ['lens', '필요 학습목표·', '분량 자동 선정'], ['spark', 'AI 콘텐츠 생성', '+ 연구원 검토'], ['print', '1인 1맞춤', '학습지 출력'], ['retry', '결과 반영', '다음 POD 재구성']];
+const PD = () => ({ t: [Wc('l8_2', '진단', .15), Wc('l8_2', '필요한', .6), Wc('l8_3', 'ai', .2), Wc('l8_3', '제작', .9), Wc('l8_4', '결과', .3)], rv: Wc('l8_3', '검토', .65),
+  nx: Wc('l8_4', '다음', .6), us: Wc('l8_6', '미국', .2), kr: Wc('l8_6', '국내', .8), sup: Wc('l8_5', '보충', .45), adj: Wc('l8_5', '조정', .65) });
+function podPage(t) {
+  if (SHARED_OFF) return; pageHead(t, 'pod', '핵심 서비스 ①', 'P-03 개인별 맞춤 POD — 1인 1맞춤 학습지');
+  const c = PD();
+  PODS.forEach(([ic, a1, a2], i) => { const x = 210 + i * 325, last = i === 4;
+    if (t < c.t[i] - .1) hbox(x, 300, 290, 300, p(t, H0('pod') + .5 + i * .12, .5), K.lineGrey, 2.5, 100 + i);
+    enter(t, c.t[i] - .1, () => { card(x, 300, 290, 300, { r: 16, stroke: last ? K.red : K.lineGrey, lw: last ? 3 : 2 }); badge(x + 145, 395, 52, last ? K.red : K.redTint, ic, last ? '#FFFFFF' : K.red);
+      text(a1, x + 145, a2 ? 505 : 525, { size: 28, weight: 800, align: 'center', maxW: 260 }); if (a2) text(a2, x + 145, 545, { size: 28, weight: 800, align: 'center', maxW: 260 }); }, { pop: true, ox: x + 145, oy: 450 });
+    if (i) penArrow(x - 30, 450, x - 6, 450, p(t, c.t[i] - .3, .3), K.red, 5, 110 + i); });
+  check(210 + 2 * 325 + 250, 330, 34, p(t, c.rv + .2, .3), K.red, 6);
+  // the loop back to the start
+  const lk = p(t, Math.max(c.nx - .2, c.t[4] + .3), 1.2); if (lk > 0) strokePts([[210 + 4 * 325 + 145, 612], [210 + 4 * 325 + 145, 660], [355, 660], [355, 612]], lk, K.red, 4, 1, [12, 9]);
+  arrowHead(355, 610, -Math.PI / 2, clamp(lk * 4 - 3), K.red, 4);
+  text('학습 결과가 다음 학습으로 이어지는 순환', 1005, 700, { size: 26, weight: 800, color: K.crimson, align: 'center', alpha: p(t, c.nx + .6, .4) });
+  enter(t, c.us - .2, () => { rr(210, 770, 1590, 100, 16, K.lightBox); text('적용 순서', 250, 821, { size: 28, weight: 800 });
+    text('미국 → 한국', 410, 821, { size: 28, weight: 800, color: K.red }); text('·  Phase 1에서 학습 순환을 검증하는 첫 번째 핵심 서비스', 410 + measure('미국 → 한국', 28, 800) + 24, 822, { size: 25, weight: 500, color: K.muted, maxW: 1000 }); });
+}
+SC.pod = t => {
+  podPage(t); const c = PD();
+  ['학습목표', '학습 분량'].forEach((s, i) => chip(s, 210 + 325 + 145, 650 + i * 52, { size: 21, fill: K.redTint, color: K.crimson, a: eBack(p(t, Wc('l8_2', i ? '분량' : ['학습목표', '목표'], .8) + .1, .4)), align: 'center' }));
+  chip('프로그램식 학습원리', 210 + 650 + 145, 650, { size: 21, fill: K.redTint, color: K.crimson, a: eBack(p(t, Wc('l8_3', '프로그램식', .4), .4)), align: 'center' });
+  chip('연구원 검토', 210 + 650 + 145, 702, { size: 21, fill: K.redTint, color: K.crimson, a: eBack(p(t, c.rv, .4)), align: 'center' });
+};
+SC.podCycle = t => {
+  podPage(t); const c = PD();
+  chip('필요한 내용 보충', 470, 735, { size: 21, fill: K.redTint, color: K.crimson, a: eBack(p(t, c.sup, .4)), align: 'center' });
+  chip('내용 · 분량 조정', 1540, 735, { size: 21, fill: K.redTint, color: K.crimson, a: eBack(p(t, c.adj, .4)), align: 'center' });
+  penCircle(410 + measure('미국 → 한국', 28, 800) / 2, 820, measure('미국 → 한국', 28, 800) / 2 + 22, 30, p(t, c.us + .2, .5), K.red, 4, 120);
+  text('검증 후 단계적으로 확대', 600, 920, { size: 30, weight: 700, fam: HAND, color: K.red, alpha: p(t, c.kr, .4) });
+};
+
+// ============================================================
+// p. 9  P-07 online learning that adjusts in real time (two scenes)
+// ============================================================
+const OL = () => ({ c1: st('l9_1', .3), b1: Wc('l9_2', '정오답', .1), sig: [Wc('l9_2', '정오답', .1), Wc('l9_2', '풀이', .2), Wc('l9_2', '힌트', .28), Wc('l9_2', ['재시도', '제시도'], .36)], b2: Wc('l9_2', '콘텐츠', .8), rt: Wc('l9_2', '실시간', .9),
+  as: Wc('l9_3', ['보조선생님', '보조'], .3), stu: Wc('l9_3', '학생과', .6), tea: Wc('l9_3', '선생님을', .8), h0: Wc('l9_4', '정답', .1), h: Wc('l9_4', '힌트', .3), sf: Wc('l9_4', '스스로', .2), d: Wc('l9_4', '어려움', .7), co: Wc('l9_4', '코칭', .85), sum: st('l9_5', .1) });
+function onlinePage(t) {
+  if (SHARED_OFF) return; pageHead(t, 'online', '핵심 서비스 ②', 'P-07 실시간으로 조정되는 온라인 학습');
+  const c = OL();
+  const cards = [['학습 행동 반영', 'screen', K.red, '', [['정오답 · 풀이시간 · 힌트 · 재시도', c.b1], ['콘텐츠와 다음 학습경로를 지속 조정', c.b2]], c.c1],
+    ['학생을 돕는 AI', 'student', K.blue, 'P-05 AI 보조선생님', [['정답 대신 스스로 풀도록 힌트·설명', c.h0], ['보충 · 복습 · 심화 학습 제공', c.h + .8]], c.stu],
+    ['선생님을 돕는 AI', 'teacher', K.mintDark, 'P-05 AI 보조선생님', [['학생의 학습 상태와 어려움 전달', c.d], ['더 구체적인 코칭 지원', c.co]], c.tea]];
+  cards.forEach(([h, ic, col, tag, bl, t0], i) => { const x = 210 + i * 540, dim = i && t < t0 ? .4 : 1;
+    enter(t, i ? c.c1 + .3 + i * .2 : c.c1, () => { ctx.save(); ctx.globalAlpha *= dim; card(x, 290, 510, 470, { r: 18 }); badge(x + 80, 375, 48, col, ic);
+      if (tag) text(tag, x + 486, 322, { size: 19, weight: 800, color: col, align: 'right' }); text(h, x + 36, 470, { size: 34, weight: 800, maxW: 440 }); ctx.restore(); });
+    bl.forEach(([s, tb], j) => bullet(t, tb - .1, x + 36, 550 + j * 96, s, { size: 25, w: 420, col })); });
+}
+SC.online = t => {
+  onlinePage(t); const c = OL();
+  let cx = 246; ['정오답', '풀이 시간', '힌트 사용', '재시도'].forEach((s, i) => { cx += chip(s, cx, 712, { size: 19, fill: K.redTint, color: K.crimson, a: eBack(p(t, c.sig[i], .35)), pad: 13, spacing: 0 }) + 10; });
+  text('실시간으로 조정', 465, 815, { size: 36, weight: 700, fam: HAND, color: K.red, align: 'center', alpha: p(t, c.rt, .4) });
+  pen(330, 842, 600, 838, p(t, c.rt + .3, .5), K.red, 5, 130);
+};
+SC.assistant = t => {
+  onlinePage(t); const c = OL();
+  hbox(744, 284, 1062, 482, p(t, c.as - .2, .8), K.red, 3, 131);
+  pen(750 + 62, 568, 750 + 62 + measure('정답 대신 스스로 풀도록', 25, 600), 566, p(t, Math.max(c.sf, c.h0 + .5), .5), K.blue, 4, 132);
+  pen(1290 + 62, 664, 1290 + 62 + measure('더 구체적인 코칭 지원', 25, 600), 662, p(t, c.co + .2, .5), K.mintDark, 4, 133);
+  text('학생에게는 개인별 맞춤 학습 · 선생님에게는 효과적인 학습 지도', 1005, 830, { size: 36, weight: 700, fam: HAND, color: K.red, align: 'center', alpha: p(t, c.sum, .5), maxW: 1580 });
+};
+
+// ============================================================
+// p. 10  a learner's state on the map (three scenes)
+// ============================================================
+const MAP = { x: 210, y: 270, w: 900, h: 640 };
+const BAND = { up: [270, 460], mid: [460, 640], low: [640, 910] };
+const NODES = (() => {   // fixed pseudo-random network
+  const out = [];
+  for (let i = 0; i < 150; i++) {
+    const x = MAP.x + 40 + (nz(i, 3) + .5) * (MAP.w - 80), y = MAP.y + 30 + (nz(i, 7) + .5) * (MAP.h - 60);
+    const r = nz(i, 11) + .5, zone = y < BAND.up[1] ? 'up' : y < BAND.mid[1] ? 'mid' : 'low';
+    const s = zone === 'up' ? 'not' : zone === 'mid' ? (r < .55 ? 'needs' : r < .85 ? 'mastered' : 'gap') : (r < .72 ? 'mastered' : r < .88 ? 'needs' : 'gap');
+    out.push({ x, y, zone, s, r: s === 'gap' ? 9 : s === 'needs' ? 8 : 6 });
+  }
+  const edges = [];
+  out.forEach((a, i) => { const near = out.map((b, j) => [Math.hypot(a.x - b.x, a.y - b.y), j]).filter(([d, j]) => j > i && d < 120).sort((u, v) => u[0] - v[0]).slice(0, 3); near.forEach(([, j]) => edges.push([i, j])); });
+  return { nodes: out, edges };
+})();
+// recommended route: from a learning gap at the bottom up to a not-yet-studied objective, hop by hop along the map's edges (as in ../ai-learning-platform-v3-ko)
+const REC_PATH = (() => {
+  const N = NODES.nodes, adj = N.map(() => []); NODES.edges.forEach(([i, j]) => { adj[i].push(j); adj[j].push(i); });
+  const far = (i, x, y) => Math.hypot(N[i].x - x, N[i].y - y);
+  const b = N.map((n, i) => i).filter(i => N[i].zone === 'up').sort((u, v) => far(u, 700, 420) - far(v, 700, 420))[0];
+  const route = a => { const dist = N.map(() => Infinity), prev = N.map(() => -1), done = new Set(); dist[a] = 0;
+    while (true) { let u = -1; N.forEach((_, i) => { if (!done.has(i) && dist[i] < Infinity && (u < 0 || dist[i] < dist[u])) u = i; }); if (u < 0 || u === b) break; done.add(u);
+      adj[u].forEach(v => { const d = dist[u] + Math.hypot(N[v].x - N[u].x, N[v].y - N[u].y) + Math.max(0, N[v].y - N[u].y) * 30; if (d < dist[v]) { dist[v] = d; prev[v] = u; } }); }
+    const out = []; if (dist[b] < Infinity) for (let i = b; i >= 0; i = prev[i]) out.unshift(N[i]); return { out, cost: dist[b] + far(a, 560, 810) }; };
+  return N.map((n, i) => i).filter(i => N[i].s === 'gap' && N[i].y > 740 && far(i, 560, 810) < 300).map(route).sort((u, v) => u.cost - v.cost)[0].out;
+})();
+// a gap in ground already covered, away from the route (the PDF's "진도는 지나갔지만 숙련되지 않은 지점")
+const OLD_GAP = NODES.nodes.filter(n => n.s === 'gap' && n.zone === 'low' && !REC_PATH.includes(n)).sort((u, v) => (u.x - 330) ** 2 + (u.y - 860) ** 2 - (v.x - 330) ** 2 - (v.y - 860) ** 2)[0];
+const STATUS = [['mastered', '완전학습', '완전히 이해하고 익힌 학습목표', 'red'], ['needs', '미숙', '현재 이해도를 확인하고 보완할 학습목표', 'mint'], ['gap', '결손', '숙련되지 않은 학습목표 — 최우선 보완', 'navy'], ['not', '미학습', '아직 학습하지 않은 학습목표', 'midGrey']];
+const SM = () => ({ t0: st('l10_1', .1), tz: [Wc('l10_2', '위쪽', .75), Wc('l10_2', '가운데', .4), Wc('l10_2', '아래쪽', .05)],
+  ts: { mastered: Wc('l10_3', '완전히', .45), needs: Wc('l10_3', '보완', .65), gap: Wc('l10_3', '결손', .8), not: Wc('l10_3', '미학습', .9) }, first: Wc('l10_4', '결손', .3),
+  up: Wc('l10_5', '갱신', .8), lack: Wc('l10_6', '부족한', .25), sup: Wc('l10_6', '보충', .5), rec: Wc('l10_6', '다음', .75), end: st('l10_7', .1) });
+function statusPage(t) {
+  if (SHARED_OFF) return; pageHead(t, 'statusMap', '학습자 활성 지식맵', '학습자 한 명의 상태를 지식맵 위에');
+  const c = SM(), mk = p(t, c.t0, .5); if (mk <= 0) return;
+  card(MAP.x, MAP.y, MAP.w, MAP.h, { r: 8, a: mk });
+  ctx.save(); ctx.beginPath(); ctx.rect(MAP.x, MAP.y, MAP.w, MAP.h); ctx.clip();
+  [['up', K.lightBox, c.tz[0]], ['mid', K.mintTint, c.tz[1]], ['low', K.redTint, c.tz[2]]].forEach(([z, col, tt]) => { const [a, b] = BAND[z], k = p(t, tt, .6); rr(MAP.x, a, MAP.w, b - a, 0, rgba(col, z === 'up' ? 1 : z === 'mid' ? .75 : .45), null, 0, k); });
+  const N = NODES.nodes, rise = n => c.t0 + .2 + (1 - (n.y - MAP.y) / MAP.h) * 1.4;
+  NODES.edges.forEach(([i, j]) => { const a = N[i], b = N[j], k = p(t, Math.max(rise(a), rise(b)), .5); if (k > 0) line0(a.x, a.y, lerp(a.x, b.x, k), lerp(a.y, b.y, k), a.zone === 'up' || b.zone === 'up' ? rgba(K.lineGrey, .45) : a.zone === 'low' && b.zone === 'low' ? rgba(K.red, .2) : rgba(K.mintDark, .3), 1.2); });
+  N.forEach((n, i) => { const k = eBack(p(t, rise(n), .4)); if (k <= 0) return; const ck = p(t, (n.s === 'not' ? c.tz[0] : c.ts[n.s]) + (i % 10) * .03, .4), col = K[STATUS.find(s => s[0] === n.s)[3]];
+    const fixed = n === OLD_GAP && t > c.sup + .3;   // made up: the gap turns mastered
+    if (n.s === 'gap' && ck > 0 && !fixed) circle(n.x, n.y, (n.r + 7) * k, rgba(K.navy, .16 * ck));
+    circle(n.x, n.y, n.r * k, fixed ? K.red : ck > 0 ? col : K.lineGrey, '#FFFFFF', 1.5); if (ck > 0 && ck < 1) circle(n.x, n.y, n.r * k, rgba(K.lineGrey, 1 - ck)); });
+  ctx.restore();
+  text('학습자 한 명의 지식맵 학습 상태 (개념 예시)', MAP.x, MAP.y + MAP.h + 28, { size: 20, weight: 600, color: K.muted, alpha: mk });
+  // legend and the update loop (stay through the next scenes)
+  const RX = 1170;
+  STATUS.forEach(([id, h, s, col], i) => enter(t, c.ts[id] - .1, () => { const y = 330 + i * 104; rr(RX, y - 44, 630, 88, 12, K.lightBox); circle(RX + 42, y, 20, K[col]); text(h, RX + 80, y - 13, { size: 28, weight: 800 }); text(s, RX + 80, y + 21, { size: 20, weight: 500, color: K.muted, maxW: 530 }); }, { dx: 24, dy: 0 }));
+  enter(t, c.up - .2, () => { rr(RX, 790, 630, 120, 16, K.ink); text('진단·학습 결과 누적  →  상태 갱신  →', RX + 30, 830, { size: 26, weight: 700, color: '#FFFFFF', maxW: 570 }); });
+  text('다음 학습경로 개인별 재조정', RX + 30, 872, { size: 26, weight: 800, color: K.lightRed, alpha: p(t, c.rec, .4), maxW: 570 });
+}
+SC.statusMap = t => {
+  statusPage(t); const c = SM(), RX = 1170;
+  text('지식맵의 세 영역', RX, 300, { size: 30, weight: 800, alpha: p(t, c.tz[2] - .3, .4) });
+  [['위쪽', '앞으로 학습할 영역', K.lightBox, c.tz[0]], ['가운데', '현재 학습 중인 영역', K.mintTint, c.tz[1]], ['아래쪽', '이미 학습한 영역', K.redTint, c.tz[2]]].forEach(([h, s, fill, tt], i) =>
+    enter(t, tt - .1, () => { const y = 345 + i * 165; rr(RX, y, 630, 140, 14, fill); text(h, RX + 30, y + 48, { size: 30, weight: 800 }); text(s, RX + 30, y + 98, { size: 28, weight: 600, color: K.muted, maxW: 570 }); }, { dx: 24, dy: 0 }));
+};
+SC.statuses = t => {
+  statusPage(t); const c = SM();
+  text('학생의 이해도에 따라 구분', 1170, 260, { size: 30, weight: 700, fam: HAND, color: K.red, alpha: p(t, st('l10_3', .2), .4) });
+  // a learning gap is made up first
+  hbox(1162, 488, 646, 100, p(t, c.first, .6), K.red, 4, 143);
+};
+SC.statusUpdate = t => {
+  statusPage(t); const c = SM(), G = OLD_GAP;
+  // results pile up: the states update (a ring sweeps the map once)
+  const uk = p(t, c.up - .3, 1.2); if (uk > 0 && uk < 1) { ctx.save(); ctx.beginPath(); ctx.rect(MAP.x, MAP.y, MAP.w, MAP.h); ctx.clip(); line0(MAP.x, lerp(MAP.y + MAP.h, MAP.y, eIO(uk)), MAP.x + MAP.w, lerp(MAP.y + MAP.h, MAP.y, eIO(uk)), rgba(K.red, .5 * (1 - uk)), 6); ctx.restore(); }
+  // a gap in ground already covered: found, made up
+  penCircle(G.x, G.y, 26, 26, p(t, c.lack, .5), K.navy, 4, 141);
+  const nx = MAP.x + 14, ny = G.y - 150;
+  enter(t, c.lack + .2, () => { rr(nx, ny, 330, 70, 10, '#FFFFFF', K.navy, 2); text('학습결손', nx + 16, ny + 20, { size: 20, weight: 800, color: K.navy }); text('진도는 지나갔지만 숙련되지 않은 지점', nx + 16, ny + 48, { size: 17, weight: 600, color: K.muted, maxW: 300 }); });
+  pen(G.x - 6, G.y - 30, G.x - 20, ny + 74, p(t, c.lack + .3, .3), K.navy, 3, 142);
+  check(G.x + 2, G.y - 2, 30, p(t, c.sup + .3, .35), K.red, 6);
+  // the next route, along the map's lines
+  const P = REC_PATH, n = P.length - 1, pk = p(t, c.rec, .4 * n);
+  for (let i = 1; i < P.length; i++) { const k = clamp(pk * n - (i - 1)); if (k > 0) penArrow(P[i - 1].x, P[i - 1].y, P[i].x, P[i].y, k, K.blue, 5, 170 + i); }
+  text('다음 학습', P[n].x + 22, P[n].y - 24, { size: 34, weight: 700, fam: HAND, color: K.blue, alpha: p(t, c.rec + .4 * n - .2, .4) });
+  text('아는 내용은 반복 없이, 부족한 부분은 충분히 보충', 1170, 260, { size: 30, weight: 700, fam: HAND, color: K.red, alpha: p(t, c.end, .5), maxW: 630 });
+};
+
+// ============================================================
+// p. 11  four changes (four scenes)
+// ============================================================
+const CH = [['국가·지역별 학습체계·콘텐츠 신속 구성', 'Knowledge Map을 기반으로 국가·지역·목적에 맞는 체계와 콘텐츠를 빠르게 재구성', 'globe', 'l11_2', '빠르게'],
+  ['개인별 맞춤 콘텐츠 제공', '현재 수준에 필요한 학습목표와 분량을 결정해 POD와 온라인으로 필요한 시점에 제공', 'print', 'l11_3', '시점'],
+  ['학습상태에 따른 실시간 경로 조정', '학습목표별 이해도와 결손 지점을 파악하고, 선수·후속 관계로 다음 경로 재구성', 'route', 'l11_4', '실시간'],
+  ['성취도 + JEI-SLI 성장관리', '이전의 자신과 비교한 성장 변화를 학습자·선생님·학부모에게 제공', 'growth', 'l11_5', ['이전', '자신']]];
+const CHXY = i => [210 + (i % 2) * 810, 290 + Math.floor(i / 2) * 290], CHW = 780, CHH = 255;
+function changePage(t) {
+  if (SHARED_OFF) return; pageHead(t, 'change1', '무엇을 할 수 있는가', 'AI 학습 플랫폼이 만드는 네 가지 변화');
+  const four = Wc('l11_1', '네', .55);
+  CH.forEach(([h, d, ic, line], i) => { const [x, y] = CHXY(i), t0 = st(line, 0) - .1;
+    if (t < t0) hbox(x, y, CHW, CHH, p(t, four + i * .15, .5), K.lineGrey, 2.5, 150 + i);
+    enter(t, t0, () => { rr(x, y, CHW, CHH, 18, K.lightBox); circle(x + 40, y + 40, 26, K.red); text(String(i + 1), x + 40, y + 41, { size: 26, weight: 800, color: '#FFFFFF', align: 'center' });
+      circle(x + 120, y + 150, 66, '#FFFFFF'); if (ic === 'print') icon('print', x + 120, y + 150, 34, K.red); else if (ic === 'route') icon('route', x + 120, y + 150, 40, K.red); else icon2(ic, x + 120, y + 150, 38, K.red);
+      const hl = wrapLines(h, 540, 32, 800); hl.forEach((l, j) => text(l, x + 220, y + 66 + j * 42, { size: 32, weight: 800 }));
+      para(d, x + 220, y + 88 + hl.length * 42, 520, { size: 23, weight: 500, color: K.muted, lh: 1.4 }); }, { pop: true, ox: x + CHW / 2, oy: y + CHH / 2 });
+  });
+}
+function changeMark(t, i) {
+  const [x, y] = CHXY(i), [, , , line, w] = CH[i];
+  hbox(x - 6, y - 6, CHW + 12, CHH + 12, p(t, st(line, .02), .7), K.red, 3, 160 + i);
+  check(x + CHW - 50, y + CHH - 46, 40, p(t, Wc(line, w, .8) + .2, .35), K.red, 6);
+}
+SC.change1 = t => { changePage(t); changeMark(t, 0); };
+SC.change2 = t => { changePage(t); changeMark(t, 1); };
+SC.change3 = t => { changePage(t); changeMark(t, 2); };
+SC.change4 = t => {
+  changePage(t); changeMark(t, 3);
+  const [x, y] = CHXY(3);
+  text('다른 학생이 아니라, 이전의 나와 비교', x + CHW / 2, y + CHH + 26, { size: 28, weight: 700, fam: HAND, color: K.red, align: 'center', alpha: p(t, Wc('l11_5', '아닌', .6), .4), maxW: CHW });
+};
+
+// ============================================================
+// p. 12  closing
+// ============================================================
+SC.outro = t => {
+  // the picture on the left, the words on the right (review 2026-11-04)
+  const TX = 980, TW = 820;
+  const a0 = st('l12_1', .05), ai = Wc('l12_1', 'ai', .3), kn = Wc('l12_1', '지식', .5), sp = Wc('l12_1', '출발점', .85);
+  enter(t, a0, () => card(210, 250, 650, 470, { r: 16, fill: K.lightBox, stroke: null, shadow: false }));
+  constellation(t, 535, 485, a0 + .2, ai, kn);
+  text('50년의 학습설계 자산', 245, 280, { size: 22, weight: 700, color: K.muted, alpha: p(t, a0 + .3, .4) });
+  text('→ AI가 이해하고 활용할 수 있는 지식', 535, 760, { size: 30, weight: 700, fam: HAND, color: K.red, align: 'center', alpha: p(t, kn, .4), maxW: 640 });
+  stamp('출발점', 760, 680, p(t, sp, .35), K.red, -.08, 24);
+  const g = Wc('l12_2', '빠르게', .3), gr = Wc('l12_2', '성장', .65), jei = Wc('l12_2', ['제이이아이만의', 'jei만의', '제이이아이', 'jei'], .8), sd = Wc('l12_3', '표준', .85), vl = Wc('l12_3', '가치', .35);
+  C.outro.lead.forEach((s, i) => enter(t, i ? gr - .2 : g - .3, () => text(s, TX, 300 + i * 52, { size: 34, weight: 600, color: K.muted, maxW: TW })));
+  enter(t, jei - .2, () => text(C.outro.words[0], TX, 470, { size: 84, weight: 800, color: K.red, maxW: TW }));
+  enter(t, jei + .1, () => text(C.outro.words[1], TX, 580, { size: 84, weight: 800, maxW: TW }));
+  hiLite(TX - 10, 540, Math.min(TW, measure(C.outro.words[1], 84, 800)) + 22, 72, p(t, jei + .6, .7));
+  text(C.outro.value, TX + 4, 690, { size: 36, weight: 700, fam: HAND, color: K.muted, alpha: p(t, vl, .5), maxW: TW });
+  enter(t, sd - .3, () => text(C.outro.standard, TX + 4, 760, { size: 42, weight: 700, fam: HAND, color: K.red, maxW: TW }));
+  pen(TX + 4, 790, TX + 4 + Math.min(TW, measure(C.outro.standard, 42, 700, HAND)), 786, p(t, sd + .2, .6), K.red, 6, 195);
+  const e = en('l12_3', .3);
+  text(C.title.kicker + '  ·  ' + C.title.date, 960, 920, { size: 22, weight: 700, color: K.muted, align: 'center', spacing: 3, alpha: p(t, e, .6) });
+};
+
+// ============================================================
+// compositor: slide between pages (with the whoosh), then hold still
+// ============================================================
+// scenes that continue the page before on the same sheet (one PDF page told in steps): the page's shared part stays put and only the
+// scene's own pen marks cross-fade, no page turn (and no whoosh: tools/make_audio.py CONT)
+const CONT = new Set(TL.cont), PAGE_OF = { kmapDots: kmapPage, kmapAI: kmapPage, countryTrack: countryPage, layerAgent: layerPage, layerService: layerPage, layerPace: layerPage,
+  phase1: roadmapPage, phase2: roadmapPage, wiki: roadmapPage, podCycle: podPage, assistant: onlinePage, statuses: statusPage, statusUpdate: statusPage, change2: changePage, change3: changePage, change4: changePage };
+let SHARED_OFF = false;
+const PAGE_NO = TL.scenes.map((s, i) => i - TL.scenes.slice(1, i + 1).filter(x => CONT.has(x.id)).length);
+const TR = 1.1;
+function frame(i, t, ox) {
+  if (Math.abs(ox) >= W) return; const s = TL.scenes[i];
+  ctx.save(); ctx.translate(Math.round(ox), 0); pageFurniture(PAGE_NO[i]); SC[s.id](t); ctx.restore();
+}
+function draw(t) {
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1;
+  const SCN = TL.scenes; let i = SCN.findIndex(s => t < s.end); if (i < 0) i = SCN.length - 1;
+  const k = i > 0 ? eIO(p(t, SCN[i].start - .15, TR)) : 1, cont = i > 0 && CONT.has(SCN[i].id);
+  paper(i > 0 ? Math.round((PAGE_NO[i - 1] + (cont ? 0 : k)) * W) : 0);
+  if (cont && k < 1) {
+    pageFurniture(PAGE_NO[i]); PAGE_OF[SCN[i].id](t); SHARED_OFF = true;
+    ctx.save(); ctx.globalAlpha = 1 - k; SC[SCN[i - 1].id](t); ctx.restore();
+    ctx.save(); ctx.globalAlpha = k; SC[SCN[i].id](t); ctx.restore();
+    SHARED_OFF = false;
+  } else {
+    if (k < 1) frame(i - 1, t, -k * W);
+    frame(i, t, (1 - k) * W);
+  }
+  const f = p(t, DURATION - 1.2, 1.2); if (f > 0) { ctx.fillStyle = rgba(K.paper, eIO(f)); ctx.fillRect(0, 0, W, H); }
+}
+
+// ---------- preview player ----------
+const seekEl = document.getElementById('seek'), timeEl = document.getElementById('time'), playEl = document.getElementById('play');
+seekEl.max = DURATION.toFixed(2);
+let playing = false, t0 = 0, tCur = 0;
+const audio = new Audio('audio/mix.wav'); audio.preload = 'auto';
+function show(t) { tCur = t; draw(t); seekEl.value = t; timeEl.textContent = t.toFixed(2) + 's'; }
+function loop(now) { if (!playing) return; const t = (now - t0) / 1000; if (t >= DURATION) { playing = false; playEl.textContent = '▶ Play'; audio.pause(); show(DURATION); return; } show(t); requestAnimationFrame(loop); }
+playEl.onclick = () => { playing = !playing; playEl.textContent = playing ? '❚❚ Pause' : '▶ Play'; if (playing) { if (tCur >= DURATION) tCur = 0; t0 = performance.now() - tCur * 1000; try { audio.currentTime = tCur; audio.play().catch(() => {}); } catch (e) {} requestAnimationFrame(loop); } else audio.pause(); };
+seekEl.oninput = () => { show(+seekEl.value); if (playing) { t0 = performance.now() - tCur * 1000; try { audio.currentTime = tCur; } catch (e) {} } };
+
+window.draw = draw; window.DURATION = DURATION;
+function merge(base, over) {
+  if (Array.isArray(base)) return Array.isArray(over) ? over.map((v, i) => base[i] !== undefined ? merge(base[i], v) : v) : base;
+  if (base && typeof base === 'object') { const o = {}; for (const k in base) o[k] = over && k in over ? merge(base[k], over[k]) : base[k]; return o; }
+  return over === undefined || over === null ? base : over;
+}
+function apply(content) { C = window.CONTENT = merge(DEFAULT_CONTENT, content); K = C.colors; }
+window.VIDEO = { schema: window.SCHEMA, defaults: DEFAULT_CONTENT, get content() { return C; }, apply, canvas: cv };
+window.ready = Promise.all([document.fonts.load(`700 100px 'Noto Sans KR'`, '가A'), document.fonts.load(`700 100px 'Gaegu'`, '가A')]).then(([r]) => {
+  if (!r.length) throw new Error('font failed to load (check fonts/)');
+}).then(() => document.fonts.ready).then(() => {
+  if (location.search.includes('render')) document.body.classList.add('render');
+  const m = location.search.match(/[?&]t=([\d.]+)/); show(m ? +m[1] : 0); return true;
+});
+</script>
+</body>
+</html>
