@@ -1,0 +1,1009 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>JEI AI 전환 비전 (인터랙티브)</title>
+<style>
+  @font-face { font-family: 'Noto Sans KR'; src: url('fonts/NotoSansKR.ttf') format('truetype'); font-weight: 100 900; font-display: block; }
+  html, body { margin: 0; background: #050A14; }
+  body { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 12px; font-family: 'Noto Sans KR', sans-serif; color: #ddd; }
+  canvas { width: min(100%, 1280px); aspect-ratio: 16 / 9; display: block; background: #08101F; }
+  .bar { display: flex; gap: 12px; align-items: center; width: min(100%, 1280px); }
+  .bar input { flex: 1; }
+  .bar button { font: inherit; padding: 4px 12px; }
+  body.render { padding: 0; gap: 0; }
+  body.render canvas { width: 1920px; height: 1080px; }
+  body.render .bar { display: none; }
+</style>
+</head>
+<body>
+<script src="timeline.js"></script>
+<script src="content.js"></script>
+<script src="schema.js"></script>
+<canvas id="c" width="1920" height="1080"></canvas>
+<div class="bar">
+  <button id="play">▶ Play</button>
+  <input id="seek" type="range" min="0" max="300" step="0.01" value="0">
+  <span id="time">0.00s</span>
+</div>
+<script>
+// ------------------------------------------------------------
+// JEI AI 전환 비전, interactive version — the 12-page deck (JEI Knowledge Map 기반 AI 개인화 학습 플랫폼) as a product being used.
+// One dark space holds a panel per page, laid out on a 4 × 3 grid and visited in a snake; the camera flies (pan + zoom-out dip) from
+// panel to panel when the page changes, and zooms inside a panel when the narration points at something. A mouse cursor clicks and
+// hovers the panel's controls; knowledge maps connect like constellations, the learner's map updates live, the three layers stack
+// isometrically, the roadmap scrolls, the POD cycle runs. The closing page first pulls back to show every panel at once.
+// Timing: timeline.js, written by tools/make_audio.py from the real narration. Pictures follow spoken words
+// (Wc(line, word) looks the word up in TL.lines[line].words). draw(t) is a pure function of time.
+// ------------------------------------------------------------
+const W = 1920, H = 1080, TL = window.TL, DURATION = TL.duration;
+const cv = document.getElementById('c'), ctx = cv.getContext('2d');
+const DEFAULT_CONTENT = JSON.parse(JSON.stringify(window.CONTENT));
+let C = window.CONTENT, K = C.colors;
+const SANS = "'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif";
+
+// ---------- basics ----------
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const lerp = (a, b, k) => a + (b - a) * k;
+const p = (t, s, d) => clamp((t - s) / d);
+const eOut = x => 1 - Math.pow(1 - x, 3), eIO = x => x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+const eBack = x => { const c1 = 1.7, c3 = c1 + 1; return x <= 0 ? 0 : 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2); };
+const ap = (t, t0, d = .5) => eOut(p(t, t0, d));       // appear
+const pop = (t, t0, d = .45) => eBack(p(t, t0, d));    // appear with a little overshoot
+const nz = (i, s = 1) => { const v = Math.sin(i * 12.9898 + s * 78.233) * 43758.5453; return v - Math.floor(v) - .5; };   // fixed jitter (no flicker)
+const mod = (v, m) => ((v % m) + m) % m;
+function rand(seed) { let s = seed >>> 0; return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; }
+function rgba(hex, a) { const n = parseInt(hex.slice(1), 16); return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`; }
+function mixc(h1, h2, k) {
+  const a = parseInt(h1.slice(1), 16), b = parseInt(h2.slice(1), 16), m = s => Math.round(lerp(a >> s & 255, b >> s & 255, clamp(k)));
+  return '#' + ((1 << 24) + (m(16) << 16) + (m(8) << 8) + m(0)).toString(16).slice(1);
+}
+const L = id => TL.lines[id] || { start: 0, end: 0, words: [] };
+// the narration's scenes (tools/script.py, shared with ../jei-ai-vision-ko) step through each PDF page; here a page is one panel,
+// so consecutive scenes of the same page are merged (the camera flies only when the page changes, where the mix has its whoosh)
+const PAGE_OF = { kmapList: 'kmap', kmapDots: 'kmap', kmapAI: 'kmap', countryTrack: 'country', layerAgent: 'layers', layerService: 'layers', layerPace: 'layers',
+  phase1: 'roadmap', phase2: 'roadmap', wiki: 'roadmap', podCycle: 'pod', assistant: 'online', statusMap: 'status', statuses: 'status', statusUpdate: 'status',
+  change1: 'benefits', change2: 'benefits', change3: 'benefits', change4: 'benefits' };
+const PAGES = TL.scenes.reduce((a, s) => { const id = PAGE_OF[s.id] || s.id, last = a[a.length - 1]; if (last && last.id === id) last.end = s.end; else a.push({ id, start: s.start, end: s.end }); return a; }, []);
+const S = id => PAGES.find(s => s.id === id) || { start: 0, end: 0 };
+const st = (id, f = 0) => L(id).start + (L(id).end - L(id).start) * f;   // f: 0 = start of the narration line, 1 = end
+const en = (id, d = 0) => L(id).end + d;
+// time a word is spoken in a line (one of several spellings, the nth time it occurs); falls back to a fraction of the line.
+// Korean words carry their particles ("효율을", "AI는"), so a cue matches the start of a spoken word
+const norm = s => String(s).toLowerCase().replace(/[^a-z0-9가-힣]/g, '');
+const MISS = window.CUE_MISS = new Set();
+function Wd(id, words, f = 0, nth = 1) {
+  const want = (Array.isArray(words) ? words : [words]).map(norm); let n = 0;
+  for (const [w, s] of L(id).words || []) if (want.some(c => norm(w).startsWith(c)) && ++n === nth) return s;
+  MISS.add(`${id}:${want.join('|')}`); return st(id, f);
+}
+const cueCache = {};
+const Wc = (id, words, f, nth) => { const k = id + '|' + words + '|' + nth; return k in cueCache ? cueCache[k] : (cueCache[k] = Wd(id, words, f, nth)); };
+
+// ---------- drawing ----------
+function rr(x, y, w, h, r, fill, stroke, lw = 2, a = 1) { if (a <= 0 || w <= 0 || h <= 0) return; ctx.save(); ctx.globalAlpha *= a; ctx.beginPath(); ctx.roundRect(x, y, w, h, Math.min(r, w / 2, h / 2)); if (fill) { ctx.fillStyle = fill; ctx.fill(); } if (stroke) { ctx.lineWidth = lw; ctx.strokeStyle = stroke; ctx.stroke(); } ctx.restore(); }
+function circle(x, y, r, fill, stroke, lw = 2, a = 1) { if (r <= 0 || a <= 0) return; ctx.save(); ctx.globalAlpha *= a; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); if (fill) { ctx.fillStyle = fill; ctx.fill(); } if (stroke) { ctx.lineWidth = lw; ctx.strokeStyle = stroke; ctx.stroke(); } ctx.restore(); }
+function seg(x1, y1, x2, y2, c, lw = 2, a = 1, dash) { if (a <= 0) return; ctx.save(); ctx.globalAlpha *= a; ctx.strokeStyle = c; ctx.lineWidth = lw; ctx.lineCap = 'round'; if (dash) ctx.setLineDash(dash); ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke(); ctx.restore(); }
+function partSeg(x1, y1, x2, y2, k, c, lw = 2, a = 1, dash) { if (k > 0) seg(x1, y1, lerp(x1, x2, k), lerp(y1, y2, k), c, lw, a, dash); }
+const font = (size, weight) => `${weight} ${size}px ${SANS}`;
+const mCache = {};
+function measure(s, size, weight = 500) { const k = s + '|' + size + '|' + weight; if (k in mCache) return mCache[k]; ctx.save(); ctx.font = font(size, weight); const w = ctx.measureText(s).width; ctx.restore(); return (mCache[k] = w); }
+function T(s, x, y, { size = 28, weight = 500, color = K.ink, align = 'left', alpha = 1, maxW, base = 'middle', spacing = 0, glow = 0 } = {}) {
+  if (alpha <= 0 || !s) return; ctx.save(); ctx.globalAlpha *= alpha; let sz = size;
+  if (maxW) { const w = measure(s, sz, weight); if (w > maxW) sz = size * maxW / w; }
+  ctx.font = font(sz, weight); ctx.fillStyle = color; ctx.textAlign = align; ctx.textBaseline = base;
+  if (spacing) ctx.letterSpacing = spacing + 'px';
+  if (glow > 0) { ctx.shadowColor = color; ctx.shadowBlur = 24 * glow; }
+  ctx.fillText(s, x, y); ctx.restore();
+}
+const wCache = {};
+function wrap(s, size, weight, maxW) {
+  const k = s + '|' + size + '|' + weight + '|' + maxW; if (k in wCache) return wCache[k];
+  const out = []; let cur = '';
+  for (const w of s.split(' ')) { const nx = cur ? cur + ' ' + w : w; if (cur && measure(nx, size, weight) > maxW) { out.push(cur); cur = w; } else cur = nx; }
+  if (cur) out.push(cur); return (wCache[k] = out);
+}
+function para(s, x, y, maxW, o = {}) { const size = o.size || 28, lh = o.lh || size * 1.45, ls = wrap(s, size, o.weight || 500, maxW); ls.forEach((l, i) => T(l, x, y + i * lh, o)); return ls.length; }
+// typing: the first k of the text, with a caret while typing
+function typeT(s, x, y, k, o = {}) {
+  if (k <= 0) return; const n = Math.round(clamp(k) * s.length), part = s.slice(0, n); T(part, x, y, o);
+  if (k < 1) { const sz = o.size || 28, w = measure(part, sz, o.weight || 500); rr(x + w + 6, y - sz * .55, 4, sz * 1.1, 2, K.gold); }
+}
+function chip(s, x, y, { size = 20, weight = 700, color = K.ink, fill = 'rgba(255,255,255,.08)', stroke = null, a = 1, align = 'left', padX = 16, h, ic, lw = 1.5 } = {}) {
+  if (a <= 0) return 0; h = h || size * 1.9;
+  const iw = ic ? size * 1.35 : 0, w = measure(s, size, weight) + padX * 2 + iw, x0 = align === 'center' ? x - w / 2 : align === 'right' ? x - w : x;
+  rr(x0, y - h / 2, w, h, h / 2, fill, stroke, lw, a);
+  if (ic) icon(ic, x0 + padX + size * .5, y, size * 1.05, color, a);
+  T(s, x0 + padX + iw, y + 1, { size, weight, color, alpha: a }); return w;
+}
+function card(x, y, w, h, { fill = K.card, stroke = K.cardLine, r = 20, a = 1, lw = 2, glow = null, g = 0, hover = 0, shadow = true } = {}) {
+  if (a <= 0) return; ctx.save(); ctx.globalAlpha *= a;
+  if (shadow) { ctx.shadowColor = 'rgba(0,0,0,.38)'; ctx.shadowBlur = 26 + 18 * hover; ctx.shadowOffsetY = 10; }
+  ctx.beginPath(); ctx.roundRect(x, y, w, h, r); ctx.fillStyle = fill; ctx.fill(); ctx.shadowColor = 'transparent';
+  if (glow && g > 0) { ctx.shadowColor = rgba(glow, .6 * g); ctx.shadowBlur = 34 * g; ctx.lineWidth = lw + 1; ctx.strokeStyle = rgba(glow, .95 * g); ctx.stroke(); ctx.shadowColor = 'transparent'; }
+  if (stroke) { ctx.lineWidth = lw; ctx.strokeStyle = hover > 0 ? mixc(stroke, K.ink, .35 * hover) : stroke; ctx.globalAlpha *= glow && g > 0 ? 1 - g : 1; ctx.stroke(); }
+  ctx.restore();
+}
+// a hovered card keeps its content in place (only its outline and shadow change): moving text a few px
+// steps it pixel by pixel, which reads as the letters jumping
+function lift(h, fn) { fn(); }
+function arrowHead(x, y, ang, s, color, a = 1) { if (a <= 0) return; ctx.save(); ctx.globalAlpha *= a; ctx.translate(x, y); ctx.rotate(ang); ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(-s, -s * .6); ctx.lineTo(-s, s * .6); ctx.closePath(); ctx.fillStyle = color; ctx.fill(); ctx.restore(); }
+function bigArrow(x, y, w, h, color, a = 1) { if (a <= 0) return; ctx.save(); ctx.globalAlpha *= a; ctx.beginPath(); ctx.moveTo(x, y - h * .22); ctx.lineTo(x + w * .55, y - h * .22); ctx.lineTo(x + w * .55, y - h * .5); ctx.lineTo(x + w, y); ctx.lineTo(x + w * .55, y + h * .5); ctx.lineTo(x + w * .55, y + h * .22); ctx.lineTo(x, y + h * .22); ctx.closePath(); ctx.fillStyle = color; ctx.fill(); ctx.restore(); }
+const bez = (a, c, b, k) => { const u = 1 - k; return [u * u * a[0] + 2 * u * k * c[0] + k * k * b[0], u * u * a[1] + 2 * u * k * c[1] + k * k * b[1]]; };
+function curve(a, c, b, color, lw = 2, k = 1, alpha = 1, dash, off = 0) {
+  if (k <= 0 || alpha <= 0) return; ctx.save(); ctx.globalAlpha *= alpha; ctx.strokeStyle = color; ctx.lineWidth = lw; ctx.lineCap = 'round';
+  if (dash) { ctx.setLineDash(dash); ctx.lineDashOffset = off; }
+  ctx.beginPath(); for (let i = 0; i <= 40; i++) { const [x, y] = bez(a, c, b, k * i / 40); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); } ctx.stroke(); ctx.restore();
+}
+function stream(t, a, c, b, color, on, n = 12, speed = .7, r = 4) { if (on <= 0) return; for (let i = 0; i < n; i++) { const k = mod(t * speed + i / n, 1), [x, y] = bez(a, c, b, k); circle(x, y, r, color, null, 0, on * Math.sin(Math.PI * k)); } }
+// polyline drawn to a fraction k of its length
+function poly(pts, k, color, lw = 3, a = 1, dash, off = 0) {
+  if (k <= 0 || a <= 0) return null; let tot = 0; const d = []; for (let i = 1; i < pts.length; i++) { d.push(Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1])); tot += d[i - 1]; }
+  let left = tot * clamp(k), end = pts[0], ang = 0; ctx.save(); ctx.globalAlpha *= a; ctx.strokeStyle = color; ctx.lineWidth = lw; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  if (dash) { ctx.setLineDash(dash); ctx.lineDashOffset = off; }
+  ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]);
+  for (let i = 1; i < pts.length && left > 0; i++) { const f = Math.min(1, left / d[i - 1]); end = [lerp(pts[i - 1][0], pts[i][0], f), lerp(pts[i - 1][1], pts[i][1], f)]; ang = Math.atan2(pts[i][1] - pts[i - 1][1], pts[i][0] - pts[i - 1][0]); ctx.lineTo(end[0], end[1]); left -= d[i - 1]; }
+  ctx.stroke(); ctx.restore(); return { end, ang };
+}
+function knn(nodes, k) {
+  const E = [], seen = new Set();
+  nodes.forEach((n, i) => {
+    const d = []; nodes.forEach((m, j) => { if (j !== i) d.push([j, (m.x - n.x) ** 2 + (m.y - n.y) ** 2]); }); d.sort((a, b) => a[1] - b[1]);
+    for (const [j] of d.slice(0, k)) { const key = Math.min(i, j) + '_' + Math.max(i, j); if (!seen.has(key)) { seen.add(key); E.push([i, j]); } }
+  });
+  return E;
+}
+
+// ---------- icons (48-unit glyphs, drawn centred) ----------
+function icon(name, x, y, s, color = '#FFFFFF', a = 1) {
+  if (a <= 0) return; ctx.save(); ctx.globalAlpha *= a; ctx.translate(x, y); ctx.scale(s / 48, s / 48);
+  ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = 3.6; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  const B = () => ctx.beginPath(), Sk = () => ctx.stroke(), F = () => ctx.fill(), M = (x, y) => ctx.moveTo(x, y), Ln = (x, y) => ctx.lineTo(x, y);
+  const arc = (x, y, r, a0 = 0, a1 = Math.PI * 2) => ctx.arc(x, y, r, a0, a1);
+  switch (name) {
+    case 'gear': B(); for (let i = 0; i <= 64; i++) { const g = i / 64 * Math.PI * 2, r = Math.floor(i / 4) % 2 ? 13 : 18; i ? Ln(Math.cos(g) * r, Math.sin(g) * r) : M(r, 0); } ctx.closePath(); Sk(); B(); arc(0, 0, 5.5); Sk(); break;
+    case 'bulb': B(); arc(0, -5, 13, Math.PI * .78, Math.PI * 2.22); Ln(5, 11); Ln(-5, 11); ctx.closePath(); Sk(); B(); M(-5, 17); Ln(5, 17); Sk(); break;
+    case 'book': B(); M(0, -11); ctx.quadraticCurveTo(-10, -16, -20, -12); Ln(-20, 15); ctx.quadraticCurveTo(-10, 11, 0, 16); ctx.quadraticCurveTo(10, 11, 20, 15); Ln(20, -12); ctx.quadraticCurveTo(10, -16, 0, -11); Ln(0, 16); Sk(); break;
+    case 'globe': B(); arc(0, 0, 18); Sk(); B(); ctx.ellipse(0, 0, 8, 18, 0, 0, Math.PI * 2); Sk(); B(); M(-18, 0); Ln(18, 0); M(-15, -9); Ln(15, -9); M(-15, 9); Ln(15, 9); Sk(); break;
+    case 'student': B(); M(-20, -9); Ln(0, -18); Ln(20, -9); Ln(0, 0); ctx.closePath(); F(); B(); M(14, -7); Ln(14, 2); Sk(); B(); arc(0, 6, 7); F(); B(); arc(0, 26, 14, Math.PI, Math.PI * 2); F(); break;
+    case 'robot': B(); ctx.roundRect(-15, -9, 30, 24, 6); Sk(); B(); arc(-6, 2, 3); arc(6, 2, 3); F(); B(); M(0, -9); Ln(0, -16); Sk(); B(); arc(0, -18, 3); F(); B(); M(-20, -1); Ln(-20, 7); M(20, -1); Ln(20, 7); M(-5, 10); Ln(5, 10); Sk(); break;
+    case 'nodes': B(); M(-12, -10); Ln(12, -10); M(-12, -10); Ln(0, 12); M(12, -10); Ln(0, 12); Sk(); for (const [a, b] of [[-12, -10], [12, -10], [0, 12]]) { B(); ctx.roundRect(a - 6, b - 6, 12, 12, 3); F(); } break;
+    case 'clipboard': B(); ctx.roundRect(-14, -15, 28, 34, 4); Sk(); B(); ctx.roundRect(-7, -20, 14, 8, 3); F(); B(); M(-4, -3); Ln(8, -3); M(-4, 5); Ln(8, 5); M(-4, 13); Ln(8, 13); Sk(); for (const yy of [-3, 5, 13]) { B(); arc(-9, yy, 1.8); F(); } break;
+    case 'search': B(); arc(-4, -4, 12); Sk(); ctx.lineWidth = 5; B(); M(5, 5); Ln(16, 16); Sk(); break;
+    case 'printer': B(); ctx.roundRect(-19, -6, 38, 18, 4); Sk(); B(); M(-11, -6); Ln(-11, -17); Ln(11, -17); Ln(11, -6); Sk(); B(); ctx.roundRect(-11, 5, 22, 15, 2); ctx.fillStyle = 'rgba(0,0,0,0)'; Sk(); B(); M(-6, 11); Ln(6, 11); M(-6, 16); Ln(4, 16); Sk(); break;
+    case 'refresh': B(); arc(0, 0, 15, -Math.PI * .1, Math.PI * .75); Sk(); B(); arc(0, 0, 15, Math.PI * .9, Math.PI * 1.75); Sk();
+      for (const g of [Math.PI * .75, Math.PI * 1.75]) { const x0 = Math.cos(g) * 15, y0 = Math.sin(g) * 15; B(); ctx.save(); ctx.translate(x0, y0); ctx.rotate(g + Math.PI / 2); M(-6, -4); Ln(1, 2); Ln(6, -6); ctx.restore(); Sk(); } break;
+    case 'pointer': B(); M(-8, -17); Ln(-8, 12); Ln(-1, 6); Ln(5, 18); Ln(10, 16); Ln(4, 4); Ln(13, 4); ctx.closePath(); F(); break;
+    case 'board': B(); ctx.roundRect(-4, -17, 24, 19, 2); Sk(); B(); M(-1, 8); Ln(12, -6); Sk(); B(); arc(-12, -3, 5.5); F(); B(); arc(-12, 18, 11, Math.PI, Math.PI * 2); F(); break;
+    case 'route': B(); arc(-14, -13, 5); Sk(); B(); arc(14, 13, 5); F(); B(); M(-14, -7); ctx.bezierCurveTo(-14, 6, 14, -6, 14, 7); Sk(); break;
+    case 'sprout': B(); M(0, 18); Ln(0, -2); Sk(); B(); M(0, 0); ctx.quadraticCurveTo(-18, -2, -16, -16); ctx.quadraticCurveTo(-2, -14, 0, 0); F(); B(); M(0, -4); ctx.quadraticCurveTo(16, -4, 15, -18); ctx.quadraticCurveTo(2, -16, 0, -4); F(); break;
+    case 'lock': B(); ctx.roundRect(-12, -2, 24, 19, 4); F(); B(); arc(0, -2, 8, Math.PI, Math.PI * 2); Sk(); break;
+    case 'chart': B(); M(-18, -16); Ln(-18, 16); Ln(18, 16); Sk(); B(); M(-12, 8); Ln(-4, -2); Ln(4, 4); Ln(15, -11); Sk(); break;
+    case 'doc': B(); ctx.roundRect(-13, -17, 26, 34, 3); Sk(); B(); M(-7, -7); Ln(7, -7); M(-7, 0); Ln(7, 0); M(-7, 7); Ln(3, 7); Sk(); break;
+    case 'check': B(); M(-13, 1); Ln(-4, 10); Ln(14, -10); Sk(); break;
+    case 'x': B(); M(-10, -10); Ln(10, 10); M(10, -10); Ln(-10, 10); Sk(); break;
+    case 'user': B(); arc(0, -6, 8); F(); B(); arc(0, 20, 15, Math.PI, Math.PI * 2); F(); break;
+    case 'spark': B(); M(0, -18); ctx.quadraticCurveTo(2, -2, 18, 0); ctx.quadraticCurveTo(2, 2, 0, 18); ctx.quadraticCurveTo(-2, 2, -18, 0); ctx.quadraticCurveTo(-2, -2, 0, -18); F(); break;
+    case 'monitor': B(); ctx.roundRect(-19, -15, 38, 26, 3); Sk(); B(); M(0, 11); Ln(0, 17); M(-9, 18); Ln(9, 18); Sk(); break;
+    case 'chat': B(); ctx.roundRect(-18, -14, 36, 24, 6); Sk(); B(); M(-8, 10); Ln(-12, 18); Ln(0, 10); Sk(); break;
+    case 'clock': B(); arc(0, 0, 16); Sk(); B(); M(0, -9); Ln(0, 0); Ln(7, 5); Sk(); break;
+    case 'bolt': B(); M(4, -18); Ln(-10, 3); Ln(0, 3); Ln(-4, 18); Ln(10, -4); Ln(0, -4); ctx.closePath(); F(); break;
+    case 'plus': B(); M(-11, 0); Ln(11, 0); M(0, -11); Ln(0, 11); Sk(); break;
+  }
+  ctx.restore();
+}
+
+// ============================================================
+// the space: one panel per page on a 4 × 3 grid, visited in a snake
+// ============================================================
+const POS = { title: [0, 0], why: [1, 0], kmap: [2, 0], universe: [3, 0], country: [3, 1], layers: [2, 1], roadmap: [1, 1], pod: [0, 1], online: [0, 2], status: [1, 2], benefits: [2, 2], outro: [3, 2] };
+const TW = 2300, TH = 1400;
+const ORG = id => ({ x: POS[id][0] * TW, y: POS[id][1] * TH });
+const SCN = PAGES;
+const WORLD = { w: 3 * TW + W, h: 2 * TH + H };
+const OV = { x: WORLD.w / 2, y: WORLD.h / 2, z: Math.min(W / (WORLD.w + 500), H / (WORLD.h + 420)) };   // every panel at once (closing page)
+const TRS = { outro: 2.6 };   // flight time into a page (s); default TR
+const TR = 1.4;
+
+// camera inside a panel: keys [time it arrives, x, y, zoom, seconds of travel] in the panel's own 1920 × 1080 coordinates
+const CAM = {}, camCache = {};
+const camKeys = id => camCache[id] || (camCache[id] = CAM[id] ? CAM[id]() : []);
+function sceneCam(id, t) {
+  const ks = camKeys(id); let c = { x: 960, y: 540, z: 1 };
+  if (ks.length) {
+    for (const k of ks) { const d = k[4] ?? 1.2, e = eIO(p(t, k[0] - d, d)); if (e <= 0) break; c = { x: lerp(c.x, k[1], e), y: lerp(c.y, k[2], e), z: Math.exp(lerp(Math.log(c.z), Math.log(k[3]), e)) }; }
+  }
+  return c;
+}
+const sceneIndex = t => { const i = SCN.findIndex(s => t < s.end); return i < 0 ? SCN.length - 1 : i; };
+function worldCam(i, t) { const id = SCN[i].id, o = ORG(id), c = sceneCam(id, t); return { x: o.x + c.x, y: o.y + c.y, z: c.z }; }
+function camAt(t) {
+  const i = sceneIndex(t), B = worldCam(i, t); if (i === 0) return B;
+  const k = p(t, SCN[i].start, TRS[SCN[i].id] || TR); if (k >= 1) return B;
+  const A = worldCam(i - 1, t), e = eIO(k), d = Math.hypot(B.x - A.x, B.y - A.y), dip = .42 * clamp(d / TW) * Math.min(1, A.z, B.z);
+  return { x: lerp(A.x, B.x, e), y: lerp(A.y, B.y, e), z: Math.exp(lerp(Math.log(A.z), Math.log(B.z), e)) * (1 - dip * Math.sin(Math.PI * e)) };
+}
+
+// ---------- the cursor: keys [time it arrives, x, y, click] in the panel's coordinates ----------
+const CURSOR = {}, curCache = {};
+const curKeys = id => curCache[id] || (curCache[id] = (CURSOR[id] ? CURSOR[id]() : []).sort((a, b) => a[0] - b[0]));
+function curLocal(id, t) {
+  const ks = curKeys(id); if (!ks.length) return null; const k0 = ks[0], wob = { x: Math.sin(t * 1.3) * 3, y: Math.cos(t * 1.1) * 2 };
+  if (t < k0[0]) { const e = eIO(p(t, k0[0] - .9, .9)); return { x: lerp(k0[1] + 260, k0[1], e) + wob.x, y: lerp(k0[2] + 200, k0[2], e) + wob.y }; }
+  for (let j = 1; j < ks.length; j++) {
+    const a = ks[j - 1], b = ks[j];
+    if (t < b[0]) { const dd = Math.hypot(b[1] - a[1], b[2] - a[2]), dur = Math.max(.12, Math.min(b[0] - a[0] - .05, .45 + dd / 2200)), e = eIO(p(t, b[0] - dur, dur)); return { x: lerp(a[1], b[1], e) + wob.x, y: lerp(a[2], b[2], e) + wob.y }; }
+  }
+  const z = ks[ks.length - 1]; return { x: z[1] + wob.x, y: z[2] + wob.y };
+}
+function curVis(id, t) { const ks = curKeys(id); if (!ks.length) return 0; const s = S(id); return p(t, ks[0][0] - .9, .35) * (1 - p(t, s.end - .7, .4)); }
+// how much the cursor is over a box (smoothed over the last 0.2 s, so hovering eases in and out)
+function hov(id, t, x, y, w, h) {
+  const v = curVis(id, t); if (v <= 0) return 0; let n = 0;
+  for (let j = 0; j < 6; j++) { const q = curLocal(id, t - j * .04); if (q && q.x >= x && q.x <= x + w && q.y >= y && q.y <= y + h) n++; }
+  return n / 6 * v;
+}
+// a button pressed at tk: 0 → 1 → 0 around the click
+const press = (t, tk) => { const d = t - tk; return d > -.12 && d < .25 ? Math.sin(Math.PI * (d + .12) / .37) : 0; };
+function drawCursor(t, cam) {
+  const id = SCN[sceneIndex(t)].id, q = curLocal(id, t), a = curVis(id, t); if (!q || a <= 0) return;
+  const o = ORG(id), x = (o.x + q.x - cam.x) * cam.z + W / 2, y = (o.y + q.y - cam.y) * cam.z + H / 2;
+  let sc = 1;
+  for (const k of curKeys(id)) if (k[3]) {
+    const d = t - k[0]; sc = Math.min(sc, 1 - .18 * press(t, k[0]));
+    if (d >= 0 && d < .7) { const e = d / .7; circle(x, y, 8 + 50 * eOut(e), null, K.gold, 3, a * (1 - e)); circle(x, y, 22 * (1 - e), rgba(K.gold, .35), null, 0, a); }
+  }
+  ctx.save(); ctx.globalAlpha = a; ctx.translate(x, y); ctx.scale(sc * 1.3, sc * 1.3);
+  ctx.shadowColor = 'rgba(0,0,0,.5)'; ctx.shadowBlur = 10; ctx.shadowOffsetY = 3;
+  ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, 26); ctx.lineTo(6.5, 20); ctx.lineTo(11, 30); ctx.lineTo(15, 28); ctx.lineTo(10.5, 18.5); ctx.lineTo(19, 18.5); ctx.closePath();
+  ctx.fillStyle = '#FFFFFF'; ctx.fill(); ctx.shadowColor = 'transparent'; ctx.lineWidth = 1.6; ctx.strokeStyle = '#0B1428'; ctx.stroke(); ctx.restore();
+}
+
+// ---------- background, panel frames ----------
+const STARS = (() => { const R = rand(3); return Array.from({ length: 220 }, () => ({ x: R(), y: R(), r: .5 + R() * 1.6, d: .02 + R() * .08, tw: R() * 6.28 })); })();
+function background(t, cam) {
+  const g = ctx.createRadialGradient(W * .5, H * .42, 80, W * .5, H * .5, 1250); g.addColorStop(0, K.bg2); g.addColorStop(1, K.bg);
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  for (const s of STARS) { const x = mod(s.x * W * 1.4 - cam.x * s.d, W * 1.4) - W * .2, y = mod(s.y * H * 1.4 - cam.y * s.d, H * 1.4) - H * .2; circle(x, y, s.r, '#C8D6F5', null, 0, .25 + .35 * (.5 + .5 * Math.sin(t * 1.5 + s.tw))); }
+}
+function worldDots(cam, v) {
+  if (cam.z < .4) return; const sp = 64; ctx.fillStyle = rgba(K.sky, .1 * clamp((cam.z - .4) / .3));
+  for (let x = Math.floor(v.x0 / sp) * sp; x < v.x1; x += sp) for (let y = Math.floor(v.y0 / sp) * sp; y < v.y1; y += sp) ctx.fillRect(x - 1.5, y - 1.5, 3, 3);
+}
+// lines between panels in reading order: lit up to the current page, a light travelling along
+function links(t, cam) {
+  const a = clamp((1 - cam.z) / .35); if (a <= 0) return; const cur = sceneIndex(t);
+  for (let i = 1; i < SCN.length; i++) {
+    const A = ORG(SCN[i - 1].id), B = ORG(SCN[i].id), ax = A.x + W / 2, ay = A.y + H / 2, bx = B.x + W / 2, by = B.y + H / 2, lit = i <= cur;
+    seg(ax, ay, bx, by, lit ? K.gold : K.dim, lit ? 14 : 8, a * (lit ? .55 : .35));
+    if (lit) { const k = mod(t * .5 + i * .3, 1); circle(lerp(ax, bx, k), lerp(ay, by, k), 22, K.gold, null, 0, a * .9); }
+  }
+}
+function win(id, t, kicker, heading) {
+  const s = S(id), a0 = s.start + .25;
+  ctx.save(); ctx.shadowColor = 'rgba(0,0,0,.55)'; ctx.shadowBlur = 70; ctx.shadowOffsetY = 24; rr(70, 56, 1780, 968, 28, K.panel); ctx.restore();
+  const g = ctx.createLinearGradient(0, 56, 0, 1024); g.addColorStop(0, rgba(K.sky, .05)); g.addColorStop(.4, 'rgba(0,0,0,0)'); rr(70, 56, 1780, 968, 28, g);
+  ctx.save(); ctx.beginPath(); ctx.roundRect(70, 56, 1780, 60, [28, 28, 0, 0]); ctx.fillStyle = K.panelHead; ctx.fill(); ctx.restore();
+  rr(70, 56, 1780, 968, 28, null, K.cardLine, 2);
+  ['#FF5F57', '#FEBC2E', '#28C840'].forEach((c, i) => circle(112 + i * 26, 86, 7.5, c, null, 0, .85));
+  rr(210, 68, 470, 36, 10, K.panel); T('JEI AI Platform  ›  ' + kicker, 232, 87, { size: 18, weight: 500, color: K.muted, maxW: 430 });
+  rr(1690, 70, 128, 32, 16, rgba(K.green, .14)); circle(1714, 86, 5.5, K.green, null, 0, .55 + .45 * Math.sin(t * 4)); T('LIVE', 1730, 87, { size: 16, weight: 800, color: K.green, spacing: 1.5 });
+  T(kicker, 130, 172, { size: 24, weight: 700, color: K.gold, alpha: ap(t, a0), spacing: 1 });
+  typeT(heading, 130, 232, p(t, a0 + .15, .4 + heading.length * .025), { size: 52, weight: 800, maxW: 1660 });
+}
+// a full-bleed cover panel (title and closing pages)
+function coverPanel() {
+  const g = ctx.createLinearGradient(0, 0, 1920, 1080); g.addColorStop(0, '#15254A'); g.addColorStop(1, '#0A1326');
+  ctx.save(); ctx.shadowColor = 'rgba(0,0,0,.55)'; ctx.shadowBlur = 70; ctx.shadowOffsetY = 24; rr(0, 0, 1920, 1080, 40, g); ctx.restore();
+  rr(0, 0, 1920, 1080, 40, null, K.cardLine, 2);
+}
+
+// ============================================================
+// the cover constellation (title and closing pages)
+// ============================================================
+const COVER = (() => {
+  const big = [[1190, 250, 30, 'chart'], [1310, 175, 26, 'spark'], [1445, 265, 34, 'nodes'], [1585, 190, 28, 'bulb'], [1705, 295, 30, 'chart'], [1255, 385, 30, 'book'], [1535, 395, 30, 'search'], [1665, 465, 26, 'doc'],
+    [1165, 690, 30, 'book'], [1285, 620, 28, 'nodes'], [1565, 640, 30, 'book'], [1695, 705, 28, 'chart'], [1315, 815, 28, 'doc'], [1535, 825, 30, 'book'], [1205, 935, 30, 'clipboard'], [1435, 945, 32, 'route'], [1655, 935, 30, 'chart']]
+    .map(([x, y, r, ic]) => ({ x, y, r, ic }));
+  const R = rand(7), small = Array.from({ length: 80 }, () => ({ x: 1110 + R() * 720, y: 110 + R() * 900, r: .8 + R() * 1.8, tw: R() * 6.28 }));
+  const AI = { x: 1440, y: 540 }, near = big.map((n, i) => [i, Math.hypot(n.x - AI.x, n.y - AI.y)]).filter(q => q[1] < 330).map(q => q[0]);
+  return { big, small, E: knn(big, 2), AI, near, kids: [[1370, 715], [1470, 745], [1610, 785]], orbit: ['미국', '한국', '영국', '호주'] };
+})();
+function coverArt(t, { grow = 1, ai = 0, kids = 0, globe = 0, glow = 0 } = {}) {
+  const N = COVER.big.length, na = j => clamp((grow - j / N * .85) / .15);
+  ctx.save(); ctx.lineCap = 'round';
+  for (const [lw, al] of [[70, .035], [34, .05], [8, .16]]) {
+    const g = ctx.createLinearGradient(0, 945, 0, 265); g.addColorStop(0, rgba(K.sky, al)); g.addColorStop(1, rgba(K.gold, al));
+    ctx.strokeStyle = g; ctx.lineWidth = lw; ctx.globalAlpha = grow; ctx.beginPath(); ctx.moveTo(1435, 945); ctx.bezierCurveTo(1150, 820, 1250, 600, 1440, 545); ctx.bezierCurveTo(1640, 490, 1720, 330, 1445, 265); ctx.stroke();
+  }
+  ctx.restore();
+  for (const s of COVER.small) circle(s.x, s.y, s.r, '#D5E1FA', null, 0, grow * (.3 + .4 * (.5 + .5 * Math.sin(t * 1.7 + s.tw))));
+  for (const [i, j] of COVER.E) { const a = Math.min(na(i), na(j)); seg(COVER.big[i].x, COVER.big[i].y, COVER.big[j].x, COVER.big[j].y, mixc(K.sky, K.gold, glow), 2, a * (.45 + .3 * glow)); }
+  const A = COVER.AI;
+  if (ai > 0) for (const i of COVER.near) { const n = COVER.big[i]; partSeg(A.x, A.y, n.x, n.y, eOut(clamp(ai * 1.6 - .2)), K.gold, 2.5, .7); }
+  COVER.big.forEach((n, j) => {
+    const a = na(j); if (a <= 0) return; const r = n.r * eBack(a);
+    circle(n.x, n.y, r + 9, rgba(K.sky, .08 + .1 * glow), null, 0, a);
+    circle(n.x, n.y, r, '#13213D', rgba(glow > 0 ? K.gold : K.sky, .75), 2, a); icon(n.ic, n.x, n.y, r * 1.05, mixc('#CFE0FF', K.gold, glow), a);
+  });
+  if (ai > 0) {
+    const e = eBack(clamp(ai * 1.8)), pulse = .5 + .5 * Math.sin(t * 3);
+    circle(A.x, A.y, 74 + 10 * pulse, rgba(K.gold, .12), null, 0, e); circle(A.x, A.y, 54 * e, K.gold); T('AI', A.x, A.y + 2, { size: 40, weight: 900, color: '#0B1428', align: 'center', alpha: e });
+  }
+  COVER.kids.forEach(([x, y], i) => {
+    const a = pop(t, 0, 1) && clamp(kids * 3 - i * .5); if (a <= 0) return;
+    circle(x, y, 22 * eBack(clamp(a)), K.green); icon('user', x, y + 1, 22, '#0B1428', a);
+    if (ai > 0) seg(A.x, A.y, x, y, K.green, 2, .6 * a, [5, 6]);
+  });
+  if (globe > 0) {
+    ctx.save(); ctx.globalAlpha *= eOut(globe); ctx.strokeStyle = rgba(K.gold, .5); ctx.lineWidth = 2; ctx.setLineDash([6, 10]); ctx.lineDashOffset = -t * 20;
+    ctx.beginPath(); ctx.ellipse(A.x, A.y, 360, 120, -.18, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
+    COVER.orbit.forEach((c, i) => { const g = t * .35 + i * Math.PI / 2, x = A.x + Math.cos(g) * 360 * Math.cos(-.18) - Math.sin(g) * 120 * Math.sin(-.18), y = A.y + Math.cos(g) * 360 * Math.sin(-.18) + Math.sin(g) * 120 * Math.cos(-.18);
+      chip(c, x, y, { size: 19, fill: '#1B2C52', stroke: rgba(K.gold, .7), align: 'center', a: eOut(clamp(globe * 2 - i * .2)) }); });
+  }
+}
+
+// ============================================================
+// pages. Each draws in its panel's own 1920 × 1080 coordinates
+// ============================================================
+const SC = {};
+
+// ---------- p.1 cover ----------
+CAM.title = () => [[0, 960, 540, 1.07, .01], [4.5, 960, 540, 1, 4.5]];
+CURSOR.title = () => [[st('l1_3', .08), 980, 760], [Wc('l1_3', '방안', .75), 700, 885], [Wc('l1_3', '소개', .9) + .1, 700, 885, 1]];
+SC.title = t => {
+  coverPanel();
+  const t50 = Wc('l1_1', ['50', '오십'], .3), tAI = Wc('l1_2', 'ai', .12), tKid = Wc('l1_2', '학생', .3), tGlo = Wc('l1_2', '글로벌', .62), tStd = Wc('l1_2', '표준', .85),
+    tKM = Wc('l1_3', ['knowledge', '날리지'], .3), tBtn = st('l1_3', .02), tClick = Wc('l1_3', '소개', .9) + .1;
+  coverArt(t, { grow: p(t, .4, Math.max(1.5, en('l1_1') - .4)), ai: p(t, tAI, .8), kids: p(t, tKid, .8), globe: p(t, tGlo, 1.2), glow: p(t, tClick, .8) });
+  T(C.title.kicker, 150, 250, { size: 26, weight: 700, color: K.gold, alpha: ap(t, .3), spacing: 2 });
+  T(C.title.sub, 150, 330, { size: 44, weight: 500, alpha: ap(t, .5) });
+  typeT(C.title.main, 150, 432, p(t, .7, .9), { size: 86, weight: 800, maxW: 900 });
+  const mw = Math.min(900, measure(C.title.main, 86, 800));
+  rr(150, 494, mw * eOut(p(t, tKM, .8)), 6, 3, K.gold);
+  T(C.title.tag1, 150, 565, { size: 36, weight: 500, color: K.gold, alpha: ap(t, 1.5) });
+  T(C.title.tag2, 150, 617, { size: 36, weight: 700, color: K.gold, alpha: ap(t, 1.6), glow: Math.sin(Math.PI * p(t, tStd, 1.6)) });
+  T(C.title.date, 150, 715, { size: 26, color: K.muted, alpha: ap(t, 1.9) });
+  const k = ap(t, t50, .5), n = String(Math.round(50 * eOut(p(t, t50, 1.3))));
+  card(150, 800, 330, 140, { a: k, fill: '#16264A' });
+  T('학습설계 자산', 182, 840, { size: 22, color: K.muted, alpha: k });
+  T(n, 182, 898, { size: 58, weight: 800, color: K.gold, alpha: k }); T('년', 190 + measure(n, 58, 800), 906, { size: 30, weight: 700, alpha: k });
+  const kb = ap(t, tBtn, .5), hb = hov('title', t, 520, 832, 380, 96), pr = press(t, tClick), bw = 380;
+  ctx.save(); ctx.translate(710, 880); ctx.scale(1 - .05 * pr, 1 - .05 * pr);
+  card(-bw / 2, -46, bw, 92, { a: kb, fill: mixc(K.gold, '#FFD27A', hb * .6), stroke: null, r: 46, glow: K.gold, g: hb });
+  T(C.title.button + '  →', 0, 1, { size: 30, weight: 800, color: '#0B1428', align: 'center', alpha: kb });
+  ctx.restore();
+};
+
+// ---------- p.2 why ----------
+CURSOR.why = () => [[Wc('l2_1', '생산성', .5), 520, 575], [Wc('l2_2', '하지만', .05) + .3, 1665, 226, 1], [Wc('l2_2', '교재', .5), 1420, 510],
+  [Wc('l2_3', '연결', .6), 1410, 822], [Wc('l2_4', '커리큘럼', .4), 1420, 640], [Wc('l2_4', '서비스', .85) + .2, 1640, 912]];
+SC.why = t => {
+  win('why', t, '왜 하는가', '업무 효율화를 넘어, 상품과 서비스의 전환');
+  const s = S('why'), t0 = s.start + .9, tP = Wc('l2_1', '생산성', .5), tE = Wc('l2_1', '효율', .7), tHow = Wc('l2_2', '하지만', .05) + .3, tOver = Wc('l2_2', '넘어', .3),
+    tB1 = Wc('l2_2', '교재', .5), tOff = Wc('l2_3', '오프라인', .4), tOn = Wc('l2_3', '온라인', .5), tPod = Wc('l2_3', ['pod', '피오디'], .55), tLink = Wc('l2_3', '연결', .6),
+    tB3 = Wc('l2_4', '커리큘럼', .4), tNew = Wc('l2_4', '서비스', .85);
+  const sw = eIO(p(t, tHow, .5)), kt = ap(t, st('l2_1', .02));
+  // toggle
+  rr(1290, 198, 500, 58, 29, K.panelHead, K.cardLine, 2, kt);
+  rr(lerp(1294, 1540, sw), 202, 246, 50, 25, mixc('#2A3A5C', K.gold, sw), null, 0, kt);
+  T('일반적인 AX', 1417, 228, { size: 21, weight: 700, color: mixc(K.ink, K.muted, sw), align: 'center', alpha: kt });
+  T('JEI의 AI 전환', 1663, 228, { size: 21, weight: 800, color: mixc(K.muted, '#0B1428', sw), align: 'center', alpha: kt });
+  // left: the usual AX
+  const kl = ap(t, t0, .6) * (1 - .45 * sw), hl = hov('why', t, 130, 300, 760, 660) * (1 - sw);
+  card(130, 300, 760, 660, { a: kl, hover: hl });
+  ctx.save(); ctx.globalAlpha *= kl; lift(hl, () => {
+    circle(215, 392, 50, '#2A3A5C'); icon('gear', 215, 392, 50, K.muted);
+    T('일반적인 AX', 292, 372, { size: 22, weight: 600, color: K.muted }); T('업무 생산성 향상', 292, 414, { size: 38, weight: 800 });
+    ['사람이 하던 업무에 AI를 적용', '반복 업무 자동화', '업무 시간 단축'].forEach((b, i) => { const a = ap(t, t0 + .3 + i * .15), y = 510 + i * 64, h = hov('why', t, 150, y - 28, 720, 56) * (1 - sw);
+      rr(150, y - 28, 720, 56, 12, rgba(K.sky, .08 * h)); circle(178, y, 5, K.muted, null, 0, a); T(b, 200, y, { size: 28, color: '#C9D3E6', alpha: a }); });
+    T('업무 시간', 170, 745, { size: 20, weight: 700, color: K.muted, alpha: ap(t, tP - .3) });
+    [560, 470, 520].forEach((w0, i) => { const y = 785 + i * 50, a = ap(t, tP - .3 + i * .1), w = lerp(w0, w0 * .48, eIO(p(t, tE + i * .12, .9)));
+      rr(170, y, 600, 30, 8, '#1C2B4C', null, 0, a); rr(170, y, w, 30, 8, mixc(K.grey, K.sky, .3), null, 0, a); });
+    chip('반복 업무 → 자동화', 840, 935, { size: 19, align: 'right', fill: '#22335A', color: K.muted, a: ap(t, tE + .4) });
+  }); ctx.restore();
+  // arrow
+  bigArrow(905, 630, 110, 84, K.gold, ap(t, tOver, .5));
+  // right: JEI's AI transition
+  const kr = ap(t, tHow, .6), hr = hov('why', t, 1030, 300, 760, 660);
+  card(1030, 300, 760, 660, { a: kr, fill: '#14244A', glow: K.gold, g: .65 * kr, hover: hr });
+  ctx.save(); ctx.globalAlpha *= kr; lift(hr, () => {
+    circle(1115, 392, 50, K.gold); icon('bulb', 1115, 392, 50, '#0B1428');
+    T('JEI의 AI 전환', 1192, 372, { size: 22, weight: 700, color: K.gold }); T('상품·서비스 자체의 전환', 1192, 414, { size: 38, weight: 800 });
+    [['교재와 학습 시스템에 AI를 더함', tB1], ['교재 + 온라인 학습 + POD가 연결된 상품', tOff], ['콘텐츠·서비스를 더 빠르고 다양하게 개발', tB3]].forEach(([b, tb], i) => {
+      const a = ap(t, tb - .2), y = 510 + i * 64, h = hov('why', t, 1050, y - 28, 720, 56);
+      rr(1050, y - 28, 720, 56, 12, rgba(K.gold, .12 * h)); circle(1078, y, 5, K.gold, null, 0, a); T(b, 1100, y, { size: 28, alpha: a });
+    });
+    // the platform hub and what it connects
+    const hub = [1410, 822], kh = ap(t, tOff - .3);
+    const sat = [['교재', 1170, 750, tOff], ['온라인 학습', 1650, 750, tOn], ['POD', 1410, 912, tPod]];
+    sat.forEach(([, x, y, ts]) => { partSeg(hub[0], hub[1], x, y, eOut(p(t, ts, .5)), rgba(K.gold, .6), 2.5); stream(t, hub, [(hub[0] + x) / 2, (hub[1] + y) / 2], [x, y], K.gold, ap(t, tLink, .6), 4, .8, 3.5); });
+    chip('AI 학습 플랫폼', hub[0], hub[1], { size: 22, align: 'center', fill: '#1B2C52', stroke: K.gold, a: kh, color: K.gold });
+    sat.forEach(([l, x, y, ts]) => chip(l, x, y, { size: 21, align: 'center', fill: '#22335A', stroke: rgba(K.sky, .5), a: pop(t, ts) }));
+    chip('국가별 커리큘럼', 1180, 912, { size: 19, align: 'center', fill: rgba(K.gold, .15), color: K.gold, a: pop(t, tB3 + .3), ic: 'plus' });
+    chip('새로운 서비스', 1640, 912, { size: 19, align: 'center', fill: rgba(K.gold, .15), color: K.gold, a: pop(t, tNew), ic: 'plus' });
+  }); ctx.restore();
+};
+
+// ---------- p.3 why a knowledge map ----------
+const KM = (() => {
+  const P = [[605, 243], [700, 290], [865, 255], [645, 395], [795, 370], [575, 488], [725, 475], [880, 455]].map(([x, y]) => ({ x: 700 + (x - 530) / 410 * 630, y: 330 + (y - 195) / 360 * 570 }));
+  // a–b, colour, width (the deck: navy = strong prerequisite, gold / green = other relation types, grey = weak)
+  const E = [[0, 1, 'gold', 3.5], [1, 2, 'sky', 6], [1, 3, 'sky', 6], [1, 4, 'grey', 2], [2, 4, 'gold', 2.2], [3, 5, 'sky', 5], [3, 6, 'grey', 2], [5, 6, 'grey', 2], [4, 6, 'green', 4], [4, 7, 'green', 4]];
+  const R = rand(11), stars = Array.from({ length: 60 }, () => ({ x: 712 + R() * 606, y: 342 + R() * 546, r: .6 + R() * 1.4, tw: R() * 6.28 }));
+  return { P, E, stars, from: [0, 1, 3, 4, 6] };   // list rows 1–5 become these points
+})();
+CAM.kmap = () => [[Wc('l3_6', '전체', .3), 1120, 600, 1.12, 1.4]];
+CURSOR.kmap = () => [[Wc('l3_2', ['학습목표', '목표'], .3), 420, 420], [Wc('l3_2', '순서', .6), 420, 572], [Wc('l3_4', '점은', .25) + .15, KM.P[4].x + 4, KM.P[4].y + 4],
+  [Wc('l3_4', '선은', .6) + .15, (KM.P[1].x + KM.P[3].x) / 2 + 2, (KM.P[1].y + KM.P[3].y) / 2], [Wc('l3_5', '색상', .4), 1160, 860], [Wc('l3_6', '보충', .6), KM.P[0].x + 4, KM.P[0].y + 4, 1], [Wc('l3_6', '다음', .7) + .2, KM.P[7].x + 4, KM.P[7].y + 4, 1]];
+SC.kmap = t => {
+  win('kmap', t, '왜 지식맵인가', '학습목표를 점으로, 관계를 선으로');
+  const s = S('kmap'), t0 = s.start + .9, tRel = Wc('l3_2', '관계', .4), tSpace = Wc('l3_3', '우주', .15), tMorph = Wc('l3_3', '별을', .35), tDef = Wc('l3_3', '정의', .7),
+    tDot = Wc('l3_4', '점은', .25), tLine = Wc('l3_4', '선은', .6), tCol = Wc('l3_5', '색상', .4), tWid = Wc('l3_5', '굵기', .6), tSup = Wc('l3_6', '보충', .6), tNext = Wc('l3_6', '다음', .7);
+  T('지금 · 목록 형태', 130, 300, { size: 24, weight: 700, color: K.muted, alpha: ap(t, t0) });
+  T('JEI 지식맵 · 점과 선', 700, 300, { size: 24, weight: 700, alpha: ap(t, t0 + .2) });
+  // the list
+  for (let i = 0; i < 5; i++) {
+    const y = 340 + i * 76, a = ap(t, t0 + .1 + i * .1), h = hov('kmap', t, 130, y, 430, 60), lit = Math.max(h, Math.sin(Math.PI * p(t, Wc('l3_2', '각각', .3) + i * .12, .8)));
+    rr(130, y, 430, 60, 12, mixc('#1A2948', '#22365E', lit), mixc(K.cardLine, K.sky, lit * .6), 1.5, a); T('학습목표 ' + (i + 1), 160, y + 31, { size: 24, color: K.muted, alpha: a });
+  }
+  // unknown relations between the list items
+  const kq = ap(t, tRel, .5) * (1 - ap(t, tMorph, .6));
+  [[0, 2], [1, 4], [2, 3]].forEach(([a, b], i) => { const y1 = 370 + a * 76, y2 = 370 + b * 76, xm = 600 + i * 22;
+    curve([560, y1], [xm + 30, (y1 + y2) / 2], [560, y2], K.red, 2, 1, kq, [5, 6]); circle(xm + 16, (y1 + y2) / 2, 13, '#3A1F2D', K.red, 1.5, kq); T('?', xm + 16, (y1 + y2) / 2 + 1, { size: 17, weight: 800, color: K.red, align: 'center', alpha: kq }); });
+  T('AI에게는 서로 독립된 항목의 집합', 130, 760, { size: 22, color: K.muted, alpha: ap(t, tRel + .4) });
+  bigArrow(585, 615, 90, 60, K.gold, ap(t, tMorph - .3));
+  // the map: a patch of space
+  card(700, 330, 630, 570, { fill: '#0A1430', a: ap(t, t0 + .2), shadow: false });
+  const ks = ap(t, tSpace, 1);
+  for (const st0 of KM.stars) circle(st0.x, st0.y, st0.r, '#D5E1FA', null, 0, ks * (.25 + .4 * (.5 + .5 * Math.sin(t * 1.8 + st0.tw))));
+  const typed = ap(t, tCol, .8), wide = ap(t, tWid, .8), colOf = c => ({ gold: K.gold, sky: K.sky, grey: K.dim, green: K.green })[c];
+  KM.E.forEach(([a, b, c, w], i) => {
+    const A = KM.P[a], B = KM.P[b], k = eOut(p(t, tDef - .3 + i * .1, .5)), hl = i === 2 ? hov('kmap', t, (A.x + B.x) / 2 - 30, (A.y + B.y) / 2 - 30, 60, 60) : 0;
+    const col = mixc(K.dim, colOf(c), typed), lw = lerp(2.5, w, wide) + 3 * hl;
+    if (hl > 0) seg(A.x, A.y, B.x, B.y, K.sky, lw + 10, .2 * hl);
+    partSeg(A.x, A.y, B.x, B.y, k, col, lw, .9);
+    if (hl > 0) { const q = mod(t * .9, 1); circle(lerp(A.x, B.x, q), lerp(A.y, B.y, q), 6, K.ink, null, 0, hl); }
+  });
+  if (hov('kmap', t, (KM.P[1].x + KM.P[3].x) / 2 - 30, (KM.P[1].y + KM.P[3].y) / 2 - 30, 60, 60) > .01 || (t > tLine && t < tLine + 3))
+    chip('선수 → 후속', (KM.P[1].x + KM.P[3].x) / 2 + 30, (KM.P[1].y + KM.P[3].y) / 2 - 10, { size: 18, fill: '#22335A', stroke: K.sky, a: ap(t, tLine) * (1 - ap(t, tLine + 3)) });
+  // list rows fly into the map and become points
+  KM.P.forEach((n, i) => {
+    const row = KM.from.indexOf(i), isE = i === 4, r0 = isE ? 17 : 12, hn = hov('kmap', t, n.x - 25, n.y - 25, 50, 50);
+    if (row >= 0) {
+      const k = eIO(p(t, tMorph + row * .12, .9)); if (k <= 0) return;
+      if (k < 1) { const y = 340 + row * 76, x = lerp(130, n.x - r0, k), yy = lerp(y, n.y - r0, k), w = lerp(430, r0 * 2, k), h = lerp(60, r0 * 2, k);
+        rr(x, yy, w, h, lerp(12, r0, k), mixc('#22365E', isE ? K.gold : K.sky, k), null, 0, 1); return; }
+    } else if (p(t, tMorph + .6, .5) <= 0) return;
+    const a = row >= 0 ? 1 : ap(t, tMorph + .6), col = isE ? K.gold : mixc('#DCE6FA', K.sky, .3);
+    circle(n.x, n.y, r0 + 10 + 6 * hn, rgba(col, .14), null, 0, a); circle(n.x, n.y, r0 * (1 + .2 * hn), col, '#0A1430', 3, a);
+  });
+  // a point is a learning goal: hover it for what it holds
+  const kt = ap(t, tDot, .35) * (1 - ap(t, tLine - .2, .35));
+  if (kt > 0) { const x = 800, y = 392; card(x, y, 290, 200, { a: kt, fill: '#F4F7FD', stroke: null, r: 14 });
+    T('학습목표', x + 20, y + 30, { size: 20, weight: 800, color: '#0F1A31', alpha: kt });
+    ['내용', '설명', '교재', '난이도', '학습 단계'].forEach((l, i) => { const yy = y + 64 + i * 28; T(l, x + 20, yy, { size: 16, weight: 600, color: '#51607E', alpha: kt });
+      if (l === '난이도') [0, 1, 2].forEach(j => circle(x + 120 + j * 18, yy, 6, j < 2 ? K.gold : '#D4DBE8', null, 0, kt)); else rr(x + 110, yy - 5, 120 + 40 * nz(i, 3), 10, 5, '#D4DBE8', null, 0, kt); }); }
+  // legend
+  const l1 = ap(t, tDot), l2 = ap(t, tLine);
+  card(1380, 330, 410, 270, { a: l1, fill: '#2A2A2A'.replace('#2A2A2A', '#1F2741'), stroke: rgba(K.gold, .45), glow: K.gold, g: Math.sin(Math.PI * p(t, tDot, 1.6)) });
+  circle(1424, 390, 18, K.gold, null, 0, l1); T('점 = 학습목표', 1460, 390, { size: 30, weight: 800, alpha: l1 });
+  para('내용·설명·교재·난이도·학습 단계 등 정보를 담는 단위', 1410, 462, 350, { size: 23, color: K.muted, alpha: l1, lh: 36 });
+  card(1380, 630, 410, 270, { a: l2, fill: '#18284A', stroke: rgba(K.sky, .45), glow: K.sky, g: Math.sin(Math.PI * p(t, tLine, 1.6)) });
+  rr(1404, 686, 40, 8, 4, K.sky, null, 0, l2); T('선 = 관계', 1460, 690, { size: 30, weight: 800, alpha: l2 });
+  T('선수·후속, 개념 공유 등', 1410, 762, { size: 23, color: K.muted, alpha: l2 });
+  T('굵기·색상으로 유형과 강도 표현', 1410, 798, { size: 23, color: K.muted, alpha: ap(t, tCol) });
+  // the whole structure: what to go back to, where to go next
+  const P = KM.P, kb = ap(t, tSup, 1.1), kn = ap(t, tNext, 1.1);
+  poly([[P[4].x, P[4].y], [P[1].x, P[1].y], [P[0].x, P[0].y]], kb, K.orange, 7, .9, [14, 10], t * 30);
+  if (kb > 0) chip('보충학습', P[0].x - 10, P[0].y - 44, { size: 20, fill: rgba(K.orange, .2), color: K.orange, stroke: K.orange, align: 'center', a: kb });
+  const r = poly([[P[4].x, P[4].y], [P[7].x, P[7].y]], kn, K.gold, 7, 1, [14, 10], -t * 30);
+  if (r && kn > .3) arrowHead(r.end[0], r.end[1], r.ang, 18, K.gold, kn);
+  if (kn > 0) chip('다음 학습', P[7].x + 10, P[7].y + 46, { size: 20, fill: rgba(K.gold, .2), color: K.gold, stroke: K.gold, align: 'center', a: kn });
+};
+
+// ---------- p.4 JEI Math Universe ----------
+const UNI = (() => {
+  const R = rand(21), N = 380, nodes = [];
+  for (let i = 0; i < N; i++) { const g = R() * Math.PI * 2, r = Math.pow(R(), .62); nodes.push({ x: 1355 + Math.cos(g) * r * 405, y: 590 + Math.sin(g) * r * 195, r: 1.8 + R() * 2.2, ord: r * .7 + R() * .3, tw: R() * 6.28 }); }
+  const E = knn(nodes, 2); return { nodes, E };
+})();
+CAM.universe = () => { const tu = Wc('l4_3', ['유니버스', 'universe', '매스', 'math'], .7); return [[tu + .6, 1290, 600, 1.26, 1.8]]; };
+CURSOR.universe = () => [[Wc('l4_1', '학습철학', .1) + .4, 470, 480], [Wc('l4_2', '교과서', .3), 470, 770], [Wc('l4_2', '분석', .6), 822, 572, 1], [Wc('l4_3', '공통', .3), 1540, 640]];
+SC.universe = t => {
+  win('universe', t, 'JEI Math Universe', '국내·미주 자산과 국내외 교육과정을 하나의 공통맵으로');
+  const s = S('universe'), t0 = s.start + .9, tSeed = Wc('l4_1', '지식맵', .8), tC2 = Wc('l4_2', '교과서', .25), tAn = Wc('l4_2', '분석', .6), tLink = Wc('l4_2', '연결', .9),
+    tFree = Wc('l4_3', '종속', .6), tCom = Wc('l4_3', '공통', .3), tU = Wc('l4_3', ['유니버스', 'universe', '매스', 'math'], .7);
+  const k1 = ap(t, t0), h1 = hov('universe', t, 130, 300, 600, 250), k2 = ap(t, tC2 - .3), h2 = hov('universe', t, 130, 590, 600, 250);
+  card(130, 300, 600, 250, { a: k1, hover: h1 }); ctx.save(); ctx.globalAlpha *= k1; lift(h1, () => {
+    circle(210, 382, 46, '#2B3E66'); icon('book', 210, 382, 46, K.ink); T('JEI 학습 설계 자산', 280, 382, { size: 32, weight: 800 });
+    T('미주·국내 재능수학 교재', 170, 462, { size: 24, color: K.muted }); T('학습목표 · 커리큘럼 · 콘텐츠 등', 170, 502, { size: 24, color: K.muted }); }); ctx.restore();
+  card(130, 590, 600, 250, { a: k2, hover: h2 }); ctx.save(); ctx.globalAlpha *= k2; lift(h2, () => {
+    circle(210, 672, 46, K.green); icon('globe', 210, 672, 46, '#FFFFFF'); T('국내외 교육과정·학습자료', 280, 672, { size: 32, weight: 800 });
+    T('미국 CCSS·주별 기준, 국내 교육과정', 170, 752, { size: 24, color: K.muted }); T('교과서·참고서, 영국·호주·뉴질랜드 등', 170, 792, { size: 24, color: K.muted }); }); ctx.restore();
+  // the AI agent compares and analyses
+  const ka = ap(t, tSeed - .5), busy = p(t, tAn - .6, Math.max(.5, tLink - tAn + .6)), done = p(t, tLink, .4), pr = press(t, tAn);
+  stream(t, [730, 425], [790, 470], [822, 572], K.gold, ka * (1 - done * .6), 7, .9);
+  stream(t, [730, 715], [790, 670], [822, 572], K.green, ap(t, tC2) * (1 - done * .6), 7, .9);
+  stream(t, [822, 572], [880, 580], [1100, 590], K.gold, ka, 9, .8);
+  circle(822, 572, 66, null, rgba(K.gold, .5), 2.5, ka); ctx.save(); ctx.translate(822, 572); ctx.rotate(t * 2 * (busy > 0 && done < 1 ? 1 : .2)); ctx.setLineDash([10, 12]); circle(0, 0, 78, null, rgba(K.gold, .7), 2, ka * (busy > 0 ? 1 : .4)); ctx.restore();
+  circle(822, 572, 52 * (1 - .08 * pr), '#13243F', K.gold, 3, ka); icon('robot', 822, 572, 50, K.gold, ka);
+  T('AI 비교·분석', 822, 664, { size: 22, weight: 800, color: K.gold, align: 'center', alpha: ka });
+  const pct = Math.round(100 * busy); T(done > 0 ? '연결 완료' : busy > 0 ? `분석 중 ${pct}%` : '대기', 822, 700, { size: 18, weight: 600, color: done > 0 ? K.green : K.muted, align: 'center', alpha: ka });
+  // the common map
+  const kf = ap(t, t0 + .3), glow = ap(t, tU, 1);
+  T('JEI-Math Knowledge Map (JEI Math Universe)', 920, 312, { size: 30, weight: 700, alpha: kf, maxW: 870, color: mixc(K.ink, K.gold, glow), glow: glow * .6 });
+  rr(920, 350, 870, 470, 22, rgba(K.gold, .05 + .05 * glow), rgba(K.gold, .55), 2, kf); ctx.save(); ctx.setLineDash([10, 8]); rr(920, 350, 870, 470, 22, null, K.gold, 2, kf); ctx.restore();
+  const g = .2 * ap(t, tSeed, 1) + .8 * eIO(p(t, tAn - .4, Math.max(.6, tLink - tAn + .4)));
+  ctx.save(); ctx.beginPath(); ctx.roundRect(920, 350, 870, 470, 22); ctx.clip();
+  ctx.lineWidth = 1; ctx.strokeStyle = rgba(K.gold, .32 + .2 * glow); ctx.beginPath();
+  for (const [i, j] of UNI.E) { const A = UNI.nodes[i], B = UNI.nodes[j]; if (A.ord < g && B.ord < g) { ctx.moveTo(A.x, A.y); ctx.lineTo(B.x, B.y); } } ctx.stroke();
+  for (const n of UNI.nodes) if (n.ord < g) { const a = clamp((g - n.ord) / .06); circle(n.x, n.y, n.r * (1 + .5 * glow * (.5 + .5 * Math.sin(t * 3 + n.tw))), mixc(K.gold, '#FFE3A3', glow * .5), null, 0, a); }
+  ctx.restore();
+  chip('공통 학습목표 지식맵', 1355, 350, { size: 19, align: 'center', fill: K.panel, stroke: rgba(K.gold, .7), color: K.gold, a: kf });
+  T('어느 나라 커리큘럼에도 종속되지 않는 개념 단위의 원본 체계', 1355, 798, { size: 17, color: K.muted, align: 'center', alpha: ap(t, tFree) });
+  T('어떤 교육과정에도 종속되지 않는 JEI 고유의 수학 학습 체계', 920, 872, { size: 30, weight: 800, alpha: ap(t, tFree), maxW: 870 });
+  T('AI가 활용하는 공통 수학 지식 구조', 920, 922, { size: 24, color: K.muted, alpha: ap(t, tCom) });
+};
+
+// ---------- p.5 country maps ----------
+function miniMap(t, x, y, w, h, color, label, seed, a, fill = 1, n = 46) {
+  if (a <= 0) return; const R = rand(seed), pts = [];
+  for (let i = 0; i < n; i++) { const g = R() * Math.PI * 2, r = Math.sqrt(R()); pts.push([x + w / 2 + Math.cos(g) * r * (w / 2 - 22), y + h / 2 - 10 + Math.sin(g) * r * (h / 2 - 28)]); }
+  rr(x, y, w, h, 16, rgba(color, .08), rgba(color, .5), 1.5, a);
+  ctx.save(); ctx.globalAlpha *= a; ctx.strokeStyle = rgba(color, .35); ctx.lineWidth = 1; ctx.beginPath();
+  for (let i = 1; i < n; i++) { const q = pts[i], o = pts[Math.floor(R() * i)]; if (i / n < fill && Math.hypot(q[0] - o[0], q[1] - o[1]) < w * .3) { ctx.moveTo(q[0], q[1]); ctx.lineTo(o[0], o[1]); } } ctx.stroke(); ctx.restore();
+  pts.forEach((q, i) => { if (i / n < fill) circle(q[0], q[1], 2.6, color, null, 0, a); });
+  T(label, x + 16, y + h - 20, { size: 18, weight: 700, color: mixc(color, K.ink, .4), alpha: a, maxW: w - 30 });
+  return pts;
+}
+CURSOR.country = () => [[st('l5_1', .3), 565, 605], [Wc('l5_2', '진출', .4) + .2, 855, 845, 1], [Wc('l5_3', '학습', .3) + .3, 300, 840], [st('l5_4', .3), 1435, 920]];
+SC.country = t => {
+  win('country', t, '국가별 지식맵', '공통맵에서 국가별 지식맵으로');
+  const s = S('country'), t0 = s.start + .8, tNat = Wc('l5_1', '국가별', .25), tNew = Wc('l5_2', '새로운', .3), tClick = Wc('l5_2', '진출', .4) + .2, tStd = Wc('l5_2', ['성취기준', '성취'], .5),
+    tTrack = Wc('l5_3', '학습', .3), tLack = Wc('l5_3', '부족', .5), tEnd = st('l5_4', .02), tBase = Wc('l5_4', '기반', .7);
+  // top: what each country has now → AI compares → the common map
+  miniMap(t, 150, 300, 400, 150, K.grey, '미주 학습목표 체계', 31, ap(t, t0));
+  miniMap(t, 580, 300, 400, 150, K.grey, '국내 학습목표 체계', 32, ap(t, t0 + .15));
+  const kc = ap(t, t0 + .7);
+  curve([350, 450], [380, 500], [520, 525], K.gold, 2.5, eOut(p(t, t0 + .4, .6)), .8); curve([780, 450], [750, 500], [610, 525], K.gold, 2.5, eOut(p(t, t0 + .4, .6)), .8);
+  T('① AI 비교·분석', 565, 486, { size: 20, weight: 700, color: K.gold, align: 'center', alpha: kc });
+  const cm = miniMap(t, 250, 525, 630, 165, K.gold, 'JEI 공통 수학 지식맵', 33, kc, 1, 120);
+  // bottom: country maps derived from the common map
+  const kn = ap(t, tNat, .6);
+  [[265, 760], [560, 760]].forEach(([x, y], i) => curve([565, 690], [x, 700], [x, y], i ? K.blue : K.green, 2.5, eOut(p(t, tNat + i * .15, .6)), .8));
+  T('② 국가별 커리큘럼 대응', 565, 724, { size: 20, weight: 700, color: K.green, align: 'center', alpha: kn });
+  const us = miniMap(t, 130, 760, 270, 170, K.green, '미주 — CCSS 대응', 34, ap(t, tNat + .2), eOut(p(t, tNat + .2, 1)));
+  miniMap(t, 425, 760, 270, 170, K.blue, '국내 — 교육과정 대응', 35, ap(t, tNat + .35), eOut(p(t, tNat + .35, 1)));
+  // a new country: click "+", its standards are linked from the common map
+  const kNew = ap(t, tNew - .2), hN = hov('country', t, 720, 760, 270, 170), filled = ap(t, tStd - .4, .8), pr = press(t, tClick);
+  if (filled < 1) { ctx.save(); ctx.setLineDash([8, 7]); rr(720, 760, 270, 170, 16, rgba(K.sky, .04 + .08 * hN), rgba(K.sky, .6), 2, kNew * (1 - filled)); ctx.restore();
+    ctx.save(); ctx.globalAlpha *= kNew * (1 - filled); ctx.translate(855, 830); ctx.scale(1 - .1 * pr, 1 - .1 * pr); circle(0, 0, 26, rgba(K.sky, .15), K.sky, 2); icon('plus', 0, 0, 30, K.sky); ctx.restore();
+    T('새 국가 추가', 855, 885, { size: 19, weight: 700, color: K.sky, align: 'center', alpha: kNew * (1 - filled) }); }
+  curve([565, 690], [855, 700], [855, 760], K.sky, 2.5, eOut(p(t, tStd - .6, .6)), .8, [6, 6], -t * 20);
+  miniMap(t, 720, 760, 270, 170, K.sky, '새 국가 — 성취기준 연결', 36, filled, eOut(p(t, tStd - .2, 1)));
+  // the learner's state tracked on a country map
+  if (us && t > tTrack) { const hop = Math.floor((t - tTrack) / .45), kt = ap(t, tTrack);
+    for (let j = 0; j <= Math.min(hop, 14); j++) { const q = us[(j * 7) % us.length], bad = j % 4 === 2 && t > tLack; circle(q[0], q[1], 6, bad ? K.red : K.green, null, 0, kt); }
+    const q = us[(Math.min(hop, 14) * 7) % us.length]; circle(q[0], q[1], 13 + 3 * Math.sin(t * 6), null, K.ink, 2, kt);
+    chip('학습자 상태 추적', 130, 968, { size: 18, fill: rgba(K.green, .15), color: K.green, a: kt, ic: 'user' }); }
+  // steps
+  [['AI 비교·분석', '국내·미주 학습목표 체계를 비교·분석해 JEI 공통 수학 지식맵 구축', K.gold, st('l5_1', .02)],
+   ['국가별 커리큘럼 대응', '공통맵의 개념 단위를 각 나라 성취기준에 다시 연결 (미주 CCSS · 국내 교육과정)', K.green, tNat],
+   ['학습자 상태 관리의 기준', '국가별 지식맵 위에서 학습자별 상태를 연결하고 추적', K.blue, tTrack]].forEach(([h, d, c, ts], i) => {
+    const y = 320 + i * 170, a = ap(t, ts - .1), on = Math.sin(Math.PI * p(t, ts - .1, 1.6));
+    circle(1112, y + 30, 32 + 4 * on, c, null, 0, a); T(String(i + 1), 1112, y + 32, { size: 28, weight: 800, align: 'center', alpha: a, color: '#0B1428' });
+    T(h, 1170, y + 30, { size: 32, weight: 800, alpha: a }); para(d, 1170, y + 82, 610, { size: 23, color: K.muted, alpha: a, lh: 34 });
+  });
+  const kk = ap(t, tEnd), gk = Math.sin(Math.PI * p(t, tBase, 1.4));
+  card(1080, 856, 710, 124, { a: kk, fill: '#0A1430', stroke: rgba(K.gold, .5), glow: K.gold, g: .4 + .6 * gk });
+  T('억지로 일대일 대응시키지 않고,', 1435, 898, { size: 25, weight: 700, align: 'center', alpha: kk });
+  T('더 촘촘한 공통 구조에서 국가별 체계를 도출', 1435, 940, { size: 25, weight: 800, color: K.gold, align: 'center', alpha: kk });
+};
+
+// ---------- p.6 three layers, stacked isometrically ----------
+const LAY = [
+  { id: 'k', name: '지식 계층', ic: 'nodes', c: 'gold', cy: 845, card: 754, d: ['학습목표·콘텐츠·지식맵을', 'AI가 활용할 수 있는 JEI 지식맵으로 구축'], tags: ['P-01 지식그래프', 'P-04 공통·국가별 지식맵', 'P-06 LLM Wiki'] },
+  { id: 'a', name: 'AI 에이전트 계층', ic: 'robot', c: 'green', cy: 655, card: 527, d: ['JEI 지식맵을 바탕으로 콘텐츠 생성', '학습 결과 분석, 설명·힌트·보충학습 제공'], tags: ['P-02 콘텐츠 자동생성', 'P-04 학습 추정/보정 엔진', 'P-05 AI 보조선생님'] },
+  { id: 's', name: '서비스 계층', ic: 'student', c: 'blue', cy: 465, card: 300, d: ['POD와 온라인으로 학습자에게 콘텐츠 제공', '학습 결과를 다음 학습에 반영'], tags: ['P-03 POD 서비스', 'P-07 AI 온라인 학습 플랫폼'] }];
+const SLAB = { cx: 510, a: 300, b: 110, th: 40 };
+const iso = (cy, u, v) => [SLAB.cx + (u - v) * SLAB.a / 2, cy + (u + v) * SLAB.b / 2];
+function slab(cy, color, a, ghost = 0) {
+  const { cx, a: A, b: Bb, th } = SLAB, top = [[cx, cy - Bb], [cx + A, cy], [cx, cy + Bb], [cx - A, cy]];
+  const face = (pts, fill, stroke) => { ctx.beginPath(); pts.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.closePath(); if (fill) { ctx.fillStyle = fill; ctx.fill(); } if (stroke) { ctx.strokeStyle = stroke; ctx.stroke(); } };
+  ctx.save(); ctx.lineWidth = 2;
+  if (ghost > 0) { ctx.globalAlpha = ghost; ctx.setLineDash([8, 8]); face(top, null, rgba(color, .55)); ctx.restore(); return; }
+  ctx.globalAlpha *= a;
+  face([[cx - A, cy], [cx, cy + Bb], [cx, cy + Bb + th], [cx - A, cy + th]], mixc(color, '#0B1428', .45), null);
+  face([[cx, cy + Bb], [cx + A, cy], [cx + A, cy + th], [cx, cy + Bb + th]], mixc(color, '#0B1428', .62), null);
+  const g = ctx.createLinearGradient(cx - A, cy, cx + A, cy); g.addColorStop(0, mixc(color, '#0F1A31', .55)); g.addColorStop(1, mixc(color, '#0F1A31', .72));
+  face(top, g, rgba(color, .95)); ctx.restore();
+}
+CURSOR.layers = () => [[Wc('l6_2', '지식', .2) + .6, 1260, 861], [Wc('l6_3', '에이전트', .3) + .5, 1260, 634], [Wc('l6_4', '서비스', .2) + .5, 1260, 407],
+  [Wc('l6_5', '안정', .5), 510, 912, 1], [Wc('l6_5', '빠르고', .6), 510, 488, 1]];
+SC.layers = t => {
+  win('layers', t, '전체 구조', '지식 → AI → 서비스, 3개의 층을 아래부터 쌓는다');
+  const tThree = Wc('l6_1', ['세', '3'], .3), tUp = Wc('l6_1', '아래', .6), tK = Wc('l6_2', '지식', .2), tKm = Wc('l6_2', '지식맵', .8), tA = Wc('l6_3', '에이전트', .3), tAn = Wc('l6_3', '분석', .8),
+    tS = Wc('l6_4', '서비스', .2), tPod = Wc('l6_4', ['pod', '피오디'], .5), tStable = Wc('l6_5', '안정', .5), tFast = Wc('l6_5', '빠르고', .6);
+  // the arrow up the side
+  const ku = ap(t, tThree);
+  rr(98, 330, 36, 640, 18, '#1A2948', null, 0, ku); const fu = eIO(p(t, tUp, 1.6));
+  const gu = ctx.createLinearGradient(0, 970, 0, 330); gu.addColorStop(0, K.gold); gu.addColorStop(.5, K.green); gu.addColorStop(1, K.blue);
+  rr(98, 970 - 640 * fu, 36, 640 * fu, 18, gu, null, 0, ku); arrowHead(116, 300, -Math.PI / 2, 26, fu >= 1 ? K.blue : '#2A3A5C', ku);
+  const times = [tK, tA, tS];
+  // ghosts, then slabs dropping in from the bottom up (drawn bottom first so upper slabs sit on top)
+  LAY.forEach((l, i) => { if (p(t, times[i], .7) < 1) slab(l.cy, K[l.c], 0, ap(t, tThree + i * .15) * (1 - p(t, times[i], .7))); });
+  LAY.forEach((l, i) => {
+    const e = eOut(p(t, times[i], .7)); if (e <= 0) return; const bob = l.id === 's' ? 6 * Math.sin(Math.PI * 2 * p(t, tFast, 1.2)) : 0, cy = l.cy - 220 * (1 - e) + bob;
+    slab(cy, K[l.c], e);
+    ctx.save(); ctx.globalAlpha *= e;
+    if (l.id === 'k') { const R = rand(5); const pts = Array.from({ length: 14 }, () => iso(cy, -.75 + R() * 1.5, -.1 + R() * .85)); const kk = ap(t, tKm - .3, 1);
+      for (let j = 1; j < pts.length; j++) { let b = 0; for (let q = 1; q < j; q++) if (Math.hypot(pts[q][0] - pts[j][0], pts[q][1] - pts[j][1]) < Math.hypot(pts[b][0] - pts[j][0], pts[b][1] - pts[j][1])) b = q; seg(pts[j][0], pts[j][1], pts[b][0], pts[b][1], K.gold, 1.5, .6 * kk); } pts.forEach(q => circle(q[0], q[1], 4, K.gold, null, 0, .4 + .6 * kk)); }
+    if (l.id === 'a') { [[-.55, .55], [0, .75], [.55, .55]].forEach(([u, v], j) => { const [x, y] = iso(cy, u, v); circle(x, y - 6, 18, '#0F2A2A', K.green, 2); icon('robot', x, y - 6, 22, K.green); });
+      const sc = p(t, tAn - .3, 1.2); if (sc > 0 && sc < 1) { const u = lerp(-1, 1, sc); const [x1, y1] = iso(cy, u, -1), [x2, y2] = iso(cy, u, 1); seg(x1, y1, x2, y2, K.green, 3, .8 * Math.sin(Math.PI * sc)); } }
+    if (l.id === 's') { const kp = pop(t, tPod); [['printer', 'POD', -.45, .45], ['monitor', '온라인', .45, .45]].forEach(([ic, lb, u, v], j) => { const [x, y] = iso(cy, u, v), k = clamp(kp - j * .1);
+        circle(x, y - 8, 22 * k, '#10223F', K.blue, 2); icon(ic, x, y - 8, 26 * k, K.blue, clamp(k)); T(lb, x, y + 26, { size: 15, weight: 700, color: K.blue, align: 'center', alpha: clamp(k) }); }); }
+    ctx.restore();
+    // connector to its card
+    partSeg(SLAB.cx + SLAB.a, cy, 900, l.card + 107, eOut(p(t, times[i] + .3, .5)), rgba(K[l.c], .7), 2);
+  });
+  // badges: the base stays, the top keeps changing
+  const kS = pop(t, tStable); if (kS > 0) chip('한 번 구축 · 안정적 유지', 510, 912, { size: 18, align: 'center', fill: '#2C2410', stroke: K.gold, color: K.gold, a: clamp(kS), ic: 'lock' });
+  const kF = pop(t, tFast); if (kF > 0) { const v = 1 + Math.min(2, Math.floor(Math.max(0, t - tFast) / .8)); chip(`빠르고 유연하게 · v${v}`, 510, 488, { size: 18, align: 'center', fill: '#0F2140', stroke: K.blue, color: K.blue, a: clamp(kF), ic: 'bolt' }); }
+  // layer cards (top to bottom on screen)
+  LAY.forEach((l, i) => {
+    const a = ap(t, times[i] + .2), y = l.card, h = hov('layers', t, 900, y, 890, 215), c = K[l.c];
+    card(900, y, 890, 215, { a, fill: mixc(c, K.panel, .88), stroke: rgba(c, .45), hover: h, glow: c, g: Math.sin(Math.PI * p(t, times[i] + .2, 1.4)) * .8 });
+    ctx.save(); ctx.globalAlpha *= a; lift(h, () => {
+      circle(965, y + 60, 40, c); icon(l.ic, 965, y + 60, 42, '#FFFFFF');
+      T(l.name, 1025, y + 58, { size: 32, weight: 800 }); l.d.forEach((d, j) => T(d, 1025, y + 116 + j * 36, { size: 22, color: K.muted, maxW: 450 }));
+      l.tags.forEach((g, j) => chip(g, 1770, y + 50 + j * 52, { size: 18, align: 'right', fill: rgba(c, .14), color: mixc(c, K.ink, .3), a: ap(t, times[i] + .4 + j * .12) }));
+    }); ctx.restore();
+  });
+};
+
+// ---------- p.7 roadmap: a timeline that scrolls ----------
+const RM = { VX: 130, VY: 290, VW: 1660, VH: 520, CW: 2160 };
+const PROJ = [
+  { id: 'P-01', t: ['학습목표', '지식그래프 구축'], m: '9개월', ph: 0 }, { id: 'P-02', t: ['프로그램식 콘텐츠', '자동생성 에이전트'], m: '10개월', ph: 0 }, { id: 'P-03', t: ['개인별 맞춤', 'POD 제작·제공'], m: '11.5개월', ph: 0, core: 1 },
+  { id: 'P-04', t: ['학습자 상태 분석', '학습경로 갱신'], m: '10개월', ph: 1 }, { id: 'P-05', t: ['AI 보조선생님', '에이전트'], m: '10개월', ph: 1 }, { id: 'P-07', t: ['AI 온라인', '학습 플랫폼'], m: '12.5개월', ph: 1, core: 1 }];
+const rmTimes = () => ({ tTwo: Wc('l7_1', '두', .75), tSeven: Wc('l7_1', ['7', '일곱'], .3), tScroll: Wc('l7_4', ['2단계', '2', '이단계'], .05) - .2, tFit: st('l7_6', .02) - .3,
+  tWiki: Wc('l7_6', ['wiki', '위키', 'llm', '엘엘엠'], .2), tLive: Wc('l7_5', '실시간', .6),
+  card: [Wc('l7_2', ['지식맵', '지식'], .4), Wc('l7_2', '콘텐츠', .6), Wc('l7_3', ['pod', '피오디'], .8), Wc('l7_4', '학습자', .3), Wc('l7_4', ['보조선생님', '보조'], .5), Wc('l7_4', '온라인', .75)] });
+function rmView(t) { const m = rmTimes(), sc = eIO(p(t, m.tScroll, 1.4)), fit = eIO(p(t, m.tFit, 1.4)), z = lerp(1, RM.VW / RM.CW, fit); return { scroll: lerp(sc * (RM.CW - RM.VW), 0, fit), z }; }
+CURSOR.roadmap = () => { const m = rmTimes(), f0 = RM.VW / RM.CW, thumbW = RM.VW * f0, x0 = RM.VX + thumbW / 2, x1 = RM.VX + (RM.CW - RM.VW) / RM.CW * RM.VW + thumbW / 2;
+  return [[m.card[0] + .2, 300, 560], [m.card[2] + .2, 950, 560], [m.tScroll, x0, 830, 1], [m.tScroll + 1.4, x1, 830], [m.tLive, 1640, 560], [m.tWiki + .5, 196, 935]]; };
+SC.roadmap = t => {
+  win('roadmap', t, '추진 로드맵', '7개 프로젝트, 두 단계로 확장');
+  const m = rmTimes(), v = rmView(t), kc = pop(t, m.tSeven);
+  if (kc > 0) { const n = Math.round(7 * eOut(p(t, m.tSeven, 1))); chip(`프로젝트 ${n}개`, 1790, 228, { size: 24, align: 'right', fill: rgba(K.gold, .15), stroke: K.gold, color: K.gold, a: clamp(kc), ic: 'nodes' }); }
+  ctx.save(); ctx.beginPath(); ctx.rect(RM.VX - 10, RM.VY - 10, RM.VW + 20, RM.VH + 20); ctx.clip();
+  ctx.translate(RM.VX - v.scroll * v.z, RM.VY); ctx.scale(v.z, v.z);
+  // ruler
+  const kr = ap(t, S('roadmap').start + .9);
+  seg(0, 26, RM.CW, 26, K.dim, 2, kr); [[20, '2026.10'], [520, '2027'], [1160, '2028.01']].forEach(([x, l]) => { seg(x, 16, x, 36, K.muted, 2, kr); T(l, x + 10, 6, { size: 18, weight: 600, color: K.muted, alpha: kr }); });
+  arrowHead(RM.CW - 4, 26, 0, 14, K.dim, kr);
+  [[0, K.gold, 'Phase 1', '2026.10 ~ 2027', 'Knowledge Map + 콘텐츠 생성 → 개인별 POD로 검증'], [1140, K.green, 'Phase 2', '2028.01 ~', '학습자 상태 분석 + AI 지원 → 온라인 개인화 플랫폼']].forEach(([x, c, ph, d, cap], g) => {
+    const a = ap(t, m.tTwo + g * .2);
+    rr(x, 60, 1000, 440, 24, rgba(c, .08), rgba(c, .35), 2, a);
+    T(ph, x + 30, 108, { size: 34, weight: 800, color: c, alpha: a }); T(d, x + 30 + measure(ph, 34, 800) + 22, 110, { size: 28, weight: 500, alpha: a });
+    T(cap, x + 30, 455, { size: 25, weight: 700, color: c, alpha: ap(t, g ? m.tLive : en('l7_3') - .6) });
+  });
+  bigArrow(1030, 280, 90, 70, K.gold, ap(t, m.tScroll + .6));
+  PROJ.forEach((q, j) => {
+    const x = (q.ph ? 1140 : 0) + 25 + (j % 3) * 325, y = 150, tc = m.card[j], a = pop(t, tc), c = q.ph ? K.green : K.gold, on = Math.sin(Math.PI * p(t, tc, 1.4));
+    if (a <= 0) { ctx.save(); ctx.setLineDash([6, 8]); rr(x, y, 300, 250, 18, null, rgba(c, .35), 1.5, ap(t, m.tTwo + .3)); ctx.restore(); return; }
+    ctx.save(); ctx.translate(x + 150, y + 125); ctx.scale(lerp(.9, 1, clamp(a)), lerp(.9, 1, clamp(a))); ctx.translate(-150, -125);
+    card(0, 0, 300, 250, { a: clamp(a), fill: q.core ? '#0A1428' : K.card, stroke: q.core ? rgba(K.gold, .9) : K.cardLine, glow: c, g: on, r: 18 });
+    ctx.globalAlpha *= clamp(a);
+    T(q.id, 22, 38, { size: 24, weight: 800, color: q.core ? K.gold : K.ink }); if (q.core) T('핵심 서비스', 100, 38, { size: 20, weight: 800, color: K.gold });
+    q.t.forEach((l, i) => T(l, 22, 96 + i * 36, { size: 25, weight: q.core ? 800 : 500, maxW: 260 }));
+    const f = eOut(p(t, tc + .3, 1.2)); rr(22, 186, 256, 8, 4, '#22335A'); rr(22, 186, 256 * f, 8, 4, c); T(q.m, 22, 220, { size: 19, color: K.muted });
+    if (q.id === 'P-07') { const kl = ap(t, m.tLive); if (kl > 0) { ctx.globalAlpha *= kl; const pts = Array.from({ length: 12 }, (_, i) => [160 + i * 11, 70 - 22 * (.5 + .5 * Math.sin(i * .9 + t * 3))]); poly(pts, 1, K.green, 2.5); circle(pts[11][0], pts[11][1], 4, K.green); } }
+    ctx.restore();
+  });
+  ctx.restore();
+  // scrollbar
+  const f = Math.min(1, RM.VW / (RM.CW * v.z)), thumbW = RM.VW * f, tx = RM.VX + v.scroll / RM.CW * RM.VW, ks = ap(t, m.tTwo) * (1 - ap(t, m.tFit + 1.2)), hs = hov('roadmap', t, tx, 816, thumbW, 28);
+  rr(RM.VX, 826, RM.VW, 8, 4, '#1A2948', null, 0, ks); rr(tx, 824 - 2 * hs, thumbW, 12 + 4 * hs, 6, mixc('#3A4E78', K.gold, hs), null, 0, ks);
+  // LLM Wiki: under everything, feeding every project
+  const kw = ap(t, m.tWiki, .6);
+  if (kw > 0) {
+    PROJ.forEach((q, j) => { const cx = RM.VX + ((q.ph ? 1140 : 0) + 25 + (j % 3) * 325 + 150 - v.scroll) * v.z, cy = RM.VY + 500 * v.z;
+      curve([cx, 868], [cx, (868 + cy) / 2], [cx, cy + 4], rgba(K.gold, .6), 2, eOut(p(t, m.tWiki + .4 + j * .08, .5)), kw, [5, 6], -t * 25);
+      stream(t, [cx, 868], [cx, (868 + cy) / 2], [cx, cy + 4], K.gold, ap(t, m.tWiki + .8), 3, .8, 3); });
+    card(130, 868, 1660, 100, { a: kw, fill: '#0A1428', stroke: rgba(K.gold, .6), glow: K.gold, g: Math.sin(Math.PI * p(t, m.tWiki, 1.6)) });
+    circle(190, 918, 32, K.gold, null, 0, kw); icon('book', 190, 918, 34, '#0B1428', kw);
+    T('P-06', 245, 918, { size: 28, weight: 800, color: K.gold, alpha: kw }); T('LLM Wiki', 320, 918, { size: 28, weight: 800, color: K.gold, alpha: kw });
+    T('JEI의 교육지식을 정리·갱신해 모든 프로젝트에 공급하는 공통 지식베이스', 490, 918, { size: 25, alpha: kw, maxW: 1270 });
+  }
+};
+
+// ---------- p.8 P-03 POD: the cycle runs ----------
+const PODS = [['clipboard', '#2B3E66', ['진단·학습 이력']], ['search', 'blue', ['필요 학습목표·', '분량 자동 선정']], ['robot', 'green', ['AI 콘텐츠 생성', '+ 연구원 검토']], ['printer', '#B8860B', ['1인 1맞춤', '학습지 출력']], ['refresh', 'gold', ['결과 반영', '다음 POD 재구성']]];
+const podX = j => 130 + j * 350;
+const LOOP = [[1670, 630], [1670, 692], [270, 692], [270, 632]];
+const podTimes = () => ({ st: [Wc('l8_2', '진단', .15), Wc('l8_2', ['학습목표', '목표'], .6), Wc('l8_3', '맞춤형', .7), Wc('l8_3', '제작', .75), Wc('l8_4', '분석', .45)],
+  rev: Wc('l8_3', '검토', .1), cyc: Wc('l8_5', '보충', .3), us: Wc('l8_6', '미국', .3), kr: Wc('l8_6', '국내', .8) });
+CURSOR.pod = () => { const m = podTimes(); return [[m.st[0] + .2, 270, 430], [m.st[1], 620, 430], [m.st[2], 970, 430], [m.st[3] - .05, 1320, 470, 1], [m.st[4], 1670, 470, 1], [m.us + .3, 340, 842], [m.kr + .2, 486, 842]]; };
+SC.pod = t => {
+  win('pod', t, '핵심 서비스 ①', 'P-03 개인별 맞춤 POD — 1인 1맞춤 학습지');
+  const m = podTimes(), t0 = S('pod').start + .8;
+  // the loop under the steps
+  const kl = eIO(p(t, m.st[4] + .3, 1.2));
+  poly(LOOP, kl, K.gold, 3, .9, [10, 8], -t * 40); if (kl >= 1) arrowHead(270, 632, -Math.PI / 2, 16, K.gold);
+  T('학습 결과가 다음 학습으로 이어지는 순환', 970, 735, { size: 26, weight: 800, color: K.gold, align: 'center', alpha: ap(t, m.st[4] + .8) });
+  if (t > m.st[4] + 1.4) { const per = 2.4, k = mod((t - m.st[4] - 1.4) / per, 1), tot = 62 + 1400 + 60, d = k * tot, pt = d < 62 ? [1670, 630 + d] : d < 1462 ? [1670 - (d - 62), 692] : [270, 692 - (d - 1462)];
+    circle(pt[0], pt[1], 14, rgba(K.gold, .25)); circle(pt[0], pt[1], 7, K.gold);
+    const kc = pop(t, m.cyc); if (kc > 0) { const n = 2 + Math.min(2, Math.floor(Math.max(0, t - m.cyc) / per)); chip(`${n}회차 POD`, 970, 692, { size: 20, align: 'center', fill: '#2C2410', stroke: K.gold, color: K.gold, a: clamp(kc), ic: 'refresh' }); } }
+  PODS.forEach(([ic, col, lab], j) => {
+    const x = podX(j), ts = m.st[j], on = ap(t, ts - .1), last = j === 4, c = K[col] || col, h = hov('pod', t, x, 290, 280, 340), pr = press(t, ts - .05);
+    card(x, 290, 280, 340, { a: lerp(.35, 1, on) * ap(t, t0 + j * .1), fill: last ? '#0A1428' : K.card, stroke: last ? rgba(K.gold, .7) : K.cardLine, glow: c, g: Math.sin(Math.PI * p(t, ts - .1, 1.5)), hover: h });
+    ctx.save(); ctx.globalAlpha *= lerp(.35, 1, on) * ap(t, t0 + j * .1); lift(h, () => {
+      const cx = x + 140; ctx.save(); ctx.translate(cx, 392); ctx.scale(1 - .08 * pr, 1 - .08 * pr);
+      circle(0, 0, 58, c); ctx.save(); if (last) ctx.rotate(kl * Math.PI * 2 + (t > m.st[4] + 1.4 ? (t - m.st[4]) * 1.5 : 0)); icon(ic, 0, 0, 56, last ? '#0B1428' : '#FFFFFF'); ctx.restore(); ctx.restore();
+      lab.forEach((l, i) => T(l, cx, (lab.length > 1 ? 515 : 535) + i * 40, { size: 27, weight: 800, align: 'center', maxW: 250 }));
+      if (j === 0) ['진단', '이력'].forEach((w, i) => chip(w, cx - 55 + i * 110, 595, { size: 17, align: 'center', fill: '#22335A', a: pop(t, ts + i * .2) }));
+      if (j === 1) [0, 1, 2].forEach(i => { const k = pop(t, ts + .2 + i * .18); rr(cx - 62 + i * 46, 582, 30, 30, 7, k > .5 ? K.blue : '#22335A', null, 0, clamp(k)); icon('check', cx - 47 + i * 46, 597, 20, '#FFFFFF', clamp(k * 2 - 1)); });
+      if (j === 2) { [0, 1, 2].forEach(i => rr(cx - 80, 584 + i * 14, 160 * eOut(p(t, ts + i * .3, .6)) * (i === 2 ? .6 : 1), 7, 3.5, rgba(K.green, .6))); chip('검토 ✓', cx + 92, 326, { size: 16, align: 'center', fill: K.green, color: '#0B1428', a: pop(t, m.rev) }); }
+      if (j === 3) { const k = eOut(p(t, ts + .1, .9)); if (k > 0) { ctx.save(); ctx.translate(cx + 80, 392 + 26 * k); ctx.rotate(.12); rr(-26, -34, 52, 68, 4, '#F4F7FD', null, 0, k); [0, 1, 2, 3].forEach(i => rr(-16, -20 + i * 12, i === 3 ? 18 : 32, 4, 2, '#B9C4D8', null, 0, k)); ctx.restore(); } }
+    }); ctx.restore();
+    if (j < 4) { const ax = x + 280 + 16; bigArrow(ax, 460, 38, 44, K.gold, ap(t, m.st[j + 1] - .3)); }
+    // the student's record travels from step to step
+    if (j < 4) { const k = p(t, m.st[j + 1] - .7, .6); if (k > 0 && k < 1) { const xx = lerp(x + 210, podX(j + 1) + 70, eIO(k)); circle(xx, 460, 10, K.gold, null, 0, Math.sin(Math.PI * k)); } }
+  });
+  // where it starts
+  const kb = ap(t, m.us - .2);
+  card(130, 788, 1660, 108, { a: kb, fill: rgba(K.gold, .09), stroke: rgba(K.gold, .35), shadow: false });
+  T('적용 순서', 170, 842, { size: 28, weight: 800, alpha: kb });
+  const ku = pop(t, m.us), kk = pop(t, m.kr);
+  chip('미국', 340, 842, { size: 24, align: 'center', fill: K.gold, color: '#0B1428', a: clamp(ku) });
+  partSeg(385, 842, 432, 842, eOut(p(t, m.us + .4, Math.max(.4, m.kr - m.us - .4))), K.gold, 4, kb); arrowHead(442, 842, 0, 14, K.gold, ap(t, m.kr - .2));
+  chip('한국', 486, 842, { size: 24, align: 'center', fill: kk > .5 ? K.gold : '#22335A', color: kk > .5 ? '#0B1428' : K.muted, a: kb });
+  T('·  Phase 1에서 학습 순환을 검증하는 첫 번째 핵심 서비스', 560, 842, { size: 25, color: K.muted, alpha: kb });
+};
+
+// ---------- p.9 P-07 online learning, adjusted in real time ----------
+const ONC = [[130, 'blue', 'pointer', '학습 행동 반영', ['정오답 · 풀이시간 · 힌트 · 재시도', '콘텐츠와 다음 학습경로를 지속 조정']], [705, 'green', 'student', '학생을 돕는 AI', ['정답 대신 스스로 풀도록 힌트·설명', '보충 · 복습 · 심화 학습 제공']], [1280, 'gold', 'board', '선생님을 돕는 AI', ['학생의 학습 상태와 어려움 전달', '더 구체적인 코칭 지원']]];
+const onTimes = () => ({ col: [S('online').start + .8, Wc('l9_3', '학생과', .6), Wc('l9_3', '선생님을', .75)], wrong: Wc('l9_2', '정오답', .1), time: Wc('l9_2', '풀이', .2), hint: Wc('l9_2', '힌트', .4),
+  retry: Wc('l9_2', ['재시도', '제시도'], .5), adj: Wc('l9_2', '실시간', .7), ask: Wc('l9_4', '정답', .15), aiHint: Wc('l9_4', '힌트', .7), alert: Wc('l9_4', '어려움', .3), coach: Wc('l9_4', '코칭', .5),
+  me: Wc('l9_5', '개인별', .3), eff: Wc('l9_5', '효과적', .6) });
+CURSOR.online = () => { const m = onTimes(); return [[m.wrong - .2, 385, 640], [m.hint, 200, 728, 1], [m.retry, 340, 728, 1], [m.ask + .4, 960, 700], [m.alert, 1530, 690], [m.coach + .4, 1690, 912, 1]]; };
+SC.online = t => {
+  win('online', t, '핵심 서비스 ②', 'P-07 실시간으로 조정되는 온라인 학습');
+  const m = onTimes();
+  ONC.forEach(([x, col, ic, title, bul], i) => {
+    const c = K[col], on = ap(t, m.col[i] - .1), a = lerp(.3, 1, on) * ap(t, S('online').start + .5 + i * .1), g = Math.sin(Math.PI * p(t, m.col[i] - .1, 1.5)) + (i === 1 ? Math.sin(Math.PI * p(t, m.me, 1.5)) : i === 2 ? Math.sin(Math.PI * p(t, m.eff, 1.5)) : 0);
+    card(x, 290, 510, 700, { a, fill: mixc(c, K.panel, .9), stroke: rgba(c, .35), glow: c, g: clamp(g) });
+    ctx.save(); ctx.globalAlpha *= a;
+    circle(x + 70, 372, 44, c); icon(ic, x + 70, 372, 44, '#FFFFFF'); T(title, x + 130, 372, { size: 32, weight: 800 });
+    if (i) T('P-05 AI 보조선생님', x + 490, 314, { size: 17, weight: 700, color: c, align: 'right' });
+    bul.forEach((b, j) => { circle(x + 40, 452 + j * 46, 4, c); T(b, x + 56, 452 + j * 46, { size: 22, color: '#C9D3E6', maxW: 430 }); });
+    ctx.restore();
+  });
+  // 1. a problem being solved: wrong, time, hint, retry → the path adjusts
+  { const x = 155, k = ap(t, m.col[0] + .3);
+    card(x, 540, 460, 210, { a: k, fill: '#0A1428', stroke: K.cardLine, shadow: false, r: 14 });
+    ctx.save(); ctx.globalAlpha *= k;
+    T('문제 3', x + 20, 568, { size: 17, weight: 700, color: K.muted });
+    const secs = Math.floor(clamp(t - m.col[0], 0, Math.max(0, m.retry - m.col[0] + .5)) * 1.6) + 12; const hT = Math.sin(Math.PI * p(t, m.time, 1.4));
+    chip(`0:${String(Math.min(59, secs)).padStart(2, '0')}`, x + 440, 568, { size: 17, align: 'right', fill: hT > .1 ? K.blue : '#22335A', ic: 'clock' });
+    T('27 + 48 =', x + 120, 630, { size: 40, weight: 800, align: 'center' });
+    const ans = t < m.wrong ? '' : t < m.retry ? '65' : '75', ok = t >= m.retry + .1, bad = t >= m.wrong && !ok;
+    rr(x + 250, 600, 110, 60, 10, ok ? rgba(K.green, .2) : bad ? rgba(K.red, .2) : '#16233F', ok ? K.green : bad ? K.red : K.cardLine, 2);
+    T(ans, x + 305, 631, { size: 34, weight: 800, align: 'center', color: ok ? K.green : bad ? K.red : K.ink });
+    if (ans) icon(ok ? 'check' : 'x', x + 395, 630, 30, ok ? K.green : K.red);
+    const ph = press(t, m.hint), prr = press(t, m.retry);
+    [[x + 20, 140, '힌트', m.hint, ph, 'bulb'], [x + 172, 150, '다시 풀기', m.retry, prr, 'refresh']].forEach(([bx, bw, l, tb, pr, bi]) => { const used = t > tb, hb = hov('online', t, bx, 708, bw, 42);
+      ctx.save(); ctx.translate(bx + bw / 2, 728); ctx.scale(1 - .06 * pr, 1 - .06 * pr); rr(-bw / 2, -21, bw, 42, 21, used ? rgba(K.blue, .25) : mixc('#22335A', '#2E4470', hb), used ? K.blue : null, 1.5); icon(bi, -bw / 2 + 24, 0, 20, used ? K.blue : K.muted); T(l, -bw / 2 + 42, 1, { size: 18, weight: 700, color: used ? K.blue : K.ink }); ctx.restore(); });
+    if (t > m.hint) chip('일의 자리: 7 + 8 = 15', x + 20, 683, { size: 16, fill: rgba(K.gold, .15), color: K.gold, a: ap(t, m.hint + .1) * (1 - ap(t, m.retry)) });
+    ctx.restore();
+    const log = [['오답 1회', K.red, m.wrong + .2], [`풀이 시간 기록`, K.blue, m.time], ['힌트 1회 사용', K.gold, m.hint + .2], ['재시도 → 정답', K.green, m.retry + .2]];
+    log.forEach(([l, c, tl], j) => { const a = ap(t, tl) * k, y = 790 + j * 40; rr(x, y - 16, 460, 34, 8, rgba(c, .1), null, 0, a); circle(x + 18, y + 1, 5, c, null, 0, a); T(l, x + 34, y + 1, { size: 18, weight: 600, alpha: a }); T('방금', x + 445, y + 1, { size: 15, color: K.dim, align: 'right', alpha: a }); });
+    const ka = pop(t, m.adj); if (ka > 0) chip('다음 학습경로 조정됨', x + 230, 958, { size: 19, align: 'center', fill: K.blue, color: '#FFFFFF', a: clamp(ka), ic: 'route' }); }
+  // 2. the student's AI tutor: a hint, not the answer
+  { const x = 705, k = ap(t, m.col[1]);
+    ctx.save(); ctx.globalAlpha *= k;
+    const qa = ap(t, m.ask); if (qa > 0) { const w = measure('어떻게 풀어요?', 21, 600) + 36; rr(x + 485 - w, 555, w, 48, 18, K.blue, null, 0, qa); T('어떻게 풀어요?', x + 485 - w + 18, 580, { size: 21, weight: 600, alpha: qa }); }
+    const typing = t > m.ask + .3 && t < m.aiHint; if (typing) [0, 1, 2].forEach(i => circle(x + 60 + i * 18, 650, 5, K.green, null, 0, .4 + .6 * Math.abs(Math.sin(t * 5 + i))));
+    const ha = ap(t, m.aiHint); if (ha > 0) { rr(x + 25, 625, 400, 104, 18, '#173A33', rgba(K.green, .5), 1.5, ha); icon('robot', x + 52, 655, 26, K.green, ha);
+      T('정답 대신 힌트!', x + 76, 655, { size: 19, weight: 800, color: K.green, alpha: ha }); T('일의 자리부터 더해 볼까요?', x + 45, 700, { size: 21, weight: 600, alpha: ha }); }
+    const ea = ap(t, m.aiHint + .9); if (ea > 0) { rr(x + 25, 742, 300, 50, 18, '#173A33', rgba(K.green, .5), 1.5, ea); T('설명 보기  ▸  받아올림', x + 45, 768, { size: 19, weight: 600, color: K.green, alpha: ea }); }
+    ['보충', '복습', '심화'].forEach((l, j) => chip(l, x + 25 + j * 110, 900, { size: 19, fill: rgba(K.green, .18), stroke: rgba(K.green, .6), color: K.green, a: pop(t, m.aiHint + 1.4 + j * .15) }));
+    T('학생에게 맞춘 다음 학습', x + 25, 955, { size: 17, color: K.muted, alpha: ap(t, m.me) });
+    ctx.restore(); }
+  // 3. the teacher's view: who is stuck where, and a coaching suggestion
+  { const x = 1280, k = ap(t, m.col[2]);
+    ctx.save(); ctx.globalAlpha *= k;
+    [['학생 A', .62, 1], ['학생 B', .85, 0], ['학생 C', .74, 0]].forEach(([n, f, alert], j) => { const y = 560 + j * 58, al = alert ? ap(t, m.alert) : 0;
+      rr(x + 25, y, 460, 48, 12, al > 0 ? mixc('#16233F', '#3A1F2D', al) : '#16233F', al > 0 ? rgba(K.red, .7 * al) : null, 1.5);
+      circle(x + 52, y + 24, 13, '#2B3E66'); icon('user', x + 52, y + 25, 14, K.muted); T(n, x + 76, y + 25, { size: 19, weight: 700 });
+      rr(x + 160, y + 19, 150, 10, 5, '#22335A'); rr(x + 160, y + 19, 150 * f, 10, 5, alert ? K.orange : K.green);
+      if (alert) chip('받아올림에서 어려움', x + 478, y + 24, { size: 15, align: 'right', fill: rgba(K.red, .2), color: K.red, a: al }); });
+    const kc = ap(t, m.coach); if (kc > 0) { const pr = press(t, m.coach + .4);
+      card(x + 25, 760, 460, 190, { a: kc, fill: '#2C2410', stroke: rgba(K.gold, .6), r: 14, shadow: false });
+      icon('spark', x + 52, 795, 22, K.gold, kc); T('AI 코칭 제안', x + 74, 795, { size: 19, weight: 800, color: K.gold, alpha: kc });
+      T('학생 A · 받아올림 보충 학습 추천', x + 45, 845, { size: 19, alpha: kc });
+      ctx.save(); ctx.translate(x + 410, 912); ctx.scale(1 - .08 * pr, 1 - .08 * pr); rr(-70, -22, 140, 44, 22, t > m.coach + .45 ? K.green : K.gold, null, 0, kc); T(t > m.coach + .45 ? '전달됨 ✓' : '전달하기', 0, 1, { size: 18, weight: 800, color: '#0B1428', align: 'center', alpha: kc }); ctx.restore(); }
+    ctx.restore(); }
+};
+
+// ---------- p.10 one learner's live knowledge map ----------
+const STM = (() => {
+  const R = rand(44), N = 340, nodes = [];
+  for (let i = 0; i < N; i++) {
+    const y = 312 + Math.pow(R(), 1) * 660, cx = 610, spread = 470 * (1 - .25 * Math.abs((y - 640) / 340)), x = cx + (R() - .5) * 2 * spread * (.35 + .65 * Math.sqrt(R()));
+    const zone = y < 512 ? 'top' : y < 700 ? 'mid' : 'low', q = R();
+    const s = zone === 'top' ? 'not' : zone === 'mid' ? (q < .66 ? 'needs' : q < .93 ? 'mastered' : 'gap') : (q < .74 ? 'mastered' : q < .88 ? 'gap' : 'needs');
+    nodes.push({ x: clamp(x, 150, 1070), y, s, zone, r: 3.2 + R() * 2.4, d: R(), flip: s === 'needs' && zone === 'mid' && R() < .35 ? R() : -1 });
+  }
+  const E = knn(nodes, 2);
+  // the gap found in what was already studied, and a route from it up through the map
+  let g0 = 0, best = 1e9; nodes.forEach((n, i) => { if (n.s === 'gap' && n.zone === 'low') { const d = Math.hypot(n.x - 440, n.y - 860); if (d < best) { best = d; g0 = i; } } });
+  const route = [g0]; let cur = nodes[g0];
+  while (cur.y > 380 && route.length < 9) {
+    let bi = -1, bd = 1e9; nodes.forEach((n, i) => { if (route.includes(i) || n.y > cur.y - 45 || n.y < cur.y - 150) return; const d = Math.hypot(n.x - lerp(cur.x, 760, .35), n.y - (cur.y - 95)); if (d < bd) { bd = d; bi = i; } });
+    if (bi < 0) break; route.push(bi); cur = nodes[bi];
+  }
+  return { nodes, E, g0, route };
+})();
+const stTimes = () => ({ t0: S('status').start + .7, top: Wc('l10_2', '위쪽', .75), mid: Wc('l10_2', '가운데', .4), low: Wc('l10_2', '아래쪽', .05), m: Wc('l10_3', '완전히', .55), n: Wc('l10_3', '보완', .72), g: Wc('l10_3', '결손', .85),
+  live: st('l10_4', .02), upd: Wc('l10_4', '갱신', .85), found: Wc('l10_5', '발견', .5), fill: Wc('l10_5', '보충', .55), next: Wc('l10_5', '다음', .8), skip: Wc('l10_6', '반복', .3), more: Wc('l10_6', '충분히', .55), path: Wc('l10_6', ['학습경로', '경로'], .85) });
+const STC = () => ({ mastered: K.green, needs: K.orange, gap: K.red, not: K.grey });
+CAM.status = () => { const m = stTimes(); return [[m.found + .2, 620, 640, 1.18, 1.2], [m.skip + .8, 960, 540, 1, 1.4]]; };
+CURSOR.status = () => { const m = stTimes(), g = STM.nodes[STM.g0]; return [[m.low + .3, 700, 850], [m.n, 1300, 430], [m.live + .4, 1460, 760], [m.found, g.x + 3, g.y + 3, 1], [m.next + .9, STM.nodes[STM.route[STM.route.length - 1]].x + 4, STM.nodes[STM.route[STM.route.length - 1]].y + 4]]; };
+SC.status = t => {
+  win('status', t, '학습자 활성 지식맵', '학습자 한 명의 상태를 지식맵 위에');
+  const m = stTimes(), col = STC();
+  card(130, 290, 960, 700, { fill: '#0A1430', a: ap(t, m.t0), shadow: false });
+  // zones
+  const kz = [ap(t, m.top), ap(t, m.mid), ap(t, m.low)];
+  const gb = ctx.createLinearGradient(0, 512, 0, 700); gb.addColorStop(0, rgba(K.gold, 0)); gb.addColorStop(.5, rgba(K.gold, .14)); gb.addColorStop(1, rgba(K.gold, 0)); rr(132, 500, 956, 212, 0, gb, null, 0, kz[1]);
+  rr(132, 292, 956, 220, 0, rgba(K.grey, .06), null, 0, kz[0]); rr(132, 700, 956, 288, 0, rgba(K.green, .05), null, 0, kz[2]);
+  // nodes and their states
+  const kN = p(t, m.t0 + .2, 1.5);
+  ctx.save(); ctx.lineWidth = 1; ctx.strokeStyle = rgba(K.sky, .16); ctx.beginPath();
+  for (const [i, j] of STM.E) { const A = STM.nodes[i], B = STM.nodes[j]; if (A.d < kN && B.d < kN) { ctx.moveTo(A.x, A.y); ctx.lineTo(B.x, B.y); } } ctx.stroke(); ctx.restore();
+  const rev = { mastered: m.m, needs: m.n, gap: m.g, not: m.top }, g0 = STM.g0;
+  let updates = 0;
+  STM.nodes.forEach((n, i) => {
+    if (n.d >= kN) return; let s = n.s; const tr = rev[s] + n.d * .6, k = ap(t, tr, .4);
+    let c = mixc('#6A7894', col[s], k), r = n.r, a = 1, flash = 0;
+    if (n.flip >= 0) { const tf = lerp(m.live + .5, m.path, n.flip); if (t > tf) { c = col.mastered; updates++; flash = 1 - p(t, tf, .7); } }
+    if (i === g0) { const kf = p(t, m.fill, 1.2); c = kf < .5 ? mixc(col.gap, col.needs, kf * 2) : mixc(col.needs, col.mastered, kf * 2 - 1); r = n.r + 3; }
+    if (s === 'mastered' && n.zone === 'low' && i !== g0) a = lerp(1, .38, ap(t, m.skip, .8));
+    if (s === 'gap' && i !== g0) { circle(n.x, n.y, r + 6 + 3 * Math.sin(t * 4 + n.d * 9), null, rgba(K.red, .7), 1.5, k * (t > m.more ? 1 : .6)); if (t > m.more) c = mixc(col.gap, col.needs, ap(t, m.more + n.d, .8)); }
+    circle(n.x, n.y, r, c, null, 0, a); if (flash > 0) circle(n.x, n.y, r + 14 * (1 - flash), null, K.green, 2, flash);
+  });
+  // the gap found: click, fill in, then a new route up
+  const G = STM.nodes[g0];
+  if (t > m.found - .2) { const e = p(t, m.found, .8); circle(G.x, G.y, 16 + 22 * eOut(e), null, K.red, 3, (1 - e) * 1); circle(G.x, G.y, 16, null, K.ink, 2, ap(t, m.found)); }
+  const kf = pop(t, m.fill); if (kf > 0) chip('보충 학습', G.x + 24, G.y + 30, { size: 18, fill: rgba(K.orange, .2), stroke: K.orange, color: K.orange, a: clamp(kf) * (1 - ap(t, m.next + 1.5)) });
+  const pts = STM.route.map(i => [STM.nodes[i].x, STM.nodes[i].y]), kr = eIO(p(t, m.next, 1.8)), glow = Math.sin(Math.PI * p(t, m.path, 1.4));
+  poly(pts, kr, rgba(K.gold, .25 + .2 * glow), 14 + 8 * glow); const r = poly(pts, kr, K.gold, 4, 1, [12, 8], -t * 30); if (r && kr > .1) arrowHead(r.end[0], r.end[1], r.ang, 16, K.gold);
+  if (kr >= 1) { const last = pts[pts.length - 1]; chip('다음 학습경로', last[0] - 22, last[1] - 26, { size: 19, align: 'right', fill: rgba(K.gold, .2), stroke: K.gold, color: K.gold, a: ap(t, m.next + 1.6) }); }
+  const kS = ap(t, m.skip); if (kS > 0) chip('이미 아는 내용 → 반복하지 않음', 1070, 965, { size: 17, align: 'right', fill: rgba(K.green, .15), color: K.green, a: kS });
+  // zone labels and the learner
+  [['앞으로 학습할 영역', 330, 0], ['현재 학습 중', 525, 1], ['이미 학습한 영역', 718, 2]].forEach(([l, y, j]) => chip(l, 1070, y, { size: 18, align: 'right', fill: '#1B2B4C', color: j === 1 ? K.gold : K.muted, a: kz[j] }));
+  chip('학습자 A', 150, 330, { size: 19, fill: '#1B2B4C', ic: 'user', a: ap(t, m.t0 + .4) });
+  // legend
+  [['mastered', '완전학습', '완전히 이해하고 익힌 학습목표', m.m], ['needs', '미숙', '현재 이해도를 확인하고 보완할 학습목표', m.n], ['gap', '결손', '숙련되지 않은 학습목표 — 최우선 보완', m.g], ['not', '미학습', '아직 학습하지 않은 학습목표', m.g + .7]].forEach(([s, n, d, tl], j) => {
+    const y = 340 + j * 92, a = ap(t, tl - .1), on = Math.sin(Math.PI * p(t, tl - .1, 1.2)), h = hov('status', t, 1130, y - 40, 660, 80);
+    rr(1130, y - 40, 660, 80, 16, rgba(col[s], .1 * on + .06 * h), null, 0, a);
+    circle(1166, y, 17 + 3 * on, col[s], null, 0, a); T(n, 1200, y, { size: 30, weight: 800, alpha: a }); T(d, 1330, y + 1, { size: 21, color: K.muted, alpha: a, maxW: 450 });
+  });
+  const kl = ap(t, m.live), n = updates;
+  chip(`실시간 갱신 · ${n}건`, 1130, 744, { size: 18, fill: rgba(K.green, .15), color: K.green, a: kl, ic: 'refresh' });
+  card(1130, 790, 660, 150, { a: kl, fill: '#0A1428', stroke: rgba(K.gold, .5), glow: K.gold, g: Math.sin(Math.PI * p(t, m.upd, 1.4)) });
+  T('진단·학습 결과 누적 → 상태 갱신 →', 1165, 840, { size: 26, weight: 700, alpha: kl });
+  T('다음 학습경로 개인별 재조정', 1165, 890, { size: 26, weight: 800, color: K.gold, alpha: ap(t, m.next) });
+};
+
+// ---------- p.11 four changes ----------
+const BEN = [
+  { n: '1', c: 'sky', ic: 'globe', t: ['국가·지역별 학습체계·콘텐츠', '신속 구성'], d: ['Knowledge Map을 기반으로 국가·지역·목적에', '맞는 체계와 콘텐츠를 빠르게 재구성'] },
+  { n: '2', c: 'blue', ic: 'printer', t: ['개인별 맞춤 콘텐츠 제공'], d: ['현재 수준에 필요한 학습목표와 분량을 결정해', 'POD와 온라인으로 필요한 시점에 제공'] },
+  { n: '3', c: 'green', ic: 'route', t: ['학습상태에 따른 실시간 경로 조정'], d: ['학습목표별 이해도와 결손 지점을 파악하고,', '선수·후속 관계로 다음 경로 재구성'] },
+  { n: '4', c: 'gold', ic: 'sprout', t: ['성취도 + JEI-SLI 성장관리'], d: ['이전의 자신과 비교한 성장 변화를', '학습자·선생님·학부모에게 제공'] }];
+const BXY = [[130, 300], [980, 300], [130, 660], [980, 660]];
+const benTimes = () => ({ all: Wc('l11_1', '네', .5), on: [Wc('l11_2', '첫째', .02), Wc('l11_3', '둘째', .02), Wc('l11_4', '셋째', .02), Wc('l11_5', '마지막', .02)] });
+CURSOR.benefits = () => { const m = benTimes(); return m.on.map((tk, i) => [tk + .25, BXY[i][0] + 110, BXY[i][1] + 165, 1]); };
+SC.benefits = t => {
+  win('benefits', t, '무엇을 할 수 있는가', 'AI 학습 플랫폼이 만드는 네 가지 변화');
+  const m = benTimes();
+  BEN.forEach((b, i) => {
+    const [x, y] = BXY[i], c = K[b.c], tk = m.on[i] + .25, on = ap(t, tk - .1), a = ap(t, m.all + i * .1) * lerp(.35, 1, on), h = hov('benefits', t, x, y, 810, 330), pr = press(t, tk);
+    card(x, y, 810, 330, { a, glow: c, g: Math.sin(Math.PI * p(t, tk - .1, 1.8)), hover: h });
+    ctx.save(); ctx.globalAlpha *= a; lift(h, () => {
+      T(b.n, x + 44, y + 52, { size: 42, weight: 800, color: c });
+      ctx.save(); ctx.translate(x + 110, y + 165); ctx.scale(1 - .08 * pr, 1 - .08 * pr); circle(0, 0, 62, c); icon(b.ic, 0, 0, 58, b.c === 'sky' || b.c === 'gold' ? '#0B1428' : '#FFFFFF'); ctx.restore();
+      b.t.forEach((l, j) => T(l, x + 215, y + 62 + j * 42, { size: 32, weight: 800, maxW: 565 }));
+      const dy = y + 62 + (b.t.length - 1) * 42 + 58; b.d.forEach((l, j) => T(l, x + 215, dy + j * 34, { size: 22, color: K.muted, maxW: 565 }));
+      // a live strip at the bottom of each card
+      const wy = y + 282, k = on;
+      if (i === 0) ['미국', '한국', '영국', '호주', '뉴질랜드'].reduce((xx, l, j) => xx + 12 + chip(l, xx, wy, { size: 18, fill: rgba(c, .15), color: c, a: pop(t, tk + .3 + j * .22), ic: 'check' }), x + 215);
+      if (i === 1) { ['학생 A', '학생 B', '학생 C'].forEach((l, j) => { const kk = eOut(p(t, tk + .3 + j * .25, .5)); if (kk <= 0) return; ctx.save(); ctx.translate(x + 222 + j * 112 + 30 * (1 - kk), wy); rr(-4, -26, 100, 52, 6, '#F4F7FD', null, 0, kk); T(l, 46, 0, { size: 17, weight: 800, color: '#0F1A31', align: 'center', alpha: kk }); ctx.restore(); });
+        const wp = chip('POD', x + 566, wy, { size: 18, fill: rgba(c, .2), color: c, a: pop(t, tk + 1.1), ic: 'printer' }); chip('온라인', x + 576 + (wp || measure('POD', 18, 700) + 56), wy, { size: 18, fill: rgba(c, .2), color: c, a: pop(t, tk + 1.3), ic: 'monitor' }); }
+      if (i === 2) { const xs = [0, 1, 2, 3, 4, 5].map(j => [x + 240 + j * 100, wy + (j % 2 ? -12 : 12)]), kk = p(t, tk + .3, 2);
+        for (let j = 1; j < 6; j++) seg(xs[j - 1][0], xs[j - 1][1], xs[j][0], xs[j][1], K.dim, 2, k);
+        xs.forEach(([xx, yy], j) => circle(xx, yy, 9, j === 2 ? (kk > .55 ? K.orange : K.red) : j < 2 ? K.green : K.grey, null, 0, k));
+        poly([xs[0], xs[1], [xs[2][0], xs[2][1] + 26], xs[2], xs[3]], eIO(kk), K.green, 4, k * .9); }
+      if (i === 3) { const kk = eOut(p(t, tk + .3, 1.6)), x0 = x + 230, x1 = x + 560;
+        poly(Array.from({ length: 9 }, (_, j) => [lerp(x0, x1, j / 8), wy + 8 - j * 1.2]), kk, K.dim, 3, k, [6, 6]);
+        const r = poly(Array.from({ length: 9 }, (_, j) => [lerp(x0, x1, j / 8), wy + 14 - j * j * .55 - j * 2]), kk, K.gold, 4, k);
+        if (r) circle(r.end[0], r.end[1], 6, K.gold, null, 0, k);
+        T('이전의 나', x1 + 18, wy + 4, { size: 16, color: K.muted, alpha: kk }); T('지금의 나 · JEI-SLI', x1 + 18, wy - 30, { size: 17, weight: 800, color: K.gold, alpha: kk }); }
+    }); ctx.restore();
+  });
+};
+
+// ---------- p.12 closing: first every panel at once, then the closing card ----------
+CAM.outro = () => { const o = ORG('outro'), t1 = st('l12_2', 0) - .2; return [[S('outro').start, OV.x - o.x, OV.y - o.y, OV.z, .01], [t1, OV.x - o.x, OV.y - o.y, OV.z, .01], [t1 + 2.2, 960, 540, 1, 2.2], [en('l12_3') + 2, 940, 540, 1.04, 5]]; };
+SC.outro = t => {
+  coverPanel();
+  const tIn = st('l12_2', 0) + 1.2, tL1 = Wc('l12_2', '국가별', .3), tL2 = Wc('l12_2', '학생', .2), tB = Wc('l12_2', ['jei', '제이'], .7), tStd = Wc('l12_3', '표준', .85), tVal = Wc('l12_3', '가치', .5);
+  coverArt(t, { grow: 1, ai: 1, kids: 1, globe: ap(t, tL1, 1.2), glow: ap(t, tVal, 1.2) });
+  T(C.outro.line1, 150, 300, { size: 36, weight: 500, color: '#D7E0F2', alpha: ap(t, Math.max(tIn, tL1)), maxW: 900 });
+  T(C.outro.line2, 150, 356, { size: 36, weight: 500, color: '#D7E0F2', alpha: ap(t, Math.max(tIn + .2, tL2)), maxW: 900 });
+  T(C.outro.big1, 150, 500, { size: 84, weight: 800, alpha: ap(t, tB - .2), maxW: 900 });
+  typeT(C.outro.big2, 150, 612, p(t, tB, .9), { size: 84, weight: 800, maxW: 900 });
+  rr(150, 676, Math.min(900, measure(C.outro.big2, 84, 800)) * eOut(p(t, tStd, .9)), 7, 3.5, K.gold);
+  T('글로벌 수학 AI 학습의 새로운 표준', 150, 740, { size: 32, weight: 700, color: K.gold, alpha: ap(t, tStd + .2), glow: Math.sin(Math.PI * p(t, tStd + .2, 2)) });
+  T('JEI', 1440, 1010, { size: 44, weight: 900, align: 'center', alpha: ap(t, tB), spacing: 3 });
+};
+// the closing page's opening words while every panel is in view: the starting point
+function overviewCaption(t, cam) {
+  const a = clamp((OV.z * 1.6 - cam.z) / (OV.z * .6)) * ap(t, Wc('l12_1', '자산', .4)); if (a <= 0) return;
+  const t1 = Wc('l12_1', '지식', .6), t2 = Wc('l12_1', '출발점', .85);
+  const s1 = '50년의 학습설계 자산', s2 = 'AI가 이해하고 활용하는 지식', w1 = measure(s1, 40, 800), w2 = measure(s2, 40, 800), w = w1 + w2 + 140;
+  rr(W / 2 - w / 2 - 30, 930, w + 60, 96, 48, rgba('#0A1428', .9), rgba(K.gold, .6), 2, a);
+  T(s1, W / 2 - w / 2, 979, { size: 40, weight: 800, alpha: a }); T('→', W / 2 - w / 2 + w1 + 70, 979, { size: 40, weight: 800, color: K.gold, align: 'center', alpha: a * ap(t, t1 - .3) });
+  T(s2, W / 2 + w / 2 - w2, 979, { size: 40, weight: 800, color: K.gold, alpha: a * ap(t, t1) });
+  chip('프로젝트의 출발점', W / 2, 900, { size: 22, align: 'center', fill: K.gold, color: '#0B1428', a: a * pop(t, t2) });
+}
+
+// ============================================================
+// compositor: the camera over the space, then the cursor on top
+// ============================================================
+function draw(t) {
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1;
+  const cam = camAt(t);
+  background(t, cam);
+  ctx.setTransform(cam.z, 0, 0, cam.z, W / 2 - cam.x * cam.z, H / 2 - cam.y * cam.z);
+  const v = { x0: cam.x - W / 2 / cam.z, x1: cam.x + W / 2 / cam.z, y0: cam.y - H / 2 / cam.z, y1: cam.y + H / 2 / cam.z };
+  worldDots(cam, v); links(t, cam);
+  for (const s of SCN) { const o = ORG(s.id); if (o.x > v.x1 || o.x + W < v.x0 || o.y > v.y1 || o.y + H < v.y0) continue; ctx.save(); ctx.translate(o.x, o.y); SC[s.id](t); ctx.restore(); }
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1;
+  overviewCaption(t, cam);
+  drawCursor(t, cam);
+  const vg = ctx.createRadialGradient(W / 2, H / 2, H * .55, W / 2, H / 2, H * 1.05); vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,.35)'); ctx.fillStyle = vg; ctx.fillRect(0, 0, W, H);
+  const f = Math.max(1 - p(t, 0, .6), p(t, DURATION - 1.6, 1.6)); if (f > 0) { ctx.fillStyle = rgba(K.bg, eIO(f)); ctx.fillRect(0, 0, W, H); }
+}
+
+// ---------- preview player ----------
+const seekEl = document.getElementById('seek'), timeEl = document.getElementById('time'), playEl = document.getElementById('play');
+seekEl.max = DURATION.toFixed(2);
+let playing = false, t0 = 0, tCur = 0;
+const audio = new Audio('audio/mix.wav'); audio.preload = 'auto';
+function show(t) { tCur = t; draw(t); seekEl.value = t; timeEl.textContent = t.toFixed(2) + 's'; }
+function loop(now) { if (!playing) return; const t = (now - t0) / 1000; if (t >= DURATION) { playing = false; playEl.textContent = '▶ Play'; audio.pause(); show(DURATION); return; } show(t); requestAnimationFrame(loop); }
+playEl.onclick = () => { playing = !playing; playEl.textContent = playing ? '❚❚ Pause' : '▶ Play'; if (playing) { if (tCur >= DURATION) tCur = 0; t0 = performance.now() - tCur * 1000; try { audio.currentTime = tCur; audio.play().catch(() => {}); } catch (e) {} requestAnimationFrame(loop); } else audio.pause(); };
+seekEl.oninput = () => { show(+seekEl.value); if (playing) { t0 = performance.now() - tCur * 1000; try { audio.currentTime = tCur; } catch (e) {} } };
+
+window.draw = draw; window.DURATION = DURATION;
+function merge(base, over) {
+  if (Array.isArray(base)) return Array.isArray(over) ? over.map((v, i) => base[i] !== undefined ? merge(base[i], v) : v) : base;
+  if (base && typeof base === 'object') { const o = {}; for (const k in base) o[k] = over && k in over ? merge(base[k], over[k]) : base[k]; return o; }
+  return over === undefined || over === null ? base : over;
+}
+function apply(content) { C = window.CONTENT = merge(DEFAULT_CONTENT, content); K = C.colors; for (const k in mCache) delete mCache[k]; for (const k in wCache) delete wCache[k]; }
+window.VIDEO = { schema: window.SCHEMA, defaults: DEFAULT_CONTENT, get content() { return C; }, apply, canvas: cv };
+window.ready = document.fonts.load(`700 100px 'Noto Sans KR'`, '가A').then(r => {
+  if (!r.length) throw new Error('font failed to load (check fonts/)');
+}).then(() => document.fonts.ready).then(() => {
+  if (location.search.includes('render')) document.body.classList.add('render');
+  const m = location.search.match(/[?&]t=([\d.]+)/); show(m ? +m[1] : 0); return true;
+});
+</script>
+</body>
+</html>
