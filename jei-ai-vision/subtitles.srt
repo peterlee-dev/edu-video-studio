@@ -1,0 +1,564 @@
+1
+00:00:01,300 --> 00:00:06,730
+Over the past 50 years, JEI has built
+deep expertise in learning design.
+
+2
+00:00:07,430 --> 00:00:12,130
+Now, by combining that expertise with
+AI, we aim to deliver learning optimized
+
+3
+00:00:12,190 --> 00:00:16,830
+for every student and set a new global
+standard for AI-powered math learning.
+
+4
+00:00:17,430 --> 00:00:21,010
+Here is our plan: building
+an AI personalized learning
+
+5
+00:00:21,076 --> 00:00:24,060
+platform based on the
+JEI Math Knowledge Map.
+
+6
+00:00:26,160 --> 00:00:30,170
+Most companies adopt AI to improve
+productivity and efficiency.
+
+7
+00:00:30,670 --> 00:00:33,300
+But this project is about
+more than efficiency.
+
+8
+00:00:33,800 --> 00:00:37,690
+It’s about transforming JEI’s
+learning products and services.
+
+9
+00:00:38,390 --> 00:00:42,365
+On one integrated platform, we
+aim to connect printed workbooks,
+
+10
+00:00:42,427 --> 00:00:46,029
+online learning, and personalized
+print-on-demand, or POD,
+
+11
+00:00:46,091 --> 00:00:49,320
+so we can offer each student
+exactly what they need.
+
+12
+00:00:49,820 --> 00:00:53,975
+We’re also building a system that can
+quickly develop curricula and content
+
+13
+00:00:54,030 --> 00:00:58,240
+for different countries and learning
+needs, and turn them into new services.
+
+14
+00:01:00,340 --> 00:01:04,530
+The foundation of this platform
+is the JEI Math Knowledge Map.
+
+15
+00:01:05,130 --> 00:01:09,672
+For AI to give each student exactly what
+they need, it must understand how learning
+
+16
+00:01:09,726 --> 00:01:13,830
+objectives relate to one another, and
+in what order they should be learned.
+
+17
+00:01:15,930 --> 00:01:19,870
+Think of it as connecting countless
+stars scattered across space.
+
+18
+00:01:20,370 --> 00:01:23,035
+We define how individual
+learning objectives
+
+19
+00:01:23,096 --> 00:01:25,700
+connect and organize
+them into one network.
+
+20
+00:01:26,300 --> 00:01:28,810
+Each point represents
+a learning objective.
+
+21
+00:01:29,310 --> 00:01:32,566
+The lines between points
+show how skills build on one
+
+22
+00:01:32,627 --> 00:01:36,190
+another, such as prerequisite
+and follow-up relationships.
+
+23
+00:01:36,690 --> 00:01:40,960
+Line color and thickness show the
+type and strength of each connection.
+
+24
+00:01:43,060 --> 00:01:47,520
+With this network, AI can understand
+the overall structure of math learning,
+
+25
+00:01:47,579 --> 00:01:51,570
+and decide what each student needs
+to review and what to learn next.
+
+26
+00:01:53,670 --> 00:01:56,964
+We’re building the JEI Math
+Knowledge Map around JEI’s
+
+27
+00:01:57,025 --> 00:02:00,564
+educational philosophy, along
+with our workbooks, learning
+
+28
+00:02:00,625 --> 00:02:03,980
+objectives, and curricula
+from Korea and North America.
+
+29
+00:02:04,580 --> 00:02:08,261
+AI then compares these with
+textbooks, curricula, and learning
+
+30
+00:02:08,321 --> 00:02:11,942
+standards from different countries,
+including the U.S. Common
+
+31
+00:02:12,002 --> 00:02:15,980
+Core State Standards, and proposes
+how learning objectives connect.
+
+32
+00:02:16,480 --> 00:02:20,830
+JEI researchers review these
+proposals for educational soundness.
+
+33
+00:02:21,430 --> 00:02:25,731
+The result is a global math knowledge
+map, one that isn’t tied to any
+
+34
+00:02:25,793 --> 00:02:30,530
+single country’s curriculum and can be
+used anywhere, in Korea and overseas.
+
+35
+00:02:31,030 --> 00:02:33,780
+We call it the JEI Math Universe.
+
+36
+00:02:35,880 --> 00:02:39,896
+By aligning this global map with each
+country’s curriculum, we can develop
+
+37
+00:02:39,951 --> 00:02:43,750
+and validate learning content for
+different markets much more quickly.
+
+38
+00:02:44,250 --> 00:02:47,880
+When we enter a new market, we
+don’t have to start from scratch.
+
+39
+00:02:48,380 --> 00:02:51,430
+We connect that country’s
+curriculum and learning standards
+
+40
+00:02:51,482 --> 00:02:54,170
+to the knowledge map, and
+build the content we need.
+
+41
+00:02:56,270 --> 00:02:59,914
+And by linking each student’s results
+to the map, we can see what they
+
+42
+00:02:59,966 --> 00:03:03,870
+understand, where they need help, and
+how their learning changes over time.
+
+43
+00:03:04,470 --> 00:03:08,142
+In short, the JEI Math Knowledge
+Map helps us develop products
+
+44
+00:03:08,202 --> 00:03:12,170
+for each market faster, and personalize
+learning for every student.
+
+45
+00:03:14,270 --> 00:03:19,210
+The platform has three connected layers:
+knowledge, AI engine, and service.
+
+46
+00:03:19,710 --> 00:03:22,540
+We build them step by
+step, from the bottom up.
+
+47
+00:03:23,140 --> 00:03:27,575
+The knowledge layer turns JEI’s
+learning materials and educational
+
+48
+00:03:27,642 --> 00:03:32,010
+expertise into the knowledge map,
+a shared foundation AI can use.
+
+49
+00:03:34,110 --> 00:03:36,860
+The AI engine layer
+uses that foundation to
+
+50
+00:03:36,924 --> 00:03:39,930
+generate content and
+analyze learning progress.
+
+51
+00:03:42,030 --> 00:03:45,341
+Finally, the service layer
+delivers these capabilities
+
+52
+00:03:45,402 --> 00:03:48,100
+to students through POD
+and online learning.
+
+53
+00:03:50,200 --> 00:03:54,559
+Once built, the knowledge layer stays
+relatively stable, while the service
+
+54
+00:03:54,618 --> 00:03:58,860
+layer can evolve quickly as technology
+and learning environments change.
+
+55
+00:04:00,960 --> 00:04:04,940
+Seven interconnected projects
+will move forward in two phases.
+
+56
+00:04:07,040 --> 00:04:11,620
+Phase 1 focuses on the knowledge map
+and automated content generation.
+
+57
+00:04:12,220 --> 00:04:15,526
+AI creates programmed learning
+materials in advance,
+
+58
+00:04:15,589 --> 00:04:18,450
+and we deliver them
+through personalized POD.
+
+59
+00:04:20,550 --> 00:04:24,650
+Phase 2 expands into online
+learning through progress analysis,
+
+60
+00:04:24,715 --> 00:04:28,230
+adaptive learning paths, and
+an AI learning assistant.
+
+61
+00:04:28,830 --> 00:04:32,425
+The system analyzes each student’s
+understanding and progress
+
+62
+00:04:32,484 --> 00:04:36,020
+as they learn, and adjusts their
+learning path in real time.
+
+63
+00:04:38,120 --> 00:04:42,470
+Throughout both phases, LLM Wiki
+serves as a shared knowledge base
+
+64
+00:04:42,536 --> 00:04:47,150
+that organizes JEI’s educational
+knowledge and supports every project.
+
+65
+00:04:49,250 --> 00:04:53,120
+The centerpiece of Phase
+1 is personalized POD.
+
+66
+00:04:53,820 --> 00:04:57,910
+First, we analyze each student’s
+assessment results and learning history
+
+67
+00:04:57,967 --> 00:05:01,830
+to identify what they need to study
+and how much practice they need.
+
+68
+00:05:02,330 --> 00:05:06,980
+AI generates programmed learning materials
+in advance for each learning objective.
+
+69
+00:05:07,480 --> 00:05:11,890
+JEI researchers review them, and
+they’re stored in a content database.
+
+70
+00:05:12,490 --> 00:05:15,029
+From this reviewed content, we create and
+
+71
+00:05:15,091 --> 00:05:17,940
+print personalized
+materials for each student.
+
+72
+00:05:20,040 --> 00:05:23,266
+The student’s results then shape
+the next round of learning,
+
+73
+00:05:23,319 --> 00:05:26,760
+adding review where needed and
+adjusting the amount of practice.
+
+74
+00:05:27,360 --> 00:05:30,425
+We’ll launch this service
+in the United States first,
+
+75
+00:05:30,482 --> 00:05:33,200
+validate the results, and
+then expand to Korea.
+
+76
+00:05:35,300 --> 00:05:38,250
+In Phase 2, we extend
+this approach online.
+
+77
+00:05:38,950 --> 00:05:43,896
+Along with correct and incorrect answers,
+the system analyzes learning behaviors,
+
+78
+00:05:43,957 --> 00:05:48,110
+including time spent on problems,
+hint usage, and repeated attempts.
+
+79
+00:05:48,610 --> 00:05:51,479
+It uses those insights
+to adjust each student’s
+
+80
+00:05:51,540 --> 00:05:53,920
+content and learning path in real time.
+
+81
+00:05:56,020 --> 00:05:59,690
+The AI learning assistant supports
+both students and teachers.
+
+82
+00:06:00,290 --> 00:06:03,914
+For students, it provides hints
+and explanations rather than
+
+83
+00:06:03,975 --> 00:06:07,780
+simply giving answers, so they
+can solve problems on their own.
+
+84
+00:06:08,380 --> 00:06:11,962
+For teachers, it shows each
+student’s progress and challenges,
+
+85
+00:06:12,019 --> 00:06:15,370
+so they can guide and coach
+each student more effectively.
+
+86
+00:06:17,470 --> 00:06:20,580
+This screen shows a student’s
+progress on the knowledge map.
+
+87
+00:06:21,180 --> 00:06:25,292
+The bottom shows concepts already
+studied, the middle shows concepts
+
+88
+00:06:25,353 --> 00:06:28,860
+being learned, and the top
+shows concepts not yet studied.
+
+89
+00:06:30,960 --> 00:06:33,942
+Each objective is classified
+as mastered, needs
+
+90
+00:06:34,005 --> 00:06:37,050
+more practice, learning
+gap, or not yet studied.
+
+91
+00:06:39,150 --> 00:06:43,320
+These statuses are updated whenever new
+assessment and learning data come in.
+
+92
+00:06:43,920 --> 00:06:47,208
+So even if a concept was
+studied earlier, any gap that
+
+93
+00:06:47,269 --> 00:06:50,800
+appears is filled, and the next
+learning path is adjusted.
+
+94
+00:06:51,400 --> 00:06:54,986
+Students don’t repeat what they
+already know, they get the practice
+
+95
+00:06:55,039 --> 00:06:58,250
+they need, and each student
+follows their own learning path.
+
+96
+00:07:00,350 --> 00:07:02,300
+We expect four key benefits.
+
+97
+00:07:03,000 --> 00:07:05,937
+First, we can develop and
+validate content aligned
+
+98
+00:07:05,996 --> 00:07:08,580
+with each country’s
+curriculum more quickly.
+
+99
+00:07:10,680 --> 00:07:15,112
+Second, we can personalize learning
+objectives and the amount of practice
+
+100
+00:07:15,173 --> 00:07:19,970
+across POD and online learning, delivering
+the right content at the right time.
+
+101
+00:07:22,070 --> 00:07:26,152
+Third, we can fill learning gaps
+and adjust each student’s learning
+
+102
+00:07:26,213 --> 00:07:29,930
+path in real time, based on their
+understanding and progress.
+
+103
+00:07:32,030 --> 00:07:36,057
+Finally, by considering academic
+achievement alongside the
+
+104
+00:07:36,126 --> 00:07:40,500
+JEI Self-Learning Index, or
+JEI-SLI, we can show each student’s
+
+105
+00:07:40,570 --> 00:07:44,180
+growth over time to students,
+teachers, and parents.
+
+106
+00:07:44,780 --> 00:07:49,070
+Students are compared not with others,
+but with their own past progress.
+
+107
+00:07:51,170 --> 00:07:53,906
+Turning 50 years of
+learning design expertise
+
+108
+00:07:53,967 --> 00:07:56,460
+into knowledge AI can understand and use.
+
+109
+00:07:57,060 --> 00:07:59,080
+This is where the project begins.
+
+110
+00:07:59,780 --> 00:08:03,406
+On this foundation, we’ll develop
+learning content for each
+
+111
+00:08:03,468 --> 00:08:07,462
+market more quickly, and build
+JEI’s own AI personalized learning
+
+112
+00:08:07,524 --> 00:08:11,150
+platform that supports every
+student’s learning and growth.
+
+113
+00:08:11,950 --> 00:08:16,756
+Through this, JEI will further advance the
+value of individualized, ability-based
+
+114
+00:08:16,816 --> 00:08:20,910
+learning, and set a new global
+standard for AI-powered math learning.
+
