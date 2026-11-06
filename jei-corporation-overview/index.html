@@ -162,12 +162,23 @@ function chip(str, x, y, { size = 22, fill = K.red, color = '#FFFFFF', a = 1, pa
   if (a <= 0) return 0; const w = measure(str, size, weight) + spacing * str.length + pad * 2, h = size * 1.8, x0 = align === 'center' ? x - w / 2 : x;
   rr(x0, y - h / 2, w, h, h / 2, '#FFFFFF', null, 0, a); rr(x0, y - h / 2, w, h, h / 2, fill, null, 0, a); text(str, x0 + pad, y + 1, { size, weight, color, alpha: a, spacing }); return w;
 }
+// horizontal centre of a glyph's ink weight, from its left edge: a "1" sits on its stem, not on the box that includes its flag
+const INK_X = {};
+function inkCentre(str, font) {
+  const k = str + font; if (k in INK_X) return INK_X[k];
+  const c = document.createElement('canvas'), g = c.getContext('2d'); g.font = font; const m = g.measureText(str);
+  const w = c.width = Math.ceil(m.actualBoundingBoxLeft + m.actualBoundingBoxRight) + 4, h = c.height = Math.ceil(m.actualBoundingBoxAscent + m.actualBoundingBoxDescent) + 4;
+  g.font = font; g.fillText(str, m.actualBoundingBoxLeft + 2, m.actualBoundingBoxAscent + 2);
+  const d = g.getImageData(0, 0, w, h).data; let s = 0, sx = 0;
+  for (let i = 3; i < d.length; i += 4) { s += d[i]; sx += d[i] * ((i >> 2) % w); }
+  return INK_X[k] = s ? sx / s - 2 - m.actualBoundingBoxLeft : (m.actualBoundingBoxRight - m.actualBoundingBoxLeft) / 2;
+}
 // numbered circle (1 2 3 of a comparison: red, blue, mint)
 function num(n, x, y, col, { r = 26, a = 1 } = {}) {
   if (a <= 0) return; circle(x, y, r, '#FFFFFF', null, 0, a); circle(x, y, r, col, null, 0, a);
   ctx.save(); ctx.globalAlpha *= a; ctx.font = `800 ${r * 1.1}px ${SANS}`; ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic'; ctx.fillStyle = '#FFFFFF';
-  const m = ctx.measureText(String(n));   // centred on the digit's ink, not its em box (1st feedback: the number sat off-centre in the red circle)
-  ctx.fillText(String(n), x - (m.actualBoundingBoxRight - m.actualBoundingBoxLeft) / 2, y + (m.actualBoundingBoxAscent - m.actualBoundingBoxDescent) / 2); ctx.restore();
+  const m = ctx.measureText(String(n));   // centred on the digit's ink weight (1st feedback: off-centre in the em box; 2nd feedback: the 1 still sat right of centre on its ink box)
+  ctx.fillText(String(n), x - inkCentre(String(n), ctx.font), y + (m.actualBoundingBoxAscent - m.actualBoundingBoxDescent) / 2); ctx.restore();
 }
 // a sheet of paper with grey text lines
 function sheet(x, y, w, h, rot = 0, a = 1, lines = 5) {
@@ -324,7 +335,7 @@ SC.whatWeDo = t => {
   enter(t, tY - .1, () => text('1977', 760, 405, { size: 110, weight: 800, color: K.red }), { pop: true, ox: 890, oy: 405 });
   const aX = 760 + measure('1977', 110, 800) + 34, gX = aX + 110, gW = 1800 - gX;   // a gap between 1977 and the arrow (1st feedback)
   penArrow(aX, 405, aX + 80, 405, p(t, tG - .5, .4), K.ink, 4, 3);
-  const g = 'A global education company';
+  const g = 'A global education organization';   // 2nd feedback: as the script says
   enter(t, tG - .3, () => text(g, gX, 405, { size: 44, weight: 700, maxW: gW }), { dx: 20, dy: 0 });
   pen(gX, 442, gX + Math.min(gW, measure(g, 44, 700)), 440, p(t, tG + .1, .5), K.red, 5, 4);
   [['Education', 'education'], ['Research', 'research'], ['Technology', 'technology'], ['Cultural services', 'cultural']].forEach(([s, w], i) => {
@@ -356,22 +367,23 @@ SC.business = t => {
   [460, 1005, 1550].forEach((x, i) => pen(x, 718, x, 746, clamp(kS * 3 - i * .3), K.red, 4, 20 + i));
   pen(460, 746, 1550, 746, clamp(kS * 1.4 - .3), K.red, 4, 24);
   penArrow(1005, 746, 1005, 790, p(t, tD - .4, .3), K.red, 4, 25);
-  bar('Diagnostic assessments identify each student’s needs and guide their learning', 800, p(t, tD - .1, .5), { size: 30 });
+  bar('Diagnostic tests identify each student’s needs and guide their learning', 800, p(t, tD - .1, .5), { size: 30 });
 };
 
 // ---------- 5. philosophy, vision, mission & core values ----------
 SC.values = t => {
   header(t, H0('values'), SEC[0], 'Philosophy, vision & core values');
-  const t1 = st('l2_5', .05), tV = Wc('l2_6', 'vision', .1), tB = Wc('l2_6', 'better', .3), tC = en('l2_6', .1);   // core values: no longer read (1st feedback), shown after the vision
+  const t1 = st('l2_5', .05), tV = Wc('l2_6', 'vision', .1), tB = Wc('l2_6', 'through', .35), tC = Wc('l2_6', 'core', .55);   // core values read again (2nd feedback)
   chip('PHILOSOPHY', 210, 310, { size: 18, fill: K.ink, spacing: 2, a: p(t, t1 - .3, .4) });
   enter(t, t1, () => { text('Every individual has the potential', 210, 380, { size: 42, weight: 600, maxW: 750 }); text('to learn and grow independently.', 210, 436, { size: 42, weight: 600, maxW: 750 }); });
   chip('VISION', 210, 560, { size: 18, fill: K.ink, spacing: 2, a: p(t, tV - .2, .4) });
-  hiLite(202, 594, measure('A Better Life Through', 54, 800) + 18, 64, p(t, tB, .6));
-  enter(t, tV, () => { text('A Better Life Through', 210, 626, { size: 54, weight: 800, color: K.red, maxW: 700 }); text('Better Education', 210, 696, { size: 54, weight: 800, maxW: 700 }); });
+  // 3rd feedback: "Through" on the second line, the marker only under "Through Better Education" (letters stay black)
+  hiLite(202, 664, measure('Through Better Education', 54, 800) + 18, 64, p(t, tB, .6));
+  enter(t, tV, () => { text('A Better Life', 210, 626, { size: 54, weight: 800, color: K.red, maxW: 760 }); text('Through Better Education', 210, 696, { size: 54, weight: 800, maxW: 760 }); });
   chip('CORE VALUES', 1000, 310, { size: 18, fill: K.red, spacing: 2, a: p(t, tC - .2, .4) });
-  [['People', 'Believes in and nurtures every individual’s potential'], ['Customer', 'Understands customers’ needs and delivers real value'],
-   ['Action', 'Turns ideas into action']].forEach(([s, d], i) => {
-    const y = 350 + i * 170, tw = tC + .15 + i * .3;
+  [['People', 'Believes in and nurtures every individual’s potential', 'people'], ['Customer', 'Understands customers’ needs and delivers real value', 'customer'],
+   ['Action', 'Turns ideas into action', 'action']].forEach(([s, d, w], i) => {
+    const y = 350 + i * 170, tw = Wc('l2_6', w, .7 + i * .1);
     enter(t, tw - .15, () => { card(1000, y, 800, 150, { r: 14 }); num(i + 1, 1052, y + 75, K.red); text(s, 1104, y + 54, { size: 36, weight: 700 }); text(d, 1104, y + 102, { size: 23, weight: 500, color: K.muted, maxW: 670 }); }, { dx: 24, dy: 0 });
   });
 };
@@ -384,7 +396,7 @@ SC.programs = t => {
   PR.forEach(([im, s, w], i) => {
     const cx = 330 + (i % 6) * 265, y = 290 + (i / 6 | 0) * 300;
     enter(t, H0('programs') + .4 + i * .07, () => { cover(im, cx - 100, y, 200, 220); text(s, cx, y + 248, { size: 24, weight: 700, align: 'center', maxW: 240 }); });
-    if (w) { const tw = Wc('l2_7', w, .3); check(cx + 92, y + 14, 46, p(t, tw, .35), K.red, 7); pen(cx - measure(s, 24, 700) / 2, y + 268, cx + measure(s, 24, 700) / 2, y + 267, p(t, tw + .1, .35), K.red, 4, i); }
+    if (w) check(cx + 92, y + 14, 46, p(t, Wc('l2_7', w, .3), .35), K.red, 7);   // 3rd feedback: check only, no underline
   });
   const tD = Wc('l2_7', 'digital', .85);
   hbox(1253, 578, 545, 290, p(t, tD - .1, .7), K.red, 4, 9);
@@ -405,27 +417,35 @@ SC.method = t => {
     const x = 1060 + i * 180, h = 80 + i * 75;
     enter(t, tG + i * .22, () => rr(x, 840 - h, 170, h, 8, c, i === 0 ? LINE : null, 2), { dy: 16 });
   });
-  penCurve(1145, 730, 1330, 560, 1660, 530, p(t, tO - .4, .6), K.red, 4, 1, true);
+  penCurve(1110, 715, 1290, 540, 1660, 462, p(t, tO - .4, .6), K.red, 4, 1, true);   // above the steps (2nd feedback: its head sat on the last red step)
   text('at their own pace', 1000, 480, { size: 36, weight: 700, fam: HAND, color: K.red, alpha: p(t, tO - .1, .4) });
 };
 
-// ---------- 8. what makes it possible? evaluation + workbooks = the student's growth ----------
-// 1st feedback: the three titles one size, bigger, centred (two lines are fine); everything under them one size, as big as the checked lines
+// ---------- 8. what makes it possible? three key elements (deck p.8) → each student ----------
+// 2nd feedback: new script (the system & materials, JEI teachers, parents), the screen follows the deck's three circles around the student
 SC.possible = t => {
   header(t, H0('possible'), SEC[1], 'What makes it possible?');
-  const tE = Wc('l3_3', 'scientific', .3), tM = Wc('l3_3', 'systematically', .7), tT = Wc('l3_4', 'together', .05);
-  const BW = 480, TS = 36, IS = 28, X = [210, 765, 1320], rowY = i => 530 + i * 90;
-  const title = (x, str, color = K.ink) => { const n = wrapLines(str, BW - 60, TS, 700).length; para(str, x + BW / 2, 390 - (n - 1) * TS * .66, BW - 60, { size: TS, weight: 700, color, align: 'center' }); };
-  const box = (x, head, items, t0) => enter(t, t0, () => {
-    card(x, 290, BW, 520, { r: 16 }); title(x, head);
-    items.forEach((s, i) => { rr(x + 24, rowY(i) - 34, BW - 48, 68, 10, K.lightBox); text(s, x + 50, rowY(i), { size: IS, weight: 700, maxW: BW - 100 }); });
-  }, { pop: true, ox: x + BW / 2, oy: 550 });
-  box(X[0], 'Scientific Evaluation System', ['Individual Diagnostic Test', 'Interim Evaluation Test', 'Achievement Test'], tE - .2);
-  text('+', (X[0] + BW + X[1]) / 2, 550, { size: 56, weight: 700, color: K.muted, align: 'center', alpha: p(t, tM - .3, .3) });
-  box(X[1], 'Self-Learning Workbooks', ['Clear learning objectives', 'Systematically structured', 'Spiral learning for mastery'], tM - .2);
-  text('=', (X[1] + BW + X[2]) / 2, 550, { size: 56, weight: 700, color: K.muted, align: 'center', alpha: p(t, tT - .1, .3) });
-  enter(t, tT, () => { card(X[2], 290, BW, 520, { r: 16, stroke: K.red, lw: 3 }); title(X[2], 'Together, students develop', K.crimson); }, { pop: true, ox: X[2] + BW / 2, oy: 550 });
-  [['Independent learning skills', 'independent'], ['Confidence', 'confidence'], ['Good study habits', 'habits']].forEach(([s, w], i) => checkRow(t, Wc('l3_4', w, .3 + i * .25) - .2, X[2] + 22, rowY(i), s, { size: IS, w: BW - 100 }));
+  text('Three key elements', 210, 228, { size: 30, weight: 700, fam: HAND, color: K.red, alpha: p(t, Wc('l3_3', 'three', .05) - .1, .4) });
+  const BW = 500, X = [210, 755, 1300], Y = 290, rowY = i => Y + 150 + i * 80;
+  const EL = [['JEI Self-Learning System', 'system', [['Scientific Evaluation System'], ['Self-Learning Materials', 'materials']]],
+              ['JEI Teachers', 'teachers', [['Implement the JEI System'], ['Motivate students'], ['Promote positive changes']]],
+              ['Parents', 'parents', [['Encourage children'], ['Provide a good environment'], ['Build good study habits']]]];
+  EL.forEach(([head, w, items], i) => {
+    const x = X[i], tw = Wc('l3_3', w, .3 + i * .3);
+    enter(t, tw - .2, () => { card(x, Y, BW, 380, { r: 16 }); num(i + 1, x + 52, Y + 62, K.red, { r: 28 }); text(head, x + 98, Y + 62, { size: 32, weight: 700, maxW: BW - 122 }); }, { pop: true, ox: x + BW / 2, oy: Y + 190 });
+    items.forEach(([s, w2], j) => enter(t, w2 ? Wc('l3_3', w2, .8) - .2 : tw + .1 + j * .12, () => {
+      rr(x + 24, rowY(j) - 30, BW - 48, 60, 10, K.lightBox); text(s, x + 48, rowY(j), { size: 26, weight: 700, maxW: BW - 96 });
+    }, { dy: 12 }));
+  });
+  const tT = Wc('l3_4', 'together', .05), tS = Wc('l3_4', 'support', .3), tD = Wc('l3_4', 'development', .9);
+  X.forEach((x, i) => penArrow(x + BW / 2, Y + 392, x + BW / 2, 742, p(t, tT + i * .12, .35), K.red, 5, 30 + i));
+  enter(t, tS - .2, () => {
+    card(210, 752, 1590, 156, { r: 16, stroke: K.red, lw: 3 });
+    text('Each student’s learning and development', 1005, 800, { size: 38, weight: 800, color: K.crimson, align: 'center', maxW: 1500 });
+  }, { pop: true, ox: 1005, oy: 830 });
+  const CH = ['Learns at own pace', 'Learns independently', 'Builds confidence'], cw = CH.map(s => measure(s, 24, 700) + .3 * s.length + 44), gap = 20;
+  let cx = 1005 - (cw.reduce((a, b) => a + b) + gap * 2) / 2;
+  CH.forEach((s, i) => { chip(s, cx, 860, { size: 24, fill: K.lightBox, color: K.ink, a: p(t, tD - .3 + i * .15, .35), spacing: .3, pad: 22 }); cx += cw[i] + gap; });
 };
 
 // ---------- 9. system flow ----------
@@ -491,8 +511,8 @@ SC.org = t => {
   enter(t, t0, () => { rr(805, 296, 400, 80, 14, K.red); text('JEI Corporation', 1005, 337, { size: 32, weight: 800, color: '#FFFFFF', align: 'center' }); }, { pop: true, ox: 1005, oy: 336 });
   const kC = p(t, t0 + .3, .6);
   pen(1005, 376, 1005, 420, clamp(kC * 3), K.ink, 3, 1); pen(327, 420, 1683, 420, clamp(kC * 1.5 - .3), K.ink, 3, 2);
-  const DIV = [['Business', 'Support'], ['Management', 'Support'], ['Management', 'Planning'], ['Asset', 'Management'], ['R&D', ''], ['Overseas', 'Development']];
-  const tB = Wc('l5_1', 'business', .35), tM = Wc('l5_1', 'management', .5), tR = Wc('l5_1', 'research', .65), tO = Wc('l5_1', 'overseas', .9);
+  const DIV = [['Business', 'Support'], ['Management', 'Support'], ['Management', 'Planning'], ['Asset', 'Management'], ['R&D', ''], ['Global', 'Business']];   // 3rd feedback: Overseas Development → Global Business
+  const tB = Wc('l5_1', 'business', .35), tM = Wc('l5_1', 'management', .5), tR = Wc('l5_1', 'research', .65), tO = Wc('l5_1', 'global', .85);
   const MARK = [tB, tM, tM + .15, tM + .3, tR, tO];
   DIV.forEach(([a, b], i) => {
     const x = 210 + i * 271;
@@ -503,9 +523,8 @@ SC.org = t => {
     });
     hbox(x - 8, 452, 251, 176, p(t, MARK[i], .5), K.red, 4, 10 + i);
   });
-  const t2 = st('l5_2', .1);
-  penArrow(222, 838, 268, 768, p(t, t2 - .1, .4), K.red, 5, 7);
-  bar('The structure behind continuous improvement of our educational services', 740, p(t, t2, .5), { x: 300, w: 1500, size: 30 });
+  // 2nd feedback: no red arrow, the bar centred under the chart
+  bar('The structure behind continuous improvement of our educational services', 740, p(t, st('l5_2', .1), .5), { x: 255, w: 1500, size: 30 });
 };
 
 // ---------- 13. printing & distribution ----------
@@ -545,18 +564,21 @@ SC.tv = t => {
   header(t, H0('tv'), SEC[4], 'JEI TV, English TV & eAcademy');
   subline(t, 'tv', 'Learning beyond workbooks');
   const tB = Wc('l6_4', 'broadcasting', .1), tD = st('l6_5') - .1, tE = st('l6_5') + .5;
+  // 3rd feedback: more room between the two titles and the photos (everything under the titles 40 px lower)
+  const dy = 40;
   text('Educational broadcasting', 210, 300, { size: 32, weight: 700, alpha: p(t, tB - .2, .4) });
-  enter(t, tB - .1, () => photo('jeitv', 210, 340, 370, 250, { rot: -.02, seed: 1 }), { dy: 24 });
-  enter(t, tB + .1, () => photo('englishtv', 610, 340, 370, 250, { rot: .02, seed: 2 }), { dy: 24 });
-  text('JEI TV', 395, 632, { size: 32, weight: 700, fam: HAND, color: K.red, align: 'center', alpha: p(t, tB + .3, .4) });
-  text('JEI English TV', 795, 632, { size: 32, weight: 700, fam: HAND, color: K.red, align: 'center', alpha: p(t, tB + .4, .4) });
-  enter(t, tB + .5, () => para('A leading children’s channel and the top English educational channel in Korea', 210, 700, 760, { size: 24, weight: 500, color: K.muted }));
+  enter(t, tB - .1, () => photo('jeitv', 210, 340 + dy, 370, 250, { rot: -.02, seed: 1 }), { dy: 24 });
+  enter(t, tB + .1, () => photo('englishtv', 610, 340 + dy, 370, 250, { rot: .02, seed: 2 }), { dy: 24 });
+  // 2nd feedback: the two names on the line of "JEI eAcademy", the sentence under them bigger
+  text('JEI TV', 395, 650 + dy, { size: 32, weight: 700, fam: HAND, color: K.red, align: 'center', alpha: p(t, tB + .3, .4) });
+  text('JEI English TV', 795, 650 + dy, { size: 32, weight: 700, fam: HAND, color: K.red, align: 'center', alpha: p(t, tB + .4, .4) });
+  enter(t, tB + .5, () => para('A leading children’s channel and the top English educational channel in Korea', 210, 718 + dy, 770, { size: 29, weight: 500, color: K.muted }));
   text('Digital technology', 1030, 300, { size: 32, weight: 700, alpha: p(t, tD - .2, .4) });
-  enter(t, tD - .1, () => photo('kids_tablet', 1030, 340, 370, 250, { rot: .015, seed: 3 }), { dy: 24 });
-  enter(t, tD + .1, () => photo('tablets', 1430, 340, 370, 250, { rot: -.02, seed: 4 }), { dy: 24 });
-  enter(t, tE - .1, () => text('JEI eAcademy', 1030, 650, { size: 36, weight: 800, color: K.red }));
-  [['Digital content', 'content'], ['Adaptive learning platforms', 'adaptive']].forEach(([s, w], i) => checkRow(t, Wc('l6_5', w, .4 + i * .2) - .2, 1030, 712 + i * 60, s, { size: 28, w: 700 }));
-  text('based on the Self-Learning Method', 1080, 840, { size: 28, weight: 700, fam: HAND, color: K.muted, alpha: p(t, Wc('l6_5', 'method', .95) - .2, .4) });
+  enter(t, tD - .1, () => photo('kids_tablet', 1030, 340 + dy, 370, 250, { rot: .015, seed: 3 }), { dy: 24 });
+  enter(t, tD + .1, () => photo('tablets', 1430, 340 + dy, 370, 250, { rot: -.02, seed: 4 }), { dy: 24 });
+  enter(t, tE - .1, () => text('JEI eAcademy', 1030, 650 + dy, { size: 36, weight: 800, color: K.red }));
+  [['Digital content', 'content'], ['Adaptive learning platforms', 'adaptive']].forEach(([s, w], i) => checkRow(t, Wc('l6_5', w, .4 + i * .2) - .2, 1030, 712 + dy + i * 60, s, { size: 28, w: 700 }));
+  text('based on the Self-Learning Method', 1080, 840 + dy, { size: 28, weight: 700, fam: HAND, color: K.muted, alpha: p(t, Wc('l6_5', 'method', .95) - .2, .4) });
 };
 
 // ---------- 16. culture ----------
@@ -572,7 +594,7 @@ SC.culture = t => {
   text('JEI Creative Center', 920, 744, { size: 30, weight: 700, align: 'center', alpha: p(t, tC, .4) });
   enter(t, tA - .2, () => photo('artcenter', 1240, 300, 560, 400, { rot: .015, seed: 6, fx: .55 }), { dy: 30 });
   text('JEI Art Center', 1520, 744, { size: 30, weight: 700, align: 'center', alpha: p(t, tA, .4) });
-  [['Creativity', 'creativity'], ['Arts', 'arts'], ['Cultural education', ['cultural'], 2]].forEach(([s, w, nth], i) => checkRow(t, Wc('l6_6', w, .7 + i * .1, nth || 1) - .2, 210 + i * 450, 840, s, { size: 32, w: 380 }));
+  [['Creativity', 'creativity'], ['Arts', 'arts'], ['Cultural education', ['cultural'], 2]].forEach(([s, w, nth], i) => checkRow(t, Wc('l6_6', w, .7 + i * .1, nth || 1) - .2, 210 + i * 450, 880, s, { size: 32, w: 380 }));   // 3rd feedback: 840 → 880
 };
 
 // ---------- 17. global network ----------
@@ -598,8 +620,9 @@ SC.global = t => {
   enter(t, tY - .15, () => text('1992', 210, 410, { size: 130, weight: 800, color: K.red }), { pop: true, ox: 360, oy: 410 });
   text('the United States', 210, 510, { size: 42, weight: 700, alpha: p(t, tU - .1, .4) });
   pen(210, 540, 210 + measure('the United States', 42, 700), 538, p(t, tU + .2, .5), K.red, 5, 3);
-  enter(t, t2, () => para('Today, our international learning centers help students develop', 210, 630, 620, { size: 27, weight: 600, color: K.muted }));
-  [['Confidence', 'confidence'], ['Independent learning skills', 'independent']].forEach(([s, w], i) => checkRow(t, Wc('l7_2', w, .6 + i * .2) - .2, 210, 745 + i * 66, s, { size: 34, w: 600 }));
+  // 2nd feedback: break after "centers", bigger; independent learning skills first, as now read
+  enter(t, t2, () => ['Today, our international learning centers', 'help students develop'].forEach((s, i) => text(s, 210, 628 + i * 42, { size: 31, weight: 600, color: K.muted, maxW: 660 })));
+  [['Independent learning skills', 'independent'], ['Confidence', 'confidence']].forEach(([s, w], i) => checkRow(t, Wc('l7_2', w, .6 + i * .2) - .2, 210, 755 + i * 66, s, { size: 34, w: 600 }));
   enter(t, H0('global') + .4, () => photo('opening', 880, 290, 900, 410, { rot: -.012, seed: 7 }), { dy: 30 });
   enter(t, t2 + .2, () => photo('girl_book', 930, 620, 390, 260, { rot: .03, seed: 8 }), { dy: 30 });
   enter(t, t2 + .5, () => photo('girl_study', 1380, 630, 390, 260, { rot: -.025, seed: 9 }), { dy: 30 });
@@ -610,7 +633,8 @@ SC.workbooks = t => {
   header(t, H0('workbooks'), SEC[5], 'JEI Programmed Workbooks');
   subline(t, 'workbooks', 'English-based workbooks for international markets');
   let x = 210;
-  [['wb_math', 'Math', 'math', 300], ['wb_english', 'English', 'english', 370], ['wb_reading', 'Reading & Writing', 'reading', 480], ['wb_problem', 'Problem Solving Math', ['problemsolving', 'problem'], 350]].forEach(([im, s, w, bw], i) => {
+  // 3rd feedback: the order Math, Problem Solving Math, English, Reading & Writing (the script reads them in this order too)
+  [['wb_math', 'Math', 'math', 300], ['wb_problem', 'Problem Solving Math', ['problemsolving', 'problem'], 350], ['wb_english', 'English', 'english', 370], ['wb_reading', 'Reading & Writing', 'reading', 480]].forEach(([im, s, w, bw], i) => {
     const x0 = x, tw = Wc('l7_3', w, .45 + i * .15); x += bw + 30;
     enter(t, tw - .2, () => { cover(im, x0, 300, bw, 330); text(s, x0 + bw / 2, 672, { size: 30, weight: 700, align: 'center', maxW: bw + 20 }); }, { pop: true, ox: x0 + bw / 2, oy: 470 });
   });
@@ -624,19 +648,19 @@ SC.workbooks = t => {
 // ---------- 20. global awards ----------
 SC.globalAwards = t => {
   header(t, H0('globalAwards'), SEC[5], 'Global awards (USA)');
-  const tY = Wc('l7_5', ['2016', 'twenty', 'sixteen'], .05);
   subline(t, 'globalAwards', 'JEI Learning Centers, ranked by Entrepreneur in 2016');
+  // 3rd feedback: the "Entrepreneur, 2016" note removed, the two cards lowered to the middle of the page (y 300 → Y)
+  const Y = 380;
   [['#37', 'Top Global Franchises', 'Top 200 franchisors around the world', ['37th', 'thirtyseventh', 'thirty'], .3], ['#175', 'Franchise 500', 'The best of more than 1,000 companies', ['175th', 'hundred', 'onehundred'], .65]].forEach(([n, s, d, w, f], i) => {
     const x = 210 + i * 820, tw = Wc('l7_5', w, f);
     enter(t, tw - .3, () => {
-      card(x, 300, 770, 460, { r: 18 });
-      text(n, x + 385, 470, { size: 170, weight: 800, color: K.red, align: 'center' });
-      text(s, x + 385, 625, { size: 40, weight: 700, align: 'center', maxW: 700 });
-      text(d, x + 385, 678, { size: 24, weight: 500, color: K.muted, align: 'center', maxW: 700 });
-    }, { pop: true, ox: x + 385, oy: 520 });
-    penCircle(x + 385, 470, measure(n, 170, 800) / 2 + 50, 105, p(t, tw + .4, .6), K.red, 5, 3 + i);
+      card(x, Y, 770, 460, { r: 18 });
+      text(n, x + 385, Y + 170, { size: 170, weight: 800, color: K.red, align: 'center' });
+      text(s, x + 385, Y + 325, { size: 40, weight: 700, align: 'center', maxW: 700 });
+      text(d, x + 385, Y + 378, { size: 24, weight: 500, color: K.muted, align: 'center', maxW: 700 });
+    }, { pop: true, ox: x + 385, oy: Y + 220 });
+    penCircle(x + 385, Y + 170, measure(n, 170, 800) / 2 + 50, 105, p(t, tw + .4, .6), K.red, 5, 3 + i);
   });
-  text('Entrepreneur, 2016', 1800, 830, { size: 30, weight: 700, fam: HAND, color: K.muted, align: 'right', alpha: p(t, tY, .4) });
 };
 
 // ---------- 21. closing: the mission ----------
@@ -649,8 +673,7 @@ SC.outro = t => {
   text(C.outro.site, 214, 790, { size: 34, weight: 700, fam: HAND, color: K.red, alpha: p(t, tE + .3, .4) });
   enter(t, H0('outro') + .4, () => photo('building_wide', 1110, 300, 690, 350, { rot: .015, seed: 10, fx: .5 }), { dy: 30 });
   const tT = st('l7_7');
-  enter(t, tT - .15, () => text(C.outro.thanks, 1455, 790, { size: 96, weight: 700, fam: HAND, align: 'center' }), { pop: true, ox: 1455, oy: 790 });
-  pen(1270, 860, 1640, 856, p(t, tT + .4, .6), K.red, 6, 11);
+  enter(t, tT - .15, () => text(C.outro.thanks, 1455, 790, { size: 96, weight: 700, fam: HAND, align: 'center' }), { pop: true, ox: 1455, oy: 790 });   // no underline (2nd feedback)
 };
 
 // ============================================================
