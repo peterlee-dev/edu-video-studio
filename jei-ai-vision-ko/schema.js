@@ -15,7 +15,7 @@ window.SCHEMA = {
  groups: [
   { tab: 'text', title: 'Title', at: 6, fields: [
    { path: 'title.kicker', label: 'Kicker', type: 'text' }, { path: 'title.words.0', label: 'Title line 1', type: 'text' }, { path: 'title.words.1', label: 'Title line 2', type: 'text' }, { path: 'title.words.2', label: 'Title line 3', type: 'text' },
-   { path: 'title.sub.0', label: 'Subtitle line 1', type: 'text' }, { path: 'title.sub.1', label: 'Subtitle line 2', type: 'text' }, { path: 'title.date', label: 'Date', type: 'text' }] },
+   { path: 'title.sub.0', label: 'Subtitle line 1', type: 'text' }, { path: 'title.sub.1', label: 'Subtitle line 2', type: 'text' }] },
   { tab: 'text', title: 'Closing', at: sceneAt('outro', 22), fields: [
    { path: 'outro.lead.0', label: 'Lead line 1', type: 'text' }, { path: 'outro.lead.1', label: 'Lead line 2', type: 'text' }, { path: 'outro.words.0', label: 'Title line 1', type: 'text' }, { path: 'outro.words.1', label: 'Title line 2', type: 'text' },
    { path: 'outro.value', label: 'Handwriting 1', type: 'text' }, { path: 'outro.standard', label: 'Handwriting 2', type: 'text' }] },

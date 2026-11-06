@@ -2,6 +2,8 @@
 # Source: JEI_AI플랫폼_동영상장면.pptx.pdf (12 pages). The paragraph in each page's dark bottom bar is the narration, word for word
 # (only the PDF's stray spaces fixed: "제공하고 ," → "제공하고,", "결손으 로" → "결손으로", "**‘…’**" → "‘…’"). Line ids: l<PDF page>_<n>.
 # One sentence (page 6) spans two scenes; it is split at its comma into l6_3 / l6_4, words unchanged.
+# Review 2026-11-05 (sheet 어댑티브진단&AI플랫폼 소개_ 영상 수정 요청): l8_3 ~ l8_6 rewritten (contents made ahead per objective, kept in a reviewed DB,
+# printed from the DB); l8_4 moved to the pod scene.
 # Review 2026-11-04: l10_3 reads all four states (미학습 added) and l10_4 (결손 first) is new; the lines after it moved to l10_5 ~ l10_7.
 LANGUAGE = 'Korean'   # TTS and whisper language ('English' or 'Korean')
 
@@ -26,7 +28,7 @@ CONT = {'kmapDots', 'kmapAI', 'countryTrack', 'layerAgent', 'layerService', 'lay
 # (as in ../ai-learning-platform-v3-ko: 날리지 sounded like Konglish), and Map is written 맵 so no vowel is added after the p
 # (review 2026-11-03: "놀리지 매프" at l1_3). make_audio.py also applies SAY to whisper's transcripts
 SAY = [('JEI-SLI', '제이이아이 에스엘아이'), ('JEI Math Universe', '제이이아이 매스 유니버스'), ('Knowledge Map', 'Knowledge 맵'), ('JEI', '제이이아이'),
-       ('LLM Wiki', '엘엘엠 위키'), ('POD', '피오디'), ('CCSS', '씨씨에스에스'), ('50년간', '오십 년간'), ('7개', '일곱 개')]
+       ('LLM Wiki', '엘엘엠 위키'), ('POD', '피오디'), ('DB', '디비'), ('CCSS', '씨씨에스에스'), ('50년간', '오십 년간'), ('7개', '일곱 개')]
 def R(s):
     for a, b in SAY + [('‘', ''), ('’', ''), ('·', ' ')]:
         s = s.replace(a, b)
@@ -74,10 +76,10 @@ _SCRIPT = [
 
     ('l8_1', 'pod', '1단계의 핵심 서비스는 개인별 맞춤 POD입니다.', .2),
     ('l8_2', 'pod', '먼저 학생의 진단 결과와 학습 이력을 바탕으로 필요한 학습목표와 학습 분량을 정합니다.', 0),
-    ('l8_3', 'pod', '이렇게 정해진 학습목표에 따라 AI가 재능교육의 프로그램식 학습원리를 적용한 맞춤형 콘텐츠를 생성하고, 연구원의 검토를 거쳐 학생 개개인을 위한 POD 학습지로 제작·출력합니다.', 0),
-    ('l8_4', 'podCycle', '이후에는 학습 결과를 분석해 다음 POD 구성에 반영합니다.', .1),
-    ('l8_5', 'podCycle', '이를 통해 학생의 학습 상태에 맞춰 필요한 내용은 보충하고, 학습 내용과 분량을 조정하면서 개인별 맞춤 학습을 이어갈 수 있습니다.', .1),
-    ('l8_6', 'podCycle', '이 서비스는 미국에서 먼저 적용하고, 운영 결과를 검증한 후 국내로 단계적으로 확대할 계획입니다.', 0),
+    ('l8_3', 'pod', '콘텐츠는 AI가 재능교육의 프로그램식 학습원리를 적용해 학습목표별로 미리 생성하고, 연구원의 검토를 거쳐 DB에 쌓아 둡니다.', .1),
+    ('l8_4', 'pod', '이 검증된 DB에서 필요한 콘텐츠를 개인을 위한 POD 학습지로 제작해 출력합니다.', 0),
+    ('l8_5', 'podCycle', '학습 결과는 다시 분석해 다음 POD에 반영하고, 보충할 내용과 분량을 조정하며 맞춤 학습을 이어갑니다.', .1),
+    ('l8_6', 'podCycle', '이 서비스는 미국에서 먼저 적용하고, 운영 결과를 검증한 뒤 국내로 단계적으로 확대할 계획입니다.', 0),
 
     ('l9_1', 'online', '2단계의 핵심 서비스는 적응형 온라인 학습 플랫폼입니다.', .2),
     ('l9_2', 'online', '학습자의 정오답뿐 아니라 풀이 시간, 힌트 사용, 재시도 등 학습 과정에서 나타나는 행동을 분석해 학생의 학습 상태에 맞춰 콘텐츠와 학습경로를 실시간으로 조정합니다.', 0),
@@ -113,7 +115,7 @@ BREATH = {
     'l5_1': ['콘텐츠를'], 'l5_2': ['때도', '바탕으로', '연결하여'], 'l5_3': ['또한', '있고'], 'l5_4': ['결국', '지식맵은'],
     'l6_1': ['플랫폼은'], 'l6_2': ['계층은', '학습자료를'], 'l6_3': ['계층에서는', '생성하고'], 'l6_4': ['계층에서는'], 'l6_5': ['이때', '계층은', '맞춰'],
     'l7_1': ['플랫폼은'], 'l7_2': ['1단계에서는'], 'l7_3': ['바탕으로', '따라'], 'l7_4': ['2단계에서는', '더해'], 'l7_5': ['조정하며'], 'l7_6': ['과정에서', 'Wiki는'],
-    'l8_1': ['서비스는'], 'l8_2': ['먼저', '바탕으로'], 'l8_3': ['따라', '거쳐'], 'l8_4': ['이후에는'], 'l8_5': ['통해', '조정하면서'], 'l8_6': ['서비스는', '후'],
+    'l8_1': ['서비스는'], 'l8_2': ['먼저', '바탕으로'], 'l8_3': ['콘텐츠는', '적용해', '거쳐'], 'l8_4': ['DB에서'], 'l8_5': ['결과는', '조정하며'], 'l8_6': ['서비스는', '뒤'],
     'l9_1': ['서비스는'], 'l9_2': ['아니라', '분석해', '맞춰'], 'l9_3': ['또한', '보조선생님은'], 'l9_4': ['학생에게는', '알려주기보다', '선생님에게는', '알려주어'], 'l9_5': ['통해'],
     'l10_1': ['표시하면'], 'l10_2': ['아래쪽은', '가운데는', '위쪽은'], 'l10_3': ['이때', '학습목표는', '따라'], 'l10_4': ['학습목표는'], 'l10_5': ['상태는'], 'l10_6': ['따라서', '발견되면', '반영해'], 'l10_7': ['결국', '보충하면서'],
     'l11_1': ['우리는'], 'l11_2': ['콘텐츠를'], 'l11_4': ['따라'], 'l11_5': ['아니라', '아닌'],
@@ -132,7 +134,9 @@ CLONE = set()
 # l4_2: the take whose pitch stays level (review 2026-11-04: the voice suddenly dropped low at 2:00, median F0 124 Hz vs ~170 elsewhere)
 # picked by ear-substitute checks (isolated whisper of the name + wav2vec2 phonemes of the whole take, trailing silence >= 0.2 s):
 # JEI as 제이 이아이 (not 제아이), JEI-SLI 에셀아이, POD 피오디 (not 푸디 / 피디), LLM 엘엘엠, Knowledge with /a/ first (not 놀) and 맵 with no vowel after p
-TAKE = {'l1_3': 9, 'l4_2': 4, 'l4_3': 1, 'l5_1': 1, 'l6_4': 2, 'l7_3': 0, 'l7_6': 2, 'l8_3': 0, 'l8_4': 5, 'l11_5': 3, 'l12_2': 2}
+# l8_3 ~ l8_5 (rewritten 2026-11-05): POD 피오디 (not 피디 / 피우디), DB 디비, 목표별로 미리 clear, F0 level to the end (l8_5 take 6 fell to 122 Hz).
+# l6_1: kept the take it had before (the new lines moved the median pace, and with it the automatic pick)
+TAKE = {'l1_3': 9, 'l4_2': 4, 'l4_3': 1, 'l5_1': 1, 'l6_1': 5, 'l6_4': 2, 'l7_3': 0, 'l7_6': 2, 'l8_3': 5, 'l8_4': 2, 'l8_5': 7, 'l11_5': 3, 'l12_2': 2}
 
 # the same pacing as ../ai-learning-platform-v3-ko (a chime at the start, breaks between lines and pages). The voice keeps its own pace
 LEAD, GAP, SCENE_GAP, TAIL = 1.3, .6, 1.8, 3.2   # s before the first line, between lines, extra between pages, after the last line

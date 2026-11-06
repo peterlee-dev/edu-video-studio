@@ -445,7 +445,7 @@ function countryPage(t) {
   if (SHARED_OFF) return; pageHead(t, 'country', '국가별 지식맵', '공통맵에서 국가별 지식맵으로');
   const c = CY();
   text('현행 학습목표 체계 · 지금 가진 것', 605, 298, { size: 20, weight: 700, color: K.muted, align: 'center', alpha: p(t, c.s0, .4) });
-  mapBox(210, 318, 380, 150, K.midGrey, K.lightBox, '미주용 933개 · 55개 영역', 'us0', 70, t, c.s0);
+  mapBox(210, 318, 380, 150, K.midGrey, K.lightBox, '미주용', 'us0', 70, t, c.s0);
   mapBox(620, 318, 380, 150, K.midGrey, K.lightBox, '국내용', 'kr0', 60, t, c.s0 + .2, { labRight: true });
   penCurve(400, 474, 430, 520, 520, 528, p(t, c.j - .2, .5), K.red, 4, 1, true); penCurve(810, 474, 780, 520, 690, 528, p(t, c.j - .1, .5), K.red, 4, 1, true);
   text('① AI 비교·분석', 605, 498, { size: 22, weight: 800, color: K.crimson, align: 'center', alpha: p(t, c.j, .4) });
@@ -573,37 +573,57 @@ SC.wiki = t => {
 // ============================================================
 // p. 8  P-03 personalized POD (two scenes)
 // ============================================================
-const PODS = [['doc', '진단·학습 이력', ''], ['lens', '필요 학습목표·', '분량 자동 선정'], ['spark', 'AI 콘텐츠 생성', '+ 연구원 검토'], ['print', '1인 1맞춤', '학습지 출력'], ['retry', '결과 반영', '다음 POD 재구성']];
-const PD = () => ({ t: [Wc('l8_2', '진단', .15), Wc('l8_2', '필요한', .6), Wc('l8_3', 'ai', .2), Wc('l8_3', '제작', .9), Wc('l8_4', '결과', .3)], rv: Wc('l8_3', '검토', .65),
-  nx: Wc('l8_4', '다음', .6), us: Wc('l8_6', '미국', .2), kr: Wc('l8_6', '국내', .8), sup: Wc('l8_5', '보충', .45), adj: Wc('l8_5', '조정', .65) });
+// review 2026-11-05: contents are made ahead per objective and kept in a reviewed DB above the flow; the DB feeds the print step
+// down a dotted line (cards 1 · 2 → DB → dotted line → 1인 1맞춤 → 결과 반영, in that order)
+const PODS = [['doc', '진단·학습 이력', '', 210], ['lens', '필요 학습목표·', '분량 자동 선정', 535], ['print', '1인 1맞춤', '학습지 출력', 1185], ['retry', '결과 반영', '다음 POD 재구성', 1510]];
+const PCT = 390, PCH2 = 260, PAY = 520, DBX = 1005, DBT = 305;   // card top · height, the flow's arrow line, the DB's centre x and top
+const PD = () => ({ t: [Wc('l8_2', '진단', .15), Wc('l8_2', '필요한', .6), Wc('l8_4', '학습지', .7), Wc('l8_5', '결과', .2)], db: Wc('l8_3', '콘텐츠는', .1),
+  pg: Wc('l8_3', '프로그램식', .4), pre: Wc('l8_3', '미리', .55), rv: Wc('l8_3', '검토', .65), fill: Wc('l8_3', 'db', .85), dot: Wc('l8_4', 'db', .25), go: Wc('l8_4', '필요한', .3),
+  nx: Wc('l8_5', '다음', .3), sup: Wc('l8_5', '보충', .55), adj: Wc('l8_5', '조정', .7), us: Wc('l8_6', '미국', .2), kr: Wc('l8_6', '국내', .8) });
+// a database drum; lv (0–1) fills it from the bottom
+function dbDrum(cx, top, lv, { rx = 78, ry = 20, h = 72 } = {}) {
+  const body = () => { ctx.beginPath(); ctx.moveTo(cx - rx, top); ctx.lineTo(cx - rx, top + h); ctx.ellipse(cx, top + h, rx, ry, 0, Math.PI, 0, true); ctx.lineTo(cx + rx, top); ctx.ellipse(cx, top, rx, ry, 0, 0, Math.PI, true); ctx.closePath(); };
+  ctx.save(); ctx.shadowColor = 'rgba(30,30,30,.08)'; ctx.shadowBlur = 18; ctx.shadowOffsetY = 6; body(); ctx.fillStyle = '#FFFFFF'; ctx.fill(); ctx.restore();
+  if (lv > 0) { ctx.save(); body(); ctx.clip(); ctx.fillStyle = K.redTint; ctx.fillRect(cx - rx, top + h + ry - (h + 2 * ry) * lv, 2 * rx, (h + 2 * ry) * lv); ctx.restore(); }
+  ctx.save(); ctx.strokeStyle = K.red; ctx.lineWidth = 3; body(); ctx.stroke();
+  ctx.beginPath(); ctx.ellipse(cx, top, rx, ry, 0, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
+  text('DB', cx, top + ry + h / 2 - 2, { size: 30, weight: 800, color: K.red, align: 'center' });
+}
 function podPage(t) {
   if (SHARED_OFF) return; pageHead(t, 'pod', '핵심 서비스 ①', 'P-03 개인별 맞춤 POD — 1인 1맞춤 학습지');
   const c = PD();
-  PODS.forEach(([ic, a1, a2], i) => { const x = 210 + i * 325, last = i === 4;
-    if (t < c.t[i] - .1) hbox(x, 300, 290, 300, p(t, H0('pod') + .5 + i * .12, .5), K.lineGrey, 2.5, 100 + i);
-    enter(t, c.t[i] - .1, () => { card(x, 300, 290, 300, { r: 16, stroke: last ? K.red : K.lineGrey, lw: last ? 3 : 2 }); badge(x + 145, 395, 52, last ? K.red : K.redTint, ic, last ? '#FFFFFF' : K.red);
-      text(a1, x + 145, a2 ? 505 : 525, { size: 28, weight: 800, align: 'center', maxW: 260 }); if (a2) text(a2, x + 145, 545, { size: 28, weight: 800, align: 'center', maxW: 260 }); }, { pop: true, ox: x + 145, oy: 450 });
-    if (i) penArrow(x - 30, 450, x - 6, 450, p(t, c.t[i] - .3, .3), K.red, 5, 110 + i); });
-  check(210 + 2 * 325 + 250, 330, 34, p(t, c.rv + .2, .3), K.red, 6);
+  PODS.forEach(([ic, a1, a2, x], i) => { const last = i === 3;
+    if (t < c.t[i] - .1) hbox(x, PCT, 290, PCH2, p(t, H0('pod') + .5 + i * .12, .5), K.lineGrey, 2.5, 100 + i);
+    enter(t, c.t[i] - .1, () => { card(x, PCT, 290, PCH2, { r: 16, stroke: last ? K.red : K.lineGrey, lw: last ? 3 : 2 }); badge(x + 145, PCT + 85, 52, last ? K.red : K.redTint, ic, last ? '#FFFFFF' : K.red);
+      text(a1, x + 145, a2 ? PCT + 178 : PCT + 196, { size: 28, weight: 800, align: 'center', maxW: 260 }); if (a2) text(a2, x + 145, PCT + 216, { size: 28, weight: 800, align: 'center', maxW: 260 }); }, { pop: true, ox: x + 145, oy: PCT + PCH2 / 2 });
+    if (i === 1 || i === 3) penArrow(x - 30, PAY, x - 6, PAY, p(t, c.t[i] - .3, .3), K.red, 5, 110 + i); });
+  // 3: contents made ahead, reviewed, kept in the DB
+  const lw = measure('AI 콘텐츠 생성', 26, 800);
+  enter(t, c.db - .1, () => { text('AI 콘텐츠 생성', DBX, 228, { size: 26, weight: 800, align: 'center' }); text('+ 연구원 검토', DBX, 262, { size: 26, weight: 800, align: 'center' });
+    dbDrum(DBX, DBT, .25 + .75 * eIO(p(t, c.fill, 1.2))); }, { pop: true, ox: DBX, oy: 330 });
+  check(DBX + lw / 2 + 34, 252, 32, p(t, c.rv + .2, .3), K.red, 6);
+  // 4: the DB feeds the flow down a dotted line; the flow runs from card 2 past it to the print step
+  pen(DBX, DBT + 72 + 26, DBX, PAY - 6, p(t, c.dot, .5), K.red, 4, 112, 1, [10, 10]);
+  penArrow(835, PAY, 1177, PAY, p(t, c.go, .6), K.red, 5, 113);
   // the loop back to the start
-  const lk = p(t, Math.max(c.nx - .2, c.t[4] + .3), 1.2); if (lk > 0) strokePts([[210 + 4 * 325 + 145, 612], [210 + 4 * 325 + 145, 660], [355, 660], [355, 612]], lk, K.red, 4, 1, [12, 9]);
-  arrowHead(355, 610, -Math.PI / 2, clamp(lk * 4 - 3), K.red, 4);
-  text('학습 결과가 다음 학습으로 이어지는 순환', 1005, 700, { size: 26, weight: 800, color: K.crimson, align: 'center', alpha: p(t, c.nx + .6, .4) });
-  enter(t, c.us - .2, () => { rr(210, 770, 1590, 100, 16, K.lightBox); text('적용 순서', 250, 821, { size: 28, weight: 800 });
-    text('미국 → 한국', 410, 821, { size: 28, weight: 800, color: K.red }); text('·  Phase 1에서 학습 순환을 검증하는 첫 번째 핵심 서비스', 410 + measure('미국 → 한국', 28, 800) + 24, 822, { size: 25, weight: 500, color: K.muted, maxW: 1000 }); });
+  const lk = p(t, Math.max(c.nx - .2, c.t[3] + .3), 1.2), ly = PCT + PCH2 + 50; if (lk > 0) strokePts([[1655, PCT + PCH2 + 12], [1655, ly], [355, ly], [355, PCT + PCH2 + 12]], lk, K.red, 4, 1, [12, 9]);
+  arrowHead(355, PCT + PCH2 + 10, -Math.PI / 2, clamp(lk * 4 - 3), K.red, 4);
+  text('학습 결과가 다음 학습으로 이어지는 순환', 1005, ly + 40, { size: 26, weight: 800, color: K.crimson, align: 'center', alpha: p(t, c.nx + .6, .4) });
+  enter(t, c.us - .2, () => { rr(210, 815, 1590, 100, 16, K.lightBox); text('적용 순서', 250, 866, { size: 28, weight: 800 });
+    text('미국 → 한국', 410, 866, { size: 28, weight: 800, color: K.red }); text('·  Phase 1에서 학습 순환을 검증하는 첫 번째 핵심 서비스', 410 + measure('미국 → 한국', 28, 800) + 24, 867, { size: 25, weight: 500, color: K.muted, maxW: 1000 }); });
 }
 SC.pod = t => {
   podPage(t); const c = PD();
-  ['학습목표', '학습 분량'].forEach((s, i) => chip(s, 210 + 325 + 145, 650 + i * 52, { size: 21, fill: K.redTint, color: K.crimson, a: eBack(p(t, Wc('l8_2', i ? '분량' : ['학습목표', '목표'], .8) + .1, .4)), align: 'center' }));
-  chip('프로그램식 학습원리', 210 + 650 + 145, 650, { size: 21, fill: K.redTint, color: K.crimson, a: eBack(p(t, Wc('l8_3', '프로그램식', .4), .4)), align: 'center' });
-  chip('연구원 검토', 210 + 650 + 145, 702, { size: 21, fill: K.redTint, color: K.crimson, a: eBack(p(t, c.rv, .4)), align: 'center' });
+  ['학습목표', '학습 분량'].forEach((s, i) => chip(s, 535 + 145, PCT + PCH2 + 34 + i * 50, { size: 21, fill: K.redTint, color: K.crimson, a: eBack(p(t, Wc('l8_2', i ? '분량' : ['학습목표', '목표'], .8) + .1, .4)), align: 'center' }));
+  chip('프로그램식 학습원리', 1110, 300, { size: 21, fill: K.redTint, color: K.crimson, a: eBack(p(t, c.pg, .4)) });
+  chip('학습목표별로 미리 생성', 1110, 352, { size: 21, fill: K.redTint, color: K.crimson, a: eBack(p(t, c.pre, .4)) });
 };
 SC.podCycle = t => {
-  podPage(t); const c = PD();
-  chip('필요한 내용 보충', 470, 735, { size: 21, fill: K.redTint, color: K.crimson, a: eBack(p(t, c.sup, .4)), align: 'center' });
-  chip('내용 · 분량 조정', 1540, 735, { size: 21, fill: K.redTint, color: K.crimson, a: eBack(p(t, c.adj, .4)), align: 'center' });
-  penCircle(410 + measure('미국 → 한국', 28, 800) / 2, 820, measure('미국 → 한국', 28, 800) / 2 + 22, 30, p(t, c.us + .2, .5), K.red, 4, 120);
-  text('검증 후 단계적으로 확대', 600, 920, { size: 30, weight: 700, fam: HAND, color: K.red, alpha: p(t, c.kr, .4) });
+  podPage(t); const c = PD(), ly = PCT + PCH2 + 50;
+  chip('필요한 내용 보충', 470, ly + 40, { size: 21, fill: K.redTint, color: K.crimson, a: eBack(p(t, c.sup, .4)), align: 'center' });
+  chip('내용 · 분량 조정', 1540, ly + 40, { size: 21, fill: K.redTint, color: K.crimson, a: eBack(p(t, c.adj, .4)), align: 'center' });
+  penCircle(410 + measure('미국 → 한국', 28, 800) / 2, 865, measure('미국 → 한국', 28, 800) / 2 + 22, 30, p(t, c.us + .2, .5), K.red, 4, 120);
+  text('검증한 뒤 단계적으로 확대', 600, 962, { size: 30, weight: 700, fam: HAND, color: K.red, alpha: p(t, c.kr, .4) });
 };
 
 // ============================================================
@@ -666,7 +686,8 @@ const REC_PATH = (() => {
 })();
 // a gap in ground already covered, away from the route (the PDF's "진도는 지나갔지만 숙련되지 않은 지점")
 const OLD_GAP = NODES.nodes.filter(n => n.s === 'gap' && n.zone === 'low' && !REC_PATH.includes(n)).sort((u, v) => (u.x - 330) ** 2 + (u.y - 860) ** 2 - (v.x - 330) ** 2 - (v.y - 860) ** 2)[0];
-const STATUS = [['mastered', '완전학습', '완전히 이해하고 익힌 학습목표', 'red'], ['needs', '미숙', '현재 이해도를 확인하고 보완할 학습목표', 'mint'], ['gap', '결손', '숙련되지 않은 학습목표 — 최우선 보완', 'navy'], ['not', '미학습', '아직 학습하지 않은 학습목표', 'midGrey']];
+// review 2026-11-05: 완전학습 navy, 결손 red (the client's choice for this page; legend, map dots, the gap marks and callout follow it)
+const STATUS = [['mastered', '완전학습', '완전히 이해하고 익힌 학습목표', 'navy'], ['needs', '미숙', '현재 이해도를 확인하고 보완할 학습목표', 'mint'], ['gap', '결손', '숙련되지 않은 학습목표 — 최우선 보완', 'red'], ['not', '미학습', '아직 학습하지 않은 학습목표', 'midGrey']];
 const SM = () => ({ t0: st('l10_1', .1), tz: [Wc('l10_2', '위쪽', .75), Wc('l10_2', '가운데', .4), Wc('l10_2', '아래쪽', .05)],
   ts: { mastered: Wc('l10_3', '완전히', .45), needs: Wc('l10_3', '보완', .65), gap: Wc('l10_3', '결손', .8), not: Wc('l10_3', '미학습', .9) }, first: Wc('l10_4', '결손', .3),
   up: Wc('l10_5', '갱신', .8), lack: Wc('l10_6', '부족한', .25), sup: Wc('l10_6', '보충', .5), rec: Wc('l10_6', '다음', .75), end: st('l10_7', .1) });
@@ -677,11 +698,11 @@ function statusPage(t) {
   ctx.save(); ctx.beginPath(); ctx.rect(MAP.x, MAP.y, MAP.w, MAP.h); ctx.clip();
   [['up', K.lightBox, c.tz[0]], ['mid', K.mintTint, c.tz[1]], ['low', K.redTint, c.tz[2]]].forEach(([z, col, tt]) => { const [a, b] = BAND[z], k = p(t, tt, .6); rr(MAP.x, a, MAP.w, b - a, 0, rgba(col, z === 'up' ? 1 : z === 'mid' ? .75 : .45), null, 0, k); });
   const N = NODES.nodes, rise = n => c.t0 + .2 + (1 - (n.y - MAP.y) / MAP.h) * 1.4;
-  NODES.edges.forEach(([i, j]) => { const a = N[i], b = N[j], k = p(t, Math.max(rise(a), rise(b)), .5); if (k > 0) line0(a.x, a.y, lerp(a.x, b.x, k), lerp(a.y, b.y, k), a.zone === 'up' || b.zone === 'up' ? rgba(K.lineGrey, .45) : a.zone === 'low' && b.zone === 'low' ? rgba(K.red, .2) : rgba(K.mintDark, .3), 1.2); });
+  NODES.edges.forEach(([i, j]) => { const a = N[i], b = N[j], k = p(t, Math.max(rise(a), rise(b)), .5); if (k > 0) line0(a.x, a.y, lerp(a.x, b.x, k), lerp(a.y, b.y, k), a.zone === 'up' || b.zone === 'up' ? rgba(K.lineGrey, .45) : a.zone === 'low' && b.zone === 'low' ? rgba(K.navy, .2) : rgba(K.mintDark, .3), 1.2); });
   N.forEach((n, i) => { const k = eBack(p(t, rise(n), .4)); if (k <= 0) return; const ck = p(t, (n.s === 'not' ? c.tz[0] : c.ts[n.s]) + (i % 10) * .03, .4), col = K[STATUS.find(s => s[0] === n.s)[3]];
     const fixed = n === OLD_GAP && t > c.sup + .3;   // made up: the gap turns mastered
-    if (n.s === 'gap' && ck > 0 && !fixed) circle(n.x, n.y, (n.r + 7) * k, rgba(K.navy, .16 * ck));
-    circle(n.x, n.y, n.r * k, fixed ? K.red : ck > 0 ? col : K.lineGrey, '#FFFFFF', 1.5); if (ck > 0 && ck < 1) circle(n.x, n.y, n.r * k, rgba(K.lineGrey, 1 - ck)); });
+    if (n.s === 'gap' && ck > 0 && !fixed) circle(n.x, n.y, (n.r + 7) * k, rgba(K.red, .16 * ck));
+    circle(n.x, n.y, n.r * k, fixed ? K.navy : ck > 0 ? col : K.lineGrey, '#FFFFFF', 1.5); if (ck > 0 && ck < 1) circle(n.x, n.y, n.r * k, rgba(K.lineGrey, 1 - ck)); });
   ctx.restore();
   text('학습자 한 명의 지식맵 학습 상태 (개념 예시)', MAP.x, MAP.y + MAP.h + 28, { size: 20, weight: 600, color: K.muted, alpha: mk });
   // legend and the update loop (stay through the next scenes)
@@ -707,10 +728,10 @@ SC.statusUpdate = t => {
   // results pile up: the states update (a ring sweeps the map once)
   const uk = p(t, c.up - .3, 1.2); if (uk > 0 && uk < 1) { ctx.save(); ctx.beginPath(); ctx.rect(MAP.x, MAP.y, MAP.w, MAP.h); ctx.clip(); line0(MAP.x, lerp(MAP.y + MAP.h, MAP.y, eIO(uk)), MAP.x + MAP.w, lerp(MAP.y + MAP.h, MAP.y, eIO(uk)), rgba(K.red, .5 * (1 - uk)), 6); ctx.restore(); }
   // a gap in ground already covered: found, made up
-  penCircle(G.x, G.y, 26, 26, p(t, c.lack, .5), K.navy, 4, 141);
+  penCircle(G.x, G.y, 26, 26, p(t, c.lack, .5), K.red, 4, 141);
   const nx = MAP.x + 14, ny = G.y - 150;
-  enter(t, c.lack + .2, () => { rr(nx, ny, 330, 70, 10, '#FFFFFF', K.navy, 2); text('학습결손', nx + 16, ny + 20, { size: 20, weight: 800, color: K.navy }); text('진도는 지나갔지만 숙련되지 않은 지점', nx + 16, ny + 48, { size: 17, weight: 600, color: K.muted, maxW: 300 }); });
-  pen(G.x - 6, G.y - 30, G.x - 20, ny + 74, p(t, c.lack + .3, .3), K.navy, 3, 142);
+  enter(t, c.lack + .2, () => { rr(nx, ny, 330, 70, 10, '#FFFFFF', K.red, 2); text('학습결손', nx + 16, ny + 20, { size: 20, weight: 800, color: K.crimson }); text('진도는 지나갔지만 숙련되지 않은 지점', nx + 16, ny + 48, { size: 17, weight: 600, color: K.muted, maxW: 300 }); });
+  pen(G.x - 6, G.y - 30, G.x - 20, ny + 74, p(t, c.lack + .3, .3), K.red, 3, 142);
   check(G.x + 2, G.y - 2, 30, p(t, c.sup + .3, .35), K.red, 6);
   // the next route, along the map's lines
   const P = REC_PATH, n = P.length - 1, pk = p(t, c.rec, .4 * n);
@@ -772,8 +793,7 @@ SC.outro = t => {
   text(C.outro.value, TX + 4, 690, { size: 36, weight: 700, fam: HAND, color: K.muted, alpha: p(t, vl, .5), maxW: TW });
   enter(t, sd - .3, () => text(C.outro.standard, TX + 4, 760, { size: 42, weight: 700, fam: HAND, color: K.red, maxW: TW }));
   pen(TX + 4, 790, TX + 4 + Math.min(TW, measure(C.outro.standard, 42, 700, HAND)), 786, p(t, sd + .2, .6), K.red, 6, 195);
-  const e = en('l12_3', .3);
-  text(C.title.kicker + '  ·  ' + C.title.date, 960, 920, { size: 22, weight: 700, color: K.muted, align: 'center', spacing: 3, alpha: p(t, e, .6) });
+  // no footer line (review 2026-11-05: "JEI AI 전환 비전 · 2026.10" removed)
 };
 
 // ============================================================
