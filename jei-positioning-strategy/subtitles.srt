@@ -1,0 +1,341 @@
+1
+00:00:02,600 --> 00:00:05,245
+This report proposes a
+shift from competing on
+
+2
+00:00:05,303 --> 00:00:08,350
+scale to giving parents a
+clear reason to choose JEI.
+
+3
+00:00:10,100 --> 00:00:14,100
+We identified three main problems
+in the traditional workbook market.
+
+4
+00:00:14,650 --> 00:00:17,317
+First, simply moving paper
+workbooks to tablets
+
+5
+00:00:17,373 --> 00:00:19,870
+did not demonstrate
+better learning results.
+
+6
+00:00:20,320 --> 00:00:24,590
+Second, sales pressure without
+effective tools led to teacher burnout.
+
+7
+00:00:25,040 --> 00:00:29,570
+Third, vague messages about study habits
+failed to address parents' concerns.
+
+8
+00:00:31,320 --> 00:00:34,510
+JEI must address two strategic enemies.
+
+9
+00:00:35,060 --> 00:00:39,820
+The first is repetitive math drills that
+focus on speed rather than understanding.
+
+10
+00:00:40,270 --> 00:00:44,440
+The second is tablet-based learning
+that relies too much on gamification.
+
+11
+00:00:44,990 --> 00:00:47,633
+Instead, JEI aims to
+help students understand
+
+12
+00:00:47,691 --> 00:00:50,510
+their mistakes and solve
+problems independently.
+
+13
+00:00:52,260 --> 00:00:57,430
+Competitors often focus on more content,
+repetitive drills, and heavy advertising.
+
+14
+00:00:57,880 --> 00:01:00,190
+JEI will take a different approach.
+
+15
+00:01:00,640 --> 00:01:05,290
+Through precise assessment, personalized
+step-by-step learning, and independent
+
+16
+00:01:05,349 --> 00:01:09,410
+problem-solving, we aim to give
+parents a clear reason to choose JEI.
+
+17
+00:01:09,860 --> 00:01:14,000
+This can help keep current students and
+attract new students through referrals.
+
+18
+00:01:15,750 --> 00:01:19,060
+Our positioning is "Thinking-Focused
+Diagnostic Learning."
+
+19
+00:01:19,510 --> 00:01:23,310
+Our Verbal Nail is "A Child Who
+Understands Why They Got It Wrong."
+
+20
+00:01:23,760 --> 00:01:29,120
+Our Visual Hammer is the "Defect
+Linker," based on 12,759 error patterns.
+
+21
+00:01:29,670 --> 00:01:32,351
+Our goal is to help
+students discover solutions
+
+22
+00:01:32,408 --> 00:01:35,260
+on their own, rather than
+simply memorize answers.
+
+23
+00:01:37,010 --> 00:01:40,180
+We also need to change how
+we communicate with parents.
+
+24
+00:01:40,630 --> 00:01:43,637
+Instead of focusing on general
+study habits, we highlight
+
+25
+00:01:43,690 --> 00:01:46,170
+a child's ability to
+understand their mistakes.
+
+26
+00:01:46,720 --> 00:01:51,300
+The Defect Linker shows the causes of
+learning gaps through a simple visual map.
+
+27
+00:01:51,750 --> 00:01:55,900
+This helps parents understand their
+child's learning needs and builds trust.
+
+28
+00:01:57,650 --> 00:02:00,070
+We will focus on two main target groups.
+
+29
+00:02:00,620 --> 00:02:04,440
+First, children aged six to seven
+preparing for elementary school.
+
+30
+00:02:04,890 --> 00:02:07,388
+We offer precise assessment
+and step-by-step
+
+31
+00:02:07,445 --> 00:02:10,340
+learning to build basic
+literacy and number skills.
+
+32
+00:02:10,890 --> 00:02:14,360
+Second, students in Grades 1
+to 3 who struggle with math.
+
+33
+00:02:14,810 --> 00:02:17,411
+Our 10-minute assessment
+identifies learning gaps
+
+34
+00:02:17,464 --> 00:02:20,330
+and connects students with
+suitable learning programs.
+
+35
+00:02:22,080 --> 00:02:24,340
+Our product strategy has three stages.
+
+36
+00:02:24,890 --> 00:02:28,550
+First, a free mobile AI assessment
+to attract new customers.
+
+37
+00:02:29,000 --> 00:02:33,650
+Second, JEI Math and Korean
+programs to provide core learning.
+
+38
+00:02:34,100 --> 00:02:37,330
+Third, additional programs in
+critical thinking and literacy
+
+39
+00:02:37,384 --> 00:02:40,990
+to support continued learning and
+increase customer lifetime value.
+
+40
+00:02:42,740 --> 00:02:46,480
+Our first action is to launch a
+free 10-minute mobile assessment.
+
+41
+00:02:46,930 --> 00:02:49,407
+Students answer 10
+questions, and parents can
+
+42
+00:02:49,463 --> 00:02:51,940
+immediately see a map
+of their learning gaps.
+
+43
+00:02:52,390 --> 00:02:55,237
+Results can be shared
+through KakaoTalk and linked
+
+44
+00:02:55,294 --> 00:02:57,800
+to a consultation with
+a nearby JEI teacher.
+
+45
+00:02:58,250 --> 00:03:00,640
+By using our existing
+assessment data, we aim
+
+46
+00:03:00,693 --> 00:03:03,190
+to attract new customers
+through word of mouth.
+
+47
+00:03:04,940 --> 00:03:09,520
+We will improve teacher consultations
+through standard guidelines and AI support.
+
+48
+00:03:09,970 --> 00:03:12,423
+Teachers will help parents
+understand why learning
+
+49
+00:03:12,472 --> 00:03:14,680
+gaps should be addressed
+before moving ahead.
+
+50
+00:03:15,130 --> 00:03:18,451
+AI will reduce grading and
+administrative tasks, so teachers
+
+51
+00:03:18,506 --> 00:03:21,440
+can spend more time coaching
+and supporting students.
+
+52
+00:03:21,890 --> 00:03:25,730
+We will also offer combined programs
+to increase enrollment value.
+
+53
+00:03:27,480 --> 00:03:30,569
+To improve student retention,
+we will introduce weekly
+
+54
+00:03:30,627 --> 00:03:33,430
+progress reports and an
+early-warning CRM system.
+
+55
+00:03:33,880 --> 00:03:36,870
+Every Friday, parents will
+receive a visual report showing
+
+56
+00:03:36,921 --> 00:03:39,550
+how their child has overcome
+learning difficulties.
+
+57
+00:03:40,000 --> 00:03:44,010
+If a student's error rate increases,
+the system will alert the teacher.
+
+58
+00:03:44,460 --> 00:03:48,130
+Teachers can then provide support
+before parents consider leaving.
+
+59
+00:03:49,880 --> 00:03:54,560
+In Q1, we will develop the mobile assessment
+system and complete teacher training.
+
+60
+00:03:55,010 --> 00:03:58,138
+In Q2, we will launch the "A
+Child Who Understands Why
+
+61
+00:03:58,196 --> 00:04:01,440
+They Got It Wrong" campaign
+to increase new enrollments.
+
+62
+00:04:01,890 --> 00:04:04,627
+In Q3, we aim to reduce
+student dropout rates
+
+63
+00:04:04,688 --> 00:04:07,850
+by 20% through weekly reports
+and early-warning CRM.
+
+64
+00:04:08,300 --> 00:04:11,041
+In Q4, we will review
+customer lifetime value
+
+65
+00:04:11,102 --> 00:04:14,270
+and establish a standard
+operating model across JEI.
+
+66
+00:04:16,020 --> 00:04:18,526
+JEI's goal is not simply
+to teach more, but
+
+67
+00:04:18,584 --> 00:04:21,440
+to find the right starting
+point for every child.
+
+68
+00:04:21,990 --> 00:04:25,119
+By combining our assessment
+system with personal care from
+
+69
+00:04:25,173 --> 00:04:28,680
+our teachers, we will make it the
+strongest reason to choose JEI.
+
