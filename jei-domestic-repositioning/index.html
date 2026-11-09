@@ -1,0 +1,837 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>JEI Repositioning Strategy</title>
+<style>
+  html, body { margin: 0; background: #0E1424; }
+  body { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 12px; font-family: 'Avenir Next', sans-serif; color: #ddd; }
+  canvas { width: min(100%, 1280px); aspect-ratio: 16 / 9; display: block; background: #FEFFFF; }
+  .bar { display: flex; gap: 12px; align-items: center; width: min(100%, 1280px); }
+  .bar input { flex: 1; }
+  body.render { padding: 0; gap: 0; }
+  body.render canvas { width: 1920px; height: 1080px; }
+  body.render .bar { display: none; }
+</style>
+</head>
+<body>
+<script src="timeline.js"></script>
+<script src="content.js"></script>
+<script src="schema.js"></script>
+<canvas id="c" width="1920" height="1080"></canvas>
+<div class="bar">
+  <button id="play">▶ Play</button>
+  <input id="seek" type="range" min="0" max="300" step="0.01" value="0">
+  <span id="time">0.00s</span>
+</div>
+<script>
+// ------------------------------------------------------------
+// Graph-paper workbook video. One continuous sheet of graph paper; each scene is a workbook page. The camera slides
+// sideways between pages (in time with the whoosh in the mix) and stays still while the page is read.
+// Teacher's-pen marks: circles, checks, crosses, boxes, arrows, underlines, highlighter, sticky notes, stamps.
+// Timing: timeline.js, written by tools/make_audio.py from the narration. Pictures follow spoken words
+// (Wc(line, word) looks the word up in TL.lines[line].words). draw(t) is a pure function of time.
+// ------------------------------------------------------------
+const W = 1920, H = 1080, TL = window.TL, DURATION = TL.duration;
+const cv = document.getElementById('c'), ctx = cv.getContext('2d');
+const DEFAULT_CONTENT = JSON.parse(JSON.stringify(window.CONTENT));
+let C = window.CONTENT, K = C.colors;
+const SANS = "'Avenir Next', 'Helvetica Neue', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif";
+const HAND = "'Noteworthy', 'Bradley Hand', 'Marker Felt', cursive";
+const LINE = '#E2E4E8';   // card outline (neutral)
+
+// ---------- basics ----------
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const lerp = (a, b, k) => a + (b - a) * k;
+const p = (t, s, d) => clamp((t - s) / d);
+const eOut = x => 1 - Math.pow(1 - x, 3), eIO = x => x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+const eBack = x => { const c1 = 1.7, c3 = c1 + 1; return x <= 0 ? 0 : 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2); };
+const nz = (i, s = 1) => { const v = Math.sin(i * 12.9898 + s * 78.233) * 43758.5453; return v - Math.floor(v) - .5; };   // fixed jitter (no flicker)
+function rgba(hex, a) { const n = parseInt(hex.slice(1), 16); return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`; }
+const L = id => TL.lines[id] || { start: 0, end: 0, words: [] };
+const S = id => TL.scenes.find(s => s.id === id) || { start: 0, end: 0 };
+const st = (id, f = 0) => L(id).start + (L(id).end - L(id).start) * f;   // f: 0 = start of the narration line, 1 = end
+const en = (id, d = 0) => L(id).end + d;
+// time a word is spoken in a line (one of several spellings, the nth time it occurs); falls back to a fraction of the line
+const norm = s => String(s).toLowerCase().replace(/[^a-z0-9]/g, '');
+const MISS = window.CUE_MISS = new Set();
+function Wd(id, words, f = 0, nth = 1) {
+  const want = (Array.isArray(words) ? words : [words]).map(norm); let n = 0;
+  for (const [w, s] of L(id).words || []) if (want.includes(norm(w)) && ++n === nth) return s;
+  MISS.add(`${id}:${want.join('|')}`); return st(id, f);
+}
+const cueCache = {};
+const Wc = (id, words, f, nth) => { const k = id + '|' + words + '|' + nth; return k in cueCache ? cueCache[k] : (cueCache[k] = Wd(id, words, f, nth)); };
+
+// ---------- shapes and text ----------
+function rr(x, y, w, h, r, fill, stroke, lw = 2, a = 1) { if (a <= 0) return; ctx.save(); ctx.globalAlpha *= a; ctx.beginPath(); ctx.roundRect(x, y, w, h, r); if (fill) { ctx.fillStyle = fill; ctx.fill(); } if (stroke) { ctx.lineWidth = lw; ctx.strokeStyle = stroke; ctx.stroke(); } ctx.restore(); }
+function circle(x, y, r, fill, stroke, lw = 3, a = 1) { if (r <= 0 || a <= 0) return; ctx.save(); ctx.globalAlpha *= a; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); if (fill) { ctx.fillStyle = fill; ctx.fill(); } if (stroke) { ctx.lineWidth = lw; ctx.strokeStyle = stroke; ctx.stroke(); } ctx.restore(); }
+function line0(x1, y1, x2, y2, c, lw = 3, dash) { ctx.save(); ctx.strokeStyle = c; ctx.lineWidth = lw; if (dash) ctx.setLineDash(dash); ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke(); ctx.restore(); }
+function card(x, y, w, h, { fill = '#FFFFFF', stroke = LINE, r = 16, a = 1, shadow = true, lw = 2 } = {}) {
+  if (a <= 0) return; ctx.save(); ctx.globalAlpha *= a;
+  if (shadow) { ctx.shadowColor = 'rgba(30,30,30,.08)'; ctx.shadowBlur = 22; ctx.shadowOffsetY = 8; }
+  ctx.beginPath(); ctx.roundRect(x, y, w, h, r); ctx.fillStyle = fill; ctx.fill(); ctx.shadowColor = 'transparent';
+  if (stroke) { ctx.lineWidth = lw; ctx.strokeStyle = stroke; ctx.stroke(); } ctx.restore();
+}
+function measure(str, size, weight = 600, fam = SANS) { ctx.save(); ctx.font = `${weight} ${size}px ${fam}`; const w = ctx.measureText(str).width; ctx.restore(); return w; }
+function text(str, x, y, { size = 36, weight = 600, fam = SANS, color = K.ink, align = 'left', alpha = 1, maxW, spacing = 0 } = {}) {
+  if (alpha <= 0 || !str) return; ctx.save(); ctx.globalAlpha *= alpha;
+  let sz = size; if (maxW) { const w = measure(str, size, weight, fam) + spacing * str.length; if (w > maxW) sz = size * maxW / w; }
+  ctx.font = `${weight} ${sz}px ${fam}`; ctx.textAlign = align; ctx.textBaseline = 'middle'; ctx.fillStyle = color;
+  if (spacing) ctx.letterSpacing = spacing + 'px';
+  ctx.fillText(str, x, y); ctx.restore();
+}
+// word-wrapped paragraph; returns the number of lines
+function wrapLines(str, maxW, size, weight) {
+  const out = []; let cur = '';
+  for (const w of str.split(' ')) { const nxt = cur ? cur + ' ' + w : w; if (cur && measure(nxt, size, weight) > maxW) { out.push(cur); cur = w; } else cur = nxt; }
+  if (cur) out.push(cur); return out;
+}
+function para(str, x, y, maxW, { size = 22, weight = 500, color = K.ink, lh = 1.32, alpha = 1, align = 'left' } = {}) {
+  const ls = wrapLines(str, maxW, size, weight); ls.forEach((l, i) => text(l, x, y + i * size * lh, { size, weight, color, alpha, align })); return ls.length;
+}
+// entrance: fade + rise (+ optional pop around ox, oy). Moves only while entering, then stays put
+function enter(t, t0, fn, { d = .55, dy = 26, dx = 0, pop = false, ox = 960, oy = 540 } = {}) {
+  const k = p(t, t0, d); if (k <= 0) return 0;
+  ctx.save(); ctx.globalAlpha *= clamp(k * 1.5);
+  if (pop) { const s = lerp(.5, 1, eBack(k)); ctx.translate(ox, oy); ctx.scale(s, s); ctx.translate(-ox, -oy); }
+  else ctx.translate((1 - eOut(k)) * dx, (1 - eOut(k)) * dy);
+  fn(k); ctx.restore(); return k;
+}
+
+// ---------- teacher's pen ----------
+function strokePts(pts, k, color, lw = 5, a = 1, dash) {
+  if (k <= 0 || a <= 0 || pts.length < 2) return;
+  let tot = 0; const seg = []; for (let i = 1; i < pts.length; i++) { const d = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); seg.push(d); tot += d; }
+  let left = tot * clamp(k);
+  ctx.save(); ctx.globalAlpha *= a; ctx.strokeStyle = color; ctx.lineWidth = lw; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; if (dash) ctx.setLineDash(dash);
+  ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]);
+  for (let i = 1; i < pts.length && left > 0; i++) { const f = Math.min(1, left / seg[i - 1]); ctx.lineTo(lerp(pts[i - 1][0], pts[i][0], f), lerp(pts[i - 1][1], pts[i][1], f)); left -= seg[i - 1]; }
+  ctx.stroke(); ctx.restore();
+}
+function wobble(x1, y1, x2, y2, seed = 1, amp = 1.6, n = 14) {
+  const dx = x2 - x1, dy = y2 - y1, len = Math.hypot(dx, dy) || 1, nx = -dy / len, ny = dx / len, pts = [];
+  for (let i = 0; i <= n; i++) { const f = i / n, j = (i === 0 || i === n) ? 0 : nz(i, seed) * amp * 2; pts.push([x1 + dx * f + nx * j, y1 + dy * f + ny * j]); }
+  return pts;
+}
+const pen = (x1, y1, x2, y2, k, c = K.red, lw = 5, seed = 1, a = 1, dash) => strokePts(wobble(x1, y1, x2, y2, seed), k, c, lw, a, dash);
+function penCircle(cx, cy, rx, ry, k, c = K.red, lw = 5, seed = 1, a = 1) {
+  const pts = [], a0 = -2.3 + nz(1, seed) * .4, n = 56;
+  for (let i = 0; i <= n; i++) { const ang = a0 + (i / n) * Math.PI * 2.12, r = 1 + nz(i, seed) * .05 + (i / n) * .06; pts.push([cx + Math.cos(ang) * rx * r, cy + Math.sin(ang) * ry * r]); }
+  strokePts(pts, k, c, lw, a);
+}
+function arrowHead(x2, y2, ang, hk, c, lw, a = 1, s = 16 + lw) {
+  if (hk <= 0) return;
+  pen(x2, y2, x2 - Math.cos(ang - .5) * s, y2 - Math.sin(ang - .5) * s, hk, c, lw, 3, a);
+  pen(x2, y2, x2 - Math.cos(ang + .5) * s, y2 - Math.sin(ang + .5) * s, hk, c, lw, 5, a);
+}
+function penArrow(x1, y1, x2, y2, k, c = K.red, lw = 5, seed = 1, a = 1, dash) {
+  pen(x1, y1, x2, y2, clamp(k / .8), c, lw, seed, a, dash);
+  arrowHead(x2, y2, Math.atan2(y2 - y1, x2 - x1), clamp((k - .75) / .25), c, lw, a);
+}
+function penCurve(x1, y1, cx, cy, x2, y2, k, c = K.red, lw = 5, a = 1, arrow = false) {
+  const pts = []; for (let i = 0; i <= 30; i++) { const f = i / 30; pts.push([(1 - f) * (1 - f) * x1 + 2 * (1 - f) * f * cx + f * f * x2, (1 - f) * (1 - f) * y1 + 2 * (1 - f) * f * cy + f * f * y2]); }
+  strokePts(pts, arrow ? clamp(k / .85) : k, c, lw, a);
+  if (arrow) arrowHead(x2, y2, Math.atan2(y2 - cy, x2 - cx), clamp((k - .8) / .2), c, lw, a);
+}
+function check(x, y, s, k, c = K.red, lw = 7) { strokePts([[x - s * .5, y], [x - s * .12, y + s * .38], [x + s * .55, y - s * .45]], k, c, lw); }
+function crossMark(x, y, s, k, c = K.navy, lw = 6) { pen(x - s / 2, y - s / 2, x + s / 2, y + s / 2, clamp(k * 2), c, lw, 2); pen(x + s / 2, y - s / 2, x - s / 2, y + s / 2, clamp(k * 2 - 1), c, lw, 4); }
+function hiLite(x, y, w, h, k, c = K.blush) { if (k <= 0) return; const e = eOut(k); ctx.save(); ctx.globalCompositeOperation = 'multiply'; ctx.fillStyle = c;   // multiply: text under the marker stays readable
+  ctx.beginPath(); ctx.moveTo(x, y + 4); ctx.lineTo(x + w * e, y); ctx.lineTo(x + w * e - 6, y + h); ctx.lineTo(x - 4, y + h - 3); ctx.closePath(); ctx.fill(); ctx.restore(); }
+function hbox(x, y, w, h, k, c = K.red, lw = 4, seed = 3) { strokePts([...wobble(x, y, x + w, y, seed, 1), ...wobble(x + w, y, x + w, y + h, seed + 1, 1).slice(1), ...wobble(x + w, y + h, x, y + h, seed + 2, 1).slice(1), ...wobble(x, y + h, x, y, seed + 3, 1).slice(1)], k, c, lw); }
+function sticky(x, y, w, h, rot, k, lines, { size = 32, color = K.ink } = {}) {
+  if (k <= 0) return; const s = lerp(.6, 1, eBack(k));
+  ctx.save(); ctx.globalAlpha *= clamp(k * 2); ctx.translate(x + w / 2, y + h / 2); ctx.rotate(rot); ctx.scale(s, s);
+  ctx.shadowColor = 'rgba(30,30,30,.14)'; ctx.shadowBlur = 16; ctx.shadowOffsetY = 8; ctx.fillStyle = K.lightBox; ctx.fillRect(-w / 2, -h / 2, w, h); ctx.shadowColor = 'transparent';
+  ctx.fillStyle = rgba(K.lineGrey, .45); ctx.fillRect(-w / 2, -h / 2, w, 26);
+  lines.forEach((l, i) => text(l, 0, (i - (lines.length - 1) / 2) * size * 1.25 + 8, { size, weight: 700, fam: HAND, color, align: 'center', maxW: w - 30 }));
+  ctx.restore();
+}
+// rectangular rubber stamp, lands from a bigger size
+function stamp(str, x, y, k, c = K.red, rot = -.08, size = 34) {
+  if (k <= 0) return; const s = lerp(1.8, 1, eOut(k)), w = measure(str, size, 800) + 2 * str.length + 60;
+  ctx.save(); ctx.globalAlpha *= clamp(k * 3) * .92; ctx.translate(x, y); ctx.rotate(rot); ctx.scale(s, s);
+  ctx.strokeStyle = c; ctx.lineWidth = 6; ctx.strokeRect(-w / 2, -size, w, size * 2); ctx.lineWidth = 2.5; ctx.strokeRect(-w / 2 + 8, -size + 8, w - 16, size * 2 - 16);
+  text(str, 0, 2, { size, weight: 800, color: c, align: 'center', spacing: 2 }); ctx.restore();
+}
+
+// ---------- workbook parts ----------
+// pill label; returns its width. White underneath: tinted labels never show the grid
+function chip(str, x, y, { size = 22, fill = K.red, color = '#FFFFFF', a = 1, pad = 16, weight = 700, spacing = 1.5, align = 'left' } = {}) {
+  if (a <= 0) return 0; const w = measure(str, size, weight) + spacing * str.length + pad * 2, h = size * 1.8, x0 = align === 'center' ? x - w / 2 : x;
+  rr(x0, y - h / 2, w, h, h / 2, '#FFFFFF', null, 0, a); rr(x0, y - h / 2, w, h, h / 2, fill, null, 0, a); text(str, x0 + pad, y + 1, { size, weight, color, alpha: a, spacing }); return w;
+}
+// numbered circle (1 2 3 of a comparison: red, blue, mint)
+function num(n, x, y, col, { r = 26, a = 1 } = {}) { if (a <= 0) return; circle(x, y, r, '#FFFFFF', null, 0, a); circle(x, y, r, col, null, 0, a); text(String(n), x, y + 1, { size: r * 1.1, weight: 800, color: '#FFFFFF', align: 'center', alpha: a }); }
+// a sheet of paper with grey text lines
+function sheet(x, y, w, h, rot = 0, a = 1, lines = 5) {
+  if (a <= 0) return; ctx.save(); ctx.globalAlpha *= a; ctx.translate(x, y); ctx.rotate(rot);
+  ctx.shadowColor = 'rgba(30,30,30,.10)'; ctx.shadowBlur = 12; ctx.shadowOffsetY = 5; ctx.fillStyle = '#FFFFFF'; ctx.fillRect(-w / 2, -h / 2, w, h); ctx.shadowColor = 'transparent';
+  ctx.strokeStyle = LINE; ctx.lineWidth = 2; ctx.strokeRect(-w / 2, -h / 2, w, h);
+  ctx.strokeStyle = rgba(K.lineGrey, .7); ctx.lineWidth = 4; for (let i = 0; i < lines; i++) { const yy = -h / 2 + h * .2 + i * h * .7 / lines; ctx.beginPath(); ctx.moveTo(-w / 2 + w * .14, yy); ctx.lineTo(w / 2 - w * (i % 2 ? .3 : .14), yy); ctx.stroke(); }
+  ctx.restore();
+}
+// vertical gauge: v = 0..1 filled, ↑ or ↓ beside the top
+function meter(x, y, h, v, col, label, sub, a, up) {
+  if (a <= 0) return; ctx.save(); ctx.globalAlpha *= a;
+  rr(x - 44, y - h, 88, h, 12, '#FFFFFF', LINE, 2); rr(x - 32, y - 12 - (h - 24) * v, 64, (h - 24) * v, 8, col);
+  text(label, x, y + 40, { size: 28, weight: 700, align: 'center', maxW: 240 }); text(sub, x, y + 76, { size: 21, weight: 500, color: K.muted, align: 'center', maxW: 250 });
+  text(up ? '↑' : '↓', x + 72, y - 12 - (h - 24) * v, { size: 44, weight: 800, color: col, align: 'center' });
+  ctx.restore();
+}
+// a checked list row: red check + text
+function checkRow(t, t0, x, y, str, { size = 30, w = 1300, col = K.red } = {}) {
+  enter(t, t0, () => text(str, x + 50, y, { size, weight: 700, maxW: w }), { dx: 20, dy: 0 });
+  check(x + 14, y + 2, 30, p(t, t0 + .25, .3), col, 5);
+}
+// dark statement bar across the page (a closing line)
+function bar(str, y, a, { x = 210, w = 1590, h = 84, size = 28 } = {}) {
+  if (a <= 0) return; rr(x, y, w, h, 14, K.ink, null, 0, a); text(str, x + 36, y + h / 2 + 1, { size, weight: 700, color: '#FFFFFF', alpha: a, maxW: w - 72 });
+}
+// speech bubble (tail at the top left), drawn at the current origin: left edge x = 0, middle y = 0
+function bubble(w, fill) {
+  const r = 36, y0 = -36;
+  ctx.save(); ctx.beginPath(); ctx.moveTo(r, y0); ctx.lineTo(42, y0); ctx.lineTo(88, y0 - 24); ctx.lineTo(70, y0); ctx.lineTo(w - r, y0); ctx.arc(w - r, 0, r, -Math.PI / 2, Math.PI / 2);
+  ctx.lineTo(r, -y0); ctx.arc(r, 0, r, Math.PI / 2, Math.PI * 3 / 2); ctx.closePath();
+  ctx.fillStyle = '#FFFFFF'; ctx.fill(); ctx.fillStyle = fill; ctx.fill(); ctx.restore();
+}
+
+// ---------- page furniture ----------
+function paper(cam) {
+  ctx.fillStyle = K.paper; ctx.fillRect(0, 0, W, H);
+  const minor = ((cam % 40) + 40) % 40, major = ((cam % 200) + 200) % 200;
+  [[40, minor, K.grid], [200, major, K.gridMajor]].forEach(([step, off, col]) => {
+    ctx.lineWidth = 1; ctx.strokeStyle = col; ctx.beginPath();
+    for (let x = -off; x <= W; x += step) { ctx.moveTo(Math.round(x) + .5, 0); ctx.lineTo(Math.round(x) + .5, H); }
+    for (let y = 0; y <= H; y += step) { ctx.moveTo(0, y + .5); ctx.lineTo(W, y + .5); }
+    ctx.stroke();
+  });
+}
+function pageFurniture(i) {
+  ctx.save(); ctx.strokeStyle = K.margin; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(150, 0); ctx.lineTo(150, H); ctx.stroke(); ctx.restore();
+  text(`p. ${i + 1}`, 1800, 92, { size: 26, weight: 700, fam: HAND, color: K.muted, align: 'right' });
+}
+// section tab (always red) + title (top-left). Slides in once, then stays still
+function header(t, t0, tab, title) {
+  const k1 = eOut(p(t, t0, .5)), k2 = eOut(p(t, t0 + .15, .6));
+  if (k1 > 0 && !SHARED_OFF) { ctx.save(); ctx.translate((1 - k1) * -30, 0); chip(tab, 210, 92, { size: 18, fill: K.red, a: k1, spacing: 2.5 }); ctx.restore(); }
+  if (k2 > 0) { ctx.save(); ctx.translate((1 - k2) * -30, 0); text(title, 210, 160, { size: 54, weight: 700, alpha: k2, maxW: 1560 }); ctx.restore(); }
+}
+const H0 = id => S(id).start + .15;   // header time for a scene
+const subline = (t, id, str, d = .45) => text(str, 210, 228, { size: 26, weight: 500, color: K.muted, alpha: p(t, H0(id) + d, .5), maxW: 1590 });
+
+// ---------- drawings used on several pages ----------
+// a person: head + shoulders
+function person(x, y, s, col, a = 1) {
+  if (a <= 0) return; circle(x, y - s * .55, s * .28, col, null, 0, a);
+  ctx.save(); ctx.globalAlpha *= a; ctx.fillStyle = col; ctx.beginPath(); ctx.arc(x, y + s * .4, s * .5, Math.PI, 0); ctx.closePath(); ctx.fill(); ctx.restore();
+}
+// small line icons, centred on x, y, about s px across
+function icon(kind, x, y, s, col, a = 1) {
+  if (a <= 0) return; ctx.save(); ctx.globalAlpha *= a; const lw = Math.max(3, s / 14);
+  if (kind === 'search') { circle(x - s * .08, y - s * .08, s * .28, '#FFFFFF', col, lw); line0(x + s * .13, y + s * .13, x + s * .4, y + s * .4, col, lw * 1.6); }
+  if (kind === 'flag') { line0(x - s * .28, y + s * .45, x - s * .28, y - s * .45, col, lw); ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(x - s * .28, y - s * .45); ctx.lineTo(x + s * .38, y - s * .27); ctx.lineTo(x - s * .28, y - s * .08); ctx.fill(); }
+  if (kind === 'chart') { line0(x - s * .42, y - s * .42, x - s * .42, y + s * .4, K.ink, lw * .7); line0(x - s * .42, y + s * .4, x + s * .44, y + s * .4, K.ink, lw * .7); strokePts([[x - s * .32, y + s * .22], [x - s * .08, y + s * .05], [x + s * .1, y + s * .12], [x + s * .36, y - s * .28]], 1, col, lw); }
+  if (kind === 'report') { rr(x - s * .34, y - s * .45, s * .68, s * .9, 6, '#FFFFFF', K.ink, lw * .7); [.5, .8, .35].forEach((v, i) => rr(x - s * .2, y - s * .25 + i * s * .2, s * .42 * v, s * .1, 3, i === 1 ? col : K.lineGrey)); }
+  if (kind === 'route') { strokePts([[x - s * .4, y + s * .3], [x - s * .1, y + s * .3], [x - s * .1, y - s * .05], [x + s * .2, y - s * .05], [x + s * .2, y - s * .3]], 1, col, lw, 1, [s * .08, s * .07]); circle(x - s * .4, y + s * .3, s * .08, col); icon('flag', x + s * .32, y - s * .3, s * .45, col); }
+  if (kind === 'ai') { rr(x - s * .32, y - s * .32, s * .64, s * .64, 8, '#FFFFFF', col, lw); for (let i = -1; i <= 1; i++) { line0(x + i * s * .16, y - s * .32, x + i * s * .16, y - s * .46, col, lw * .7); line0(x + i * s * .16, y + s * .32, x + i * s * .16, y + s * .46, col, lw * .7); line0(x - s * .32, y + i * s * .16, x - s * .46, y + i * s * .16, col, lw * .7); line0(x + s * .32, y + i * s * .16, x + s * .46, y + i * s * .16, col, lw * .7); } text('AI', x, y + 1, { size: s * .3, weight: 800, color: col, align: 'center' }); }
+  if (kind === 'store') { rr(x - s * .4, y - s * .1, s * .8, s * .55, 4, '#FFFFFF', col, lw); for (let i = 0; i < 4; i++) rr(x - s * .46 + i * s * .23, y - s * .34, s * .23, s * .24, 3, i % 2 ? '#FFFFFF' : col, col, lw * .5); rr(x - s * .1, y + s * .15, s * .2, s * .3, 2, col); }
+  if (kind === 'home') { ctx.fillStyle = '#FFFFFF'; ctx.strokeStyle = col; ctx.lineWidth = lw; ctx.lineJoin = 'round'; ctx.beginPath(); ctx.moveTo(x - s * .4, y - s * .02); ctx.lineTo(x, y - s * .42); ctx.lineTo(x + s * .4, y - s * .02); ctx.lineTo(x + s * .3, y - s * .02); ctx.lineTo(x + s * .3, y + s * .42); ctx.lineTo(x - s * .3, y + s * .42); ctx.lineTo(x - s * .3, y - s * .02); ctx.closePath(); ctx.fill(); ctx.stroke(); person(x, y + s * .26, s * .3, col); }
+  if (kind === 'cycle') { ctx.strokeStyle = col; ctx.lineWidth = lw; ctx.lineCap = 'round'; [0, Math.PI].forEach(a0 => { ctx.beginPath(); ctx.arc(x, y, s * .32, a0 + .3, a0 + 2.6); ctx.stroke(); const ae = a0 + 2.6, hx = x + Math.cos(ae) * s * .32, hy = y + Math.sin(ae) * s * .32; arrowHead(hx, hy, ae + Math.PI / 2, 1, col, lw, 1, s * .16); }); }
+  if (kind === 'levels') [.3, .55, .8].forEach((v, i) => rr(x - s * .4 + i * s * .3, y + s * .4 - s * v, s * .22, s * v, 3, col));
+  if (kind === 'tablet') { rr(x - s * .36, y - s * .45, s * .72, s * .9, 8, '#FFFFFF', col, lw); for (let i = 0; i < 2; i++) for (let j = 0; j < 2; j++) rr(x - s * .24 + i * s * .26, y - s * .3 + j * s * .26, s * .2, s * .2, 3, K.lineGrey); }
+  if (kind === 'pencil') { ctx.translate(x, y); ctx.rotate(-.7); rr(-s * .12, -s * .42, s * .24, s * .66, 3, '#FFFFFF', col, lw); ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(-s * .12, s * .24); ctx.lineTo(s * .12, s * .24); ctx.lineTo(0, s * .46); ctx.closePath(); ctx.fill(); }
+  if (kind === 'coach') { person(x - s * .14, y + s * .05, s * .62, col); rr(x + s * .12, y - s * .46, s * .36, s * .26, 6, '#FFFFFF', col, lw * .8); }
+  if (kind === 'grow') { icon('chart', x, y, s, col); text('↑', x + s * .36, y - s * .1, { size: s * .4, weight: 800, color: col, align: 'center' }); }
+  ctx.restore();
+}
+// rounded box with a centred, wrapped label
+function labelBox(x, y, w, h, str, { fill = K.lightBox, stroke = null, color = K.ink, size = 26, weight = 800, a = 1, lw = 3 } = {}) {
+  if (a <= 0) return; rr(x, y, w, h, 14, '#FFFFFF', null, 0, a); rr(x, y, w, h, 14, fill, stroke, lw, a);
+  const ls = wrapLines(str, w - 36, size, weight), lh = size * 1.22;
+  ls.forEach((l, i) => text(l, x + w / 2, y + h / 2 + (i - (ls.length - 1) / 2) * lh + 1, { size, weight, color, align: 'center', alpha: a, maxW: w - 30 }));
+}
+// centred wrapped lines (any number), middle at y
+function cpara(str, x, y, maxW, { size = 26, weight = 800, color = K.ink, alpha = 1, lh = 1.22 } = {}) {
+  const ls = wrapLines(str, maxW, size, weight); ls.forEach((l, i) => text(l, x, y + (i - (ls.length - 1) / 2) * size * lh, { size, weight, color, align: 'center', alpha, maxW })); return ls.length;
+}
+// table: head row tint first, then the column labels (cols: [x, w, label])
+function tHead(cols, y, a, h = 46) {
+  if (a <= 0) return; const x0 = cols[0][0], x1 = cols[cols.length - 1][0] + cols[cols.length - 1][1];
+  rr(x0, y, x1 - x0, h, 10, K.lightBox, null, 0, a);
+  cols.forEach(([x, w, lab]) => text(lab, x + 20, y + h / 2 + 1, { size: 19, weight: 800, color: K.muted, spacing: 1.5, alpha: a, maxW: w - 30 }));
+}
+function tRow(y, h, a, hot = false) { if (a <= 0) return; card(210, y, 1590, h, { a, stroke: hot ? K.red : LINE, lw: hot ? 3 : 2, shadow: false, r: 12 }); }
+// step cards in a row joined by arrows: items = [[title, sub, icon, time]], col = the card's accent
+function stepRow(t, items, y, h, { x0 = 210, x1 = 1800, gap = 40, col = K.red, size = 26 } = {}) {
+  const n = items.length, w = (x1 - x0 - gap * (n - 1)) / n;
+  items.forEach(([tt, sub, ic, t0, c = col], i) => {
+    const x = x0 + i * (w + gap);
+    enter(t, t0 - .2, () => {
+      card(x, y, w, h, { stroke: c === K.red ? K.red : LINE, lw: c === K.red ? 3 : 2 });
+      num(`0${i + 1}`, x + 40, y + 40, c === K.red ? K.red : K.midGrey, { r: 22 });
+      if (ic) icon(ic, x + w - 52, y + 46, 54, c);
+      cpara(tt, x + w / 2, y + (sub ? h * .52 : h * .6), w - 36, { size });
+      if (sub) cpara(sub, x + w / 2, y + h - 38, w - 36, { size: 20, weight: 600, color: K.muted });
+    }, { pop: true, ox: x + w / 2, oy: y + h / 2 });
+    if (i < n - 1) penArrow(x + w + 6, y + h / 2, x + w + gap - 6, y + h / 2, p(t, items[i + 1][3] - .35, .3), K.ink, 3, 20 + i);
+  });
+}
+// pen underline under one phrase of a bar() line (the same scaling bar() uses)
+function barUnder(str, phrase, y, k, { x = 210, w = 1590, h = 84, size = 28 } = {}) {
+  const sc = Math.min(1, (w - 72) / measure(str, size, 700)), x0 = x + 36 + measure(str.slice(0, str.indexOf(phrase)), size, 700) * sc;
+  pen(x0, y + h / 2 + size * .62, x0 + measure(phrase, size, 700) * sc, y + h / 2 + size * .6, k, '#FFFFFF', 4, 4);
+}
+const TAB = {
+  market: '01  ·  MARKET & COMPETITION', brand: '02  ·  OUR BRAND TODAY', customers: '03  ·  CUSTOMERS',
+  diff: '04  ·  DIFFERENTIATION', pos: '05  ·  POSITIONING', exec: '06  ·  EXECUTION',
+};
+const N = { '146': ['146', '146%', 'percent'], d: ['daekyo', 'dekyo', 'daegyo', 'daikyo', 'taekyo', 'dekyos'], k: ['kumon', 'kumons', 'coumon', 'kuman'], wj: ['woongjin', 'wangjin', 'wungjin', 'woongjins', 'wongjin', 'woongjinn'] };
+
+// ============================================================
+// scenes (absolute time t). One SC entry per scene id in tools/script.py SCENES, in the same order
+// ============================================================
+const SC = {};
+
+// ---------- 1. title: precise assessment → the right learning path → growing independently ----------
+SC.title = t => {
+  const [w0, w1] = C.title.words;
+  chip(C.title.kicker, 210, 330, { size: 18, fill: K.red, a: eOut(p(t, .3, .5)), spacing: 2.5 });
+  hiLite(200, 394, measure(w0, 92, 800) + 22, 74, p(t, 1.5, .7));
+  [w0, w1].forEach((w, i) => enter(t, .6 + i * .25, () => text(w, 210, 432 + i * 108, { size: 92, weight: 800, color: i === 0 ? K.red : K.ink, maxW: 900 })));
+  enter(t, 1.4, () => text(C.title.sub, 214, 660, { size: 32, weight: 600, color: K.muted, maxW: 860 }));
+  text(C.title.date, 214, 730, { size: 30, weight: 700, fam: HAND, color: K.red, alpha: p(t, 2, .5) });
+  const tA = Wc('l1_2', 'assessments', .35), tP = Wc('l1_2', 'path', .5), tG = Wc('l1_2', 'independently', .95), x = 1200;
+  enter(t, tA - .3, () => { card(x, 300, 280, 200); icon('search', x + 140, 372, 90, K.red); text('Precise assessment', x + 140, 462, { size: 25, weight: 800, align: 'center', maxW: 250 }); }, { pop: true, ox: x + 140, oy: 400 });
+  strokePts([[x + 140, 510], [x + 140, 610], [x + 420, 610], [x + 420, 700]], p(t, tP - .4, .9), K.red, 5, 1, [14, 12]);
+  text('The right learning path', x + 300, 578, { size: 28, weight: 700, fam: HAND, color: K.red, align: 'center', alpha: p(t, tP, .4) });
+  enter(t, tG - .5, () => {
+    card(x + 60, 712, 540, 170, { stroke: K.red, lw: 3 }); person(x + 130, 800, 66, K.ink); icon('flag', x + 545, 760, 56, K.red);
+    text('The ability to grow', x + 190, 770, { size: 30, weight: 800, color: K.red, maxW: 320 }); text('independently', x + 190, 815, { size: 30, weight: 800, maxW: 320 });
+  }, { pop: true, ox: x + 330, oy: 797 });
+};
+
+// ---------- 2. changes in the market: fewer potential customers (navy = down), more options ----------
+SC.market = t => {
+  header(t, H0('market'), TAB.market, 'Changes in the Market');
+  subline(t, 'market', 'Fewer school-age children, a growing range of education options');
+  // potential customers aged 4–14: 2021 → 2025
+  const t21 = Wc('l2_2', ['2021', 'twenty'], .1), tDec = Wc('l2_2', 'decreased', .7), tP = Wc('l2_2', N['146'], .85), base = 690, HB = 280;
+  enter(t, t21 - .3, () => { card(210, 290, 760, 470); text('POTENTIAL CUSTOMERS, AGES 4–14', 250, 336, { size: 20, weight: 800, color: K.muted, spacing: 2 }); line0(260, base, 680, base, K.ink, 3); });
+  const k1 = eOut(p(t, t21, .6)), h2 = HB * 419.3 / 490.8, k2 = eOut(p(t, tDec - .4, .7));
+  rr(300, base - HB * k1, 150, HB * k1, 4, K.midGrey, null, 0, p(t, t21, .1));
+  text('4,908,000', 375, base - HB - 26, { size: 24, weight: 800, align: 'center', alpha: p(t, t21 + .4, .3) });
+  text('2021', 375, base + 32, { size: 24, weight: 700, color: K.muted, align: 'center', alpha: p(t, t21, .3) });
+  rr(500, base - h2 * k2, 150, h2 * k2, 4, K.navy, null, 0, p(t, tDec - .4, .1));
+  text('4,193,000', 575, base - h2 - 26, { size: 24, weight: 800, color: K.navy, align: 'center', alpha: p(t, tDec, .3) });
+  text('2025', 575, base + 32, { size: 24, weight: 700, color: K.muted, align: 'center', alpha: p(t, tDec - .4, .3) });
+  penArrow(830, 400, 830, 455, p(t, tP - .3, .3), K.navy, 6, 3);
+  enter(t, tP - .2, () => { text('14.6%', 830, 510, { size: 64, weight: 800, color: K.navy, align: 'center' }); text('in four years', 830, 600, { size: 24, weight: 700, color: K.muted, align: 'center' }); }, { pop: true, ox: 830, oy: 510 });
+  penCircle(830, 510, 122, 56, p(t, tP + .4, .5), K.red, 4, 5);
+  // home-visit learning: its strengths and its limits
+  const tT = Wc('l2_1', 'traditional', .1), tO = Wc('l2_1', 'options', .9);
+  enter(t, tT - .2, () => { card(1010, 290, 790, 215, { fill: K.lightBox, stroke: null, shadow: false }); icon('home', 1090, 397, 80, K.midGrey);
+    text('Strengths of home-visit learning', 1160, 365, { size: 22, weight: 800, color: K.muted, maxW: 600 }); text('Paper-based learning · 1:1 teacher care', 1160, 418, { size: 30, weight: 800, maxW: 610 }); });
+  enter(t, tO - .4, () => { card(1010, 545, 790, 215, { fill: K.navyTint, stroke: null, shadow: false });
+    text('Key limits', 1060, 620, { size: 22, weight: 800, color: K.navy, maxW: 700 }); text('More channels · all-subject competitors', 1060, 673, { size: 30, weight: 800, color: K.navy, maxW: 700 }); });
+  // a wider range of services, a smaller number of customers
+  const tW = Wc('l2_3', 'wider', .4);
+  const b2 = 'We compete with a wider range of education services for a smaller number of customers';
+  enter(t, st('l2_3') - .1, () => bar(b2, 800, 1, { size: 29 }));
+  barUnder(b2, 'a wider range', 800, p(t, tW, .5), { size: 29 }); barUnder(b2, 'a smaller number', 800, p(t, Wc('l2_3', 'smaller', .8), .5), { size: 29 });
+};
+
+// ---------- 3. competitive environment: four alternatives competing for parents' time and budgets ----------
+SC.competition = t => {
+  header(t, H0('competition'), TAB.market, 'Competitive Environment');
+  subline(t, 'competition', 'Our competition goes beyond traditional home-visit education');
+  const CX = 1005, CY = 550, R = 150, tB = Wc('l3_1', 'beyond', .5), tC = Wc('l3_2', 'competing', .7), tTm = Wc('l3_2', 'time', .85);
+  // centre: home-visit education first, then parents' time and budgets
+  const kHome = p(t, st('l3_1') - .1, .4) * (1 - p(t, tTm - .3, .4)), kPar = p(t, tTm - .3, .4);
+  circle(CX, CY, R, '#FFFFFF', kPar > 0 ? K.red : K.lineGrey, 4, p(t, st('l3_1') - .1, .4));
+  icon('home', CX, CY - 40, 70, K.midGrey, kHome); text('Home-visit', CX, CY + 30, { size: 26, weight: 800, align: 'center', alpha: kHome }); text('education', CX, CY + 62, { size: 26, weight: 800, align: 'center', alpha: kHome });
+  text("Parents'", CX, CY - 50, { size: 30, weight: 800, color: K.red, align: 'center', alpha: kPar }); text('time', CX, CY - 10, { size: 30, weight: 800, color: K.red, align: 'center', alpha: kPar });
+  text('& education', CX, CY + 36, { size: 26, weight: 800, align: 'center', alpha: kPar }); text('budgets', CX, CY + 72, { size: 26, weight: 800, align: 'center', alpha: kPar });
+  const ALT = [
+    ['Smart learning services', 'All subjects · video lessons · tablets', 'tablet', 'smart', 210, 300],
+    ['Large private academies', 'School subjects · entrance exams', 'store', 'academies', 1240, 300],
+    ['Local learning centers', 'Small groups close to home', 'home', 'centers', 210, 610],
+    ['Digital workbooks', 'Paper and digital combined', 'ai', 'workbooks', 1240, 610]];
+  ALT.forEach(([tt, sub, ic, w, x, y], i) => {
+    const t0 = Wc('l3_2', w, .15 + i * .15);
+    enter(t, t0 - .2, () => { card(x, y, 560, 190); icon(ic, x + 75, y + 95, 76, K.midGrey); text(tt, x + 140, y + 75, { size: 29, weight: 800, maxW: 400 }); text(sub, x + 140, y + 122, { size: 22, weight: 600, color: K.muted, maxW: 400 }); }, { pop: true, ox: x + 280, oy: y + 95 });
+    const left = x < CX, ax = left ? x + 575 : x - 15, ay = y + 95, ang = Math.atan2(CY - ay, CX - ax), ex = CX - Math.cos(ang) * (R + 14), ey = CY - Math.sin(ang) * (R + 14);
+    penArrow(ax, ay, ex, ey, p(t, tC - .2 + i * .12, .4), K.ink, 3, 40 + i);
+  });
+  text('goes beyond', CX, 330, { size: 28, weight: 700, fam: HAND, color: K.red, align: 'center', alpha: p(t, tB - .2, .4) });
+  // JEI: a clear competitive advantage
+  const tA = Wc('l3_3', 'advantage', .8);
+  enter(t, st('l3_3') - .1, () => { rr(210, 836, 1590, 84, 14, K.red); text('JEI needs to build a clear competitive advantage', 1005, 879, { size: 32, weight: 800, color: '#FFFFFF', align: 'center', maxW: 1500 }); }, { pop: true, ox: 1005, oy: 878 });
+  const s3 = 'JEI needs to build a clear competitive advantage', x3 = 1005 - measure(s3, 32, 800) / 2 + measure('JEI needs to build a clear ', 32, 800);
+  pen(x3, 900, x3 + measure('competitive advantage', 32, 800), 898, p(t, tA, .5), '#FFFFFF', 4, 6);
+};
+
+// ---------- 4. key competitor strategies: three competitors (grey), JEI (red) ----------
+SC.competitors = t => {
+  header(t, H0('competitors'), TAB.market, 'Key Competitor Strategies');
+  subline(t, 'competitors', 'Major education companies are following different strategies');
+  const COL = [[210, 240, 'COMPANY'], [450, 560, 'STRATEGY'], [1010, 790, 'KEY CHALLENGE']];
+  tHead(COL, 290, p(t, st('l4_1'), .4));
+  const ROWS = [
+    ['Daekyo', 'Learning centers', 'Center members · fixed costs and profitability', Wc('l4_2', N.d, .05)],
+    ['Kumon', 'Paper-based + digital learning', 'Responding to all-subject learning', Wc('l4_2', N.k, .35)],
+    ['Woongjin', 'AI-based learning programs', 'Retention · marketing costs and profitability', Wc('l4_2', N.wj, .7)],
+    ['JEI', 'Assessment-based care, online + offline', 'Expanding to Korean and English · speed', st('l4_3')]];
+  ROWS.forEach(([co, s, ch, t0], i) => {
+    const y = 350 + i * 96, hot = i === 3, a = p(t, t0 - .2, .4);
+    enter(t, t0 - .2, () => {
+      tRow(y, 84, 1, hot);
+      text(co, 236, y + 43, { size: 30, weight: 800, color: hot ? K.red : K.ink });
+      text(s, 470, y + 43, { size: 27, weight: 800, maxW: 520 });
+      text(ch, 1030, y + 43, { size: 23, weight: 600, color: K.muted, maxW: 750 });
+    }, { dx: 24, dy: 0 });
+  });
+  // JEI: expand its assessment strengths across subjects
+  const tE = Wc('l4_3', 'expand', .3), tS = Wc('l4_3', 'subjects', .9), y = 820;
+  const wA = measure('Assessment-based', 27, 800); penCircle(462 + wA / 2, 682, wA / 2 + 34, 32, p(t, tE - .1, .5), K.red, 4, 7);
+  enter(t, tE, () => { chip('Math assessment', 210, y, { size: 26, fill: K.red, spacing: .5 }); }, { dx: 20, dy: 0 });
+  penArrow(500, y, 600, y, p(t, tE + .4, .35), K.red, 5, 4);
+  enter(t, tS - .5, () => { ['Korean', 'English'].forEach((s, i) => { const w = measure(s, 26, 700) + 40; rr(620 + i * 180, y - 23, w, 46, 23, '#FFFFFF', K.red, 3); text(s, 640 + i * 180, y + 1, { size: 26, weight: 700, color: K.crimson }); }); }, { dx: 20, dy: 0 });
+  text('Expand assessment strengths across different subjects', 1000, y + 2, { size: 32, weight: 700, fam: HAND, color: K.red, alpha: p(t, tS, .4), maxW: 790 });
+};
+
+// ---------- 5. current brand positioning: JEI's "self-learning" overlaps with Kumon's habits ----------
+SC.current = t => {
+  header(t, H0('current'), TAB.brand, 'Current Brand Positioning');
+  const tJ = st('l5_1', .02), tO = Wc('l5_1', 'overlaps', .4), tH = Wc('l5_1', 'habits', .7);
+  const A = [470, 590], B = [740, 590], R = 205, kK = p(t, tO - .2, .5), kJ = p(t, tJ, .5), kO = p(t, tH, .6);
+  // overlap (navy tint), clipped to both circles
+  if (kO > 0) { ctx.save(); ctx.globalAlpha *= kO; ctx.beginPath(); ctx.arc(A[0], A[1], R, 0, Math.PI * 2); ctx.clip(); ctx.beginPath(); ctx.arc(B[0], B[1], R, 0, Math.PI * 2); ctx.fillStyle = K.navyTint; ctx.fill(); ctx.restore(); }
+  circle(A[0], A[1], R, null, K.midGrey, 4, kK); circle(B[0], B[1], R, null, K.red, 4, kJ);
+  text('Kumon', A[0] - 80, A[1] - 60, { size: 34, weight: 800, align: 'center', alpha: kK });
+  text('Study habits', A[0] - 80, A[1] - 6, { size: 23, weight: 700, color: K.muted, align: 'center', alpha: kK }); text('Independent', A[0] - 80, A[1] + 26, { size: 23, weight: 700, color: K.muted, align: 'center', alpha: kK }); text('learning', A[0] - 80, A[1] + 56, { size: 23, weight: 700, color: K.muted, align: 'center', alpha: kK });
+  text('JEI', B[0] + 80, B[1] - 60, { size: 34, weight: 800, color: K.red, align: 'center', alpha: kJ });
+  text('Self-learning', B[0] + 80, B[1] - 6, { size: 23, weight: 700, color: K.crimson, align: 'center', alpha: kJ });
+  text('Overlap', (A[0] + B[0]) / 2, A[1] + 4, { size: 26, weight: 800, color: K.navy, align: 'center', alpha: kO });
+  text('partly overlaps', (A[0] + B[0]) / 2, 352, { size: 30, weight: 700, fam: HAND, color: K.navy, align: 'center', alpha: kO });
+  // now → goal
+  const tS = Wc('l5_2', 'stand', .2), tPr = Wc('l5_2', 'precise', .6), tPa = Wc('l5_2', 'paths', .95);
+  enter(t, tS - .3, () => { card(1080, 330, 720, 150, { fill: K.lightBox, stroke: null, shadow: false }); text('NOW', 1120, 375, { size: 20, weight: 800, color: K.muted, spacing: 2 }); text('Self-learning', 1120, 430, { size: 36, weight: 800, color: K.muted }); });
+  text('To stand out', 1640, 530, { size: 30, weight: 700, fam: HAND, color: K.red, align: 'center', alpha: p(t, tS, .4) });
+  penArrow(1440, 495, 1440, 590, p(t, tS + .2, .4), K.red, 5, 3);
+  enter(t, tPr - .3, () => { card(1080, 610, 720, 200, { stroke: K.red, lw: 3 }); text('GOAL', 1120, 656, { size: 20, weight: 800, color: K.red, spacing: 2 }); text('Precise assessments', 1120, 712, { size: 36, weight: 800, color: K.red, maxW: 640 }); text('+ personalized learning paths', 1120, 762, { size: 36, weight: 800, maxW: 640 }); }, { pop: true, ox: 1440, oy: 710 });
+  check(1740, 660, 44, p(t, tPa, .35));
+};
+
+// ---------- 6. new direction: independent learning is the final goal, not the starting point ----------
+SC.direction = t => {
+  header(t, H0('direction'), TAB.brand, 'New Direction for Differentiation');
+  const n = 5, gap = 36, w = (1590 - gap * 4) / n, xs = i => 210 + i * (w + gap), Y = 420, HH = 210;
+  // "independent learning" at the start: crossed out (navy), gone when the new path is drawn
+  const tSt = Wc('l6_1', 'starting', .7), kOld = p(t, st('l6_1') - .1, .4) * (1 - p(t, st('l6_3') - .2, .4));
+  text('START', xs(0) + w / 2, 368, { size: 22, weight: 800, color: K.muted, align: 'center', spacing: 2, alpha: p(t, st('l6_1') - .1, .4) });
+  if (kOld > 0) { rr(xs(0), Y, w, HH, 16, '#FFFFFF', K.lineGrey, 3, kOld); ctx.save(); ctx.globalAlpha *= kOld; cpara('Independent learning', xs(0) + w / 2, Y + HH / 2, w - 40, { size: 28, color: K.navy }); crossMark(xs(0) + w / 2, Y + HH / 2, 120, p(t, tSt, .4)); ctx.restore(); }
+  const tF = Wc('l6_2', 'final', .6);
+  text('FINAL GOAL', xs(4) + w / 2, 368, { size: 22, weight: 800, color: K.red, align: 'center', spacing: 2, alpha: p(t, tF - .2, .4) });
+  const STEPS = [['Precise assessment', 'search', Wc('l6_3', 'assessments', .3)], ['Learning path design', 'route', Wc('l6_3', 'design', .1)],
+    ['Teacher coaching', 'coach', Wc('l6_3', 'coaching', .7)], ['Regular progress reviews', 'chart', Wc('l6_3', 'reviews', .95)], ['Independent learning', 'flag', tF]];
+  STEPS.forEach(([s, ic, t0], i) => {
+    const x = xs(i), last = i === 4;
+    enter(t, t0 - .25, () => {
+      card(x, Y, w, HH, { fill: last ? K.red : '#FFFFFF', stroke: last ? null : LINE });
+      num(`0${i + 1}`, x + 40, Y + 40, last ? '#FFFFFF' : K.red, { r: 22 }); if (last) text(`0${i + 1}`, x + 40, Y + 41, { size: 24, weight: 800, color: K.red, align: 'center' });
+      icon(ic, x + w - 50, Y + 48, 52, last ? '#FFFFFF' : K.red);
+      cpara(s, x + w / 2, Y + 140, w - 36, { size: 27, color: last ? '#FFFFFF' : K.ink });
+    }, { pop: true, ox: x + w / 2, oy: Y + HH / 2 });
+    if (i < 3) penArrow(x + w + 4, Y + HH / 2, x + w + gap - 4, Y + HH / 2, p(t, STEPS[i + 1][2] - .35, .3), K.ink, 3, 20 + i);
+  });
+  penArrow(xs(3) + w + 4, Y + HH / 2, xs(4) - 4, Y + HH / 2, p(t, en('l6_3') - .2, .3), K.red, 4, 31);
+  text("each child's growth", xs(2) + w / 2, Y + HH + 50, { size: 30, weight: 700, fam: HAND, color: K.red, align: 'center', alpha: p(t, Wc('l6_3', 'growth', .55), .4) });
+  pen(xs(0) + 20, Y + HH + 18, xs(3) + w - 20, Y + HH + 16, p(t, Wc('l6_3', 'growth', .55), .8), K.red, 4, 8);
+  enter(t, en('l6_3') - .2, () => bar('Not just different words, but a connected service experience', 800, 1));
+};
+
+// ---------- 7. current brand perception: what we have (red checks) vs. what parents may not see (navy) ----------
+SC.perception = t => {
+  header(t, H0('perception'), TAB.brand, 'Current Brand Perception');
+  subline(t, 'perception', 'A perception hypothesis based on public information, not survey results');
+  enter(t, st('l7_1') - .2, () => { card(210, 290, 760, 470); text('WHAT JEI HAS', 250, 340, { size: 20, weight: 800, color: K.red, spacing: 2 }); });
+  [['A long history', 'history'], ['A trusted reputation', 'trusted'], ['Structured learning materials', 'structured'], ['Strong assessment capabilities', 'assessment']].forEach(([s, w], i) =>
+    checkRow(t, Wc('l7_1', w, .2 + i * .25) - .2, 250, 420 + i * 88, s, { size: 32, w: 620 }));
+  // parents: why choose JEI today?
+  const tH = st('l7_2'), tTd = Wc('l7_2', 'today', .9);
+  enter(t, tH - .2, () => { card(1030, 290, 770, 470, { fill: K.navyTint, stroke: null, shadow: false }); text('WHAT PARENTS MAY MISS', 1070, 340, { size: 20, weight: 800, color: K.navy, spacing: 2 }); person(1120, 470, 90, K.navy); });
+  enter(t, Wc('l7_2', 'why', .5) - .2, () => { ctx.save(); ctx.translate(1200, 455); bubble(560, '#FFFFFF'); ctx.restore(); text('Why should we choose JEI today?', 1235, 456, { size: 28, weight: 800, color: K.navy, maxW: 500 }); }, { dx: -20, dy: 0 });
+  ['Assessment strengths are hard to see', 'Seen as similar to other home-visit brands', 'Experience differs from teacher to teacher'].forEach((s, i) =>
+    text('·  ' + s, 1070, 590 + i * 50, { size: 24, weight: 700, color: K.navy, alpha: p(t, tTd + i * .2, .4), maxW: 700 }));
+  const q7 = 'Why should we choose JEI today?', s7 = Math.min(1, 500 / measure(q7, 28, 800)), x7 = 1235 + measure('Why should we choose JEI ', 28, 800) * s7;
+  pen(x7, 482, x7 + measure('today?', 28, 800) * s7, 480, p(t, tTd, .4), K.red, 4, 3);
+  // changing this perception is a priority
+  const tP = Wc('l7_3', 'priority', .85);
+  enter(t, st('l7_3') - .1, () => bar('Changing this perception is an important priority', 800, 1, { size: 32 }));
+  stamp('PRIORITY', 1630, 842, p(t, tP, .3), K.red, -.08, 30);
+};
+
+// ---------- 8. what parents want: needs (problems) and wants (experiences) ----------
+SC.parents = t => {
+  header(t, H0('parents'), TAB.customers, 'What Parents Want');
+  subline(t, 'parents', 'From knowing where the child is to seeing the growth');
+  const COL = [[210, 720, 'NEED  ·  THE PROBLEM TO SOLVE'], [930, 870, 'WANT  ·  THE EXPERIENCE THEY EXPECT']];
+  tHead(COL, 290, p(t, st('l8_1') - .1, .4));
+  const ROWS = [
+    ['Accuracy', 'Current level and learning gaps', 'A trustworthy assessment that explains weak areas', Wc('l8_1', 'level', .3), true],
+    ['Fit', 'The right subject, level and pace', 'A clear learning order right after the assessment', Wc('l8_1', 'programs', .7), true],
+    ['Consistency', 'Steady study without nagging', 'Short sessions, success and teacher encouragement', en('l8_1', .1), false],
+    ['Visibility', 'Seeing real growth', 'Regular progress reports: scores, levels, graphs', Wc('l8_2', 'evidence', .6), true]];
+  ROWS.forEach(([k, need, want, t0, hot], i) => {
+    const y = 350 + i * 106;
+    enter(t, t0 - .2, () => {
+      tRow(y, 94, 1);
+      text(k, 236, y + 32, { size: 21, weight: 800, color: hot ? K.red : K.muted, spacing: 1 });
+      text(need, 236, y + 66, { size: 27, weight: 800, maxW: 660 });
+      text(want, 950, y + 48, { size: 26, weight: 700, color: K.ink, maxW: 760 });
+    }, { dx: 24, dy: 0 });
+    if (hot) check(1760, y + 48, 34, p(t, t0 + .3, .35), K.red, 5);
+  });
+  const tP = Wc('l8_2', 'progress', .9);
+  enter(t, tP - .3, () => bar('Know where they are  ·  Learn what fits  ·  See the growth', 800, 1, { size: 32 }));
+};
+
+// ---------- 9. learning needs by grade: a staircase (red gets stronger with each grade) ----------
+SC.grades = t => {
+  header(t, H0('grades'), TAB.customers, 'Learning Needs by Grade');
+  subline(t, 'grades', 'Learning needs change as children grow');
+  const G = [
+    ['Age 7 · Preschool', 'Basic preparation', 'Ready for school · letters and numbers', 'l9_2', K.lightBox, K.ink],
+    ['Grades 1–2', 'Good study habits', 'Short sessions and praise', 'l9_3', K.blush, K.crimson],
+    ['Grades 3–4', 'Support to prevent learning gaps', 'Weak areas · school pace', 'l9_4', K.lightRed, '#FFFFFF'],
+    ['Grades 5–6', 'Prepare for middle school', 'Self-directed learning · advanced and review', 'l9_5', K.red, '#FFFFFF']];
+  const w = 370, gap = 36, BOT = 790;
+  G.forEach(([g, need, sub, id, band, tc], i) => {
+    const x = 210 + i * (w + gap), y = 470 - i * 55;
+    enter(t, st(id) - .2, () => {
+      card(x, y, w, BOT - y, { r: 14 }); ctx.save(); ctx.beginPath(); ctx.roundRect(x, y, w, 70, [14, 14, 0, 0]); ctx.fillStyle = band; ctx.fill(); ctx.restore();
+      text(g, x + w / 2, y + 36, { size: 27, weight: 800, color: tc, align: 'center', maxW: w - 30 });
+      cpara(need, x + w / 2, y + 140, w - 50, { size: 30 });
+      cpara(sub, x + w / 2, BOT - 60, w - 50, { size: 21, weight: 600, color: K.muted });
+    }, { dy: 30 });
+  });
+  penArrow(300, 445, 1690, 255, p(t, Wc('l9_1', 'grow', .8) - .2, .9), K.red, 4, 6);
+  const tF = Wc('l9_6', 'fits', .8), s = 'The common goal: start with learning that fits each child';
+  enter(t, st('l9_6') - .1, () => bar(s, 820, 1, { size: 32 }));
+  barUnder(s, 'fits each child', 820, p(t, tF, .5), { size: 32 });
+};
+
+// ---------- 10. core target customers: parents of Grades 1–4 ----------
+SC.target = t => {
+  header(t, H0('target'), TAB.customers, 'Core Target Customers');
+  const tG = Wc('l10_1', ['4', 'four'], .9), tEx = Wc('l10_2', 'exactly', .6), tSup = Wc('l10_2', 'support', .95);
+  enter(t, st('l10_1') - .2, () => {
+    card(210, 280, 1590, 250, { stroke: K.red, lw: 3 }); chip('PRIMARY TARGET', 250, 330, { size: 18, fill: K.red, spacing: 2 });
+    text('Parents of children in', 250, 410, { size: 40, weight: 800 }); text('Grades 1–4', 250 + measure('Parents of children in ', 40, 800), 410, { size: 40, weight: 800, color: K.red });
+    person(1640, 420, 110, K.ink); person(1730, 450, 70, K.midGrey);
+  });
+  penCircle(250 + measure('Parents of children in ', 40, 800) + 105, 412, 130, 40, p(t, tG, .5), K.red, 4, 3);
+  text('who want to understand exactly where their children need additional support', 250, 478, { size: 28, weight: 700, color: K.muted, alpha: p(t, st('l10_2'), .5), maxW: 1300 });
+  hiLite(250 + measure('who want to understand ', 28, 700) - 6, 458, measure('exactly where', 28, 700) + 14, 40, p(t, tEx, .5));
+  // priorities
+  const COL = [[210, 300, 'PRIORITY'], [510, 420, 'WHO'], [930, 870, 'KEY LEARNING ISSUE']];
+  tHead(COL, 570, p(t, tSup - .2, .4));
+  [['1st  ·  Core', 'Grades 1–4', 'Finding learning gaps · uneven skills by area', true], ['2nd  ·  Growth', 'Age 7 · Preschool', 'Adjusting to school · basic preparation'], ['3rd  ·  Optional', 'Grades 5–6', 'Filling basic gaps · getting ready for middle school']].forEach(([pr, who, iss, hot], i) => {
+    const y = 628 + i * 84;
+    enter(t, tSup + i * .2, () => { tRow(y, 72, 1, hot); text(pr, 236, y + 37, { size: 25, weight: 800, color: hot ? K.red : K.muted }); text(who, 530, y + 37, { size: 26, weight: 800 }); text(iss, 950, y + 37, { size: 24, weight: 600, color: hot ? K.ink : K.muted, maxW: 820 }); }, { dx: 24, dy: 0 });
+  });
+};
+
+// ---------- 11. our strategic challenge: one-size-fits-all learning without assessment ----------
+SC.challenge = t => {
+  header(t, H0('challenge'), TAB.diff, 'Our Strategic Challenge');
+  const tO = Wc('l11_1', ['onesizefitsall', 'one'], .4), tW = Wc('l11_1', 'without', .8);
+  enter(t, st('l11_1') - .1, () => { rr(210, 280, 1590, 130, 16, K.navyTint); text('OUR MAIN CHALLENGE', 250, 322, { size: 20, weight: 800, color: K.navy, spacing: 2 }); text('One-size-fits-all learning that begins without proper assessment', 250, 370, { size: 36, weight: 800, color: K.navy, maxW: 1510 }); });
+  pen(250, 394, 250 + measure('One-size-fits-all learning', 36, 800), 392, p(t, tO, .6), K.navy, 4, 3);
+  // fixed schedule (navy) → each child's level and difficulty (red)
+  const tF = Wc('l11_2', 'fixed', .3), tA = Wc('l11_2', 'away', .15), tL = Wc('l11_2', 'level', .75), tD = Wc('l11_2', 'difficulty', .95), Y = 450;
+  enter(t, tF - .3, () => {
+    card(210, Y, 720, 400); text('A fixed learning schedule', 250, Y + 50, { size: 30, weight: 800, color: K.navy });
+    for (let j = 0; j < 3; j++) { const yy = Y + 135 + j * 88; person(270, yy + 12, 48, K.midGrey); for (let s = 0; s < 6; s++) rr(330 + s * 90, yy - 6, 76, 24, 6, K.lightBox, K.lineGrey, 2); }
+    text('Same pages, same pace for everyone', 570, Y + 370, { size: 23, weight: 600, color: K.muted, align: 'center' });
+  });
+  crossMark(870, Y + 50, 40, p(t, tA, .4));
+  penArrow(948, Y + 200, 1042, Y + 200, p(t, tL - .5, .4), K.red, 5, 4);
+  enter(t, tL - .3, () => {
+    card(1060, Y, 740, 400, { stroke: K.red, lw: 3 }); text("Each child's level and areas of difficulty", 1100, Y + 50, { size: 30, weight: 800, color: K.red, maxW: 660 });
+    [[2, 4], [0, 2], [3, 5]].forEach(([lev, gap], j) => { const yy = Y + 135 + j * 88; person(1120, yy + 12, 48, K.ink); for (let s = 0; s < 6; s++) rr(1180 + s * 90, yy - 6, 76, 24, 6, s < lev ? K.redTint : '#FFFFFF', K.lineGrey, 2); });
+  }, { pop: true, ox: 1430, oy: Y + 200 });
+  [[2, 4], [0, 2], [3, 5]].forEach(([lev, gap], j) => { const yy = Y + 135 + j * 88, k = p(t, tD - .2 + j * .15, .35); rr(1180 + gap * 90, yy - 6, 76, 24, 6, K.red, null, 0, k); penCircle(1218 + gap * 90, yy + 6, 54, 26, k, K.red, 3, 4 + j); });
+};
+
+// ---------- 12. JEI's core strengths: five strengths, connected into one process ----------
+SC.strengths = t => {
+  header(t, H0('strengths'), TAB.diff, "JEI's Core Strengths");
+  const S5 = [['Diagnostic assessment', 'Current level and weak areas', 'search', 'diagnostic'], ['Personalized learning progress', 'Levels set for each child', 'levels', 'personalized'],
+    ['Structured workbooks', 'Small steps to success', 'report', 'structured'], ['Paper-based learning', 'Read, think and write', 'pencil', ['paper', 'paperbased']], ['Teacher support', 'Feedback, pace, parent talks', 'coach', 'teacher']];
+  const gap = 32, w = (1590 - gap * 4) / 5;
+  S5.forEach(([s, sub, ic, wd], i) => {
+    const x = 210 + i * (w + gap), t0 = Wc('l12_1', wd, .2 + i * .17);
+    enter(t, t0 - .2, () => { card(x, 280, w, 270); num(i + 1, x + 38, 320, K.red, { r: 22 }); icon(ic, x + w / 2, 372, 66, K.red); cpara(s, x + w / 2, 462, w - 30, { size: 25 }); cpara(sub, x + w / 2, 520, w - 30, { size: 19, weight: 600, color: K.muted }); }, { pop: true, ox: x + w / 2, oy: 415 });
+  });
+  // one process: assessment → recommendations → learning → coaching → reassessment, and around again
+  const P = [['Assessment', Wc('l12_2', 'assessment', .4)], ['Learning recommendations', Wc('l12_2', 'recommendations', .55)], ['Learning', Wc('l12_2', 'learning', .7, 2)], ['Coaching', Wc('l12_2', 'coaching', .8)], ['Reassessment', Wc('l12_2', 'reassessment', .95)]];
+  text('ONE PROCESS', 210, 616, { size: 20, weight: 800, color: K.red, spacing: 2, alpha: p(t, Wc('l12_2', 'process', .3) - .2, .4) });
+  const pw = [260, 400, 220, 240, 290], pg = (1590 - pw.reduce((a, b) => a + b)) / 4; let x = 210;
+  const xs = pw.map(w => { const v = x; x += w + pg; return v; });
+  P.forEach(([s, t0], i) => {
+    enter(t, t0 - .25, () => { rr(xs[i], 660, pw[i], 90, 45, '#FFFFFF'); rr(xs[i], 660, pw[i], 90, 45, i === 0 || i === 4 ? K.red : K.redTint); text(s, xs[i] + pw[i] / 2, 706, { size: 27, weight: 800, color: i === 0 || i === 4 ? '#FFFFFF' : K.crimson, align: 'center', maxW: pw[i] - 30 }); }, { pop: true, ox: xs[i] + pw[i] / 2, oy: 705 });
+    if (i < 4) penArrow(xs[i] + pw[i] + 6, 705, xs[i + 1] - 6, 705, p(t, P[i + 1][1] - .4, .3), K.ink, 3, 10 + i);
+  });
+  const tR = P[4][1];
+  strokePts([[xs[4] + pw[4] / 2, 756], [xs[4] + pw[4] / 2, 830], [xs[0] + pw[0] / 2, 830], [xs[0] + pw[0] / 2, 762]], p(t, tR + .3, .9), K.red, 5);
+  arrowHead(xs[0] + pw[0] / 2, 762, -Math.PI / 2, p(t, tR + 1.1, .2), K.red, 5);
+  text('and around again', 1005, 862, { size: 28, weight: 700, fam: HAND, color: K.red, align: 'center', alpha: p(t, tR + .9, .4) });
+};
+
+// ---------- 13. principles of differentiation: common words (grey) vs. a real, connected experience (red) ----------
+SC.principles = t => {
+  header(t, H0('principles'), TAB.diff, 'Principles of Differentiation');
+  const Wd3 = [['“Self-learning”', 'Kumon · daily study habits', ['self', 'selflearning']], ['“Personalized”', 'Daekyo · leveled materials, 1:1 care', 'personalized'], ['“AI”', 'Woongjin · AI across all subjects', ['ai', 'aibased']]];
+  const gap = 40, w = (1590 - gap * 2) / 3, tE = Wc('l13_1', 'enough', .7);
+  Wd3.forEach(([s, sub, wd], i) => {
+    const x = 210 + i * (w + gap), t0 = Wc('l13_1', wd, .15 + i * .2);
+    enter(t, t0 - .2, () => { card(x, 280, w, 230, { fill: K.lightBox, stroke: null, shadow: false }); text(s, x + w / 2, 360, { size: 46, weight: 800, color: K.muted, align: 'center', maxW: w - 40 }); text(sub, x + w / 2, 426, { size: 23, weight: 600, color: K.muted, align: 'center', maxW: w - 40 }); }, { pop: true, ox: x + w / 2, oy: 395 });
+    chip('Not enough to set us apart', x + w / 2, 472, { size: 19, fill: K.navy, a: p(t, tE + i * .15, .4), spacing: .5, align: 'center' });
+  });
+  // a real learning experience: four connected steps
+  text('A REAL LEARNING EXPERIENCE', 210, 580, { size: 20, weight: 800, color: K.red, spacing: 2, alpha: p(t, st('l13_2') - .1, .4) });
+  stepRow(t, [['Precise assessment', '', 'search', Wc('l13_2', 'precise', .45)], ['Learning path design', '', 'route', Wc('l13_2', 'path', .6)],
+    ['Teacher coaching', '', 'coach', Wc('l13_2', 'coaching', .75)], ['Clear evidence of progress', '', 'grow', Wc('l13_2', 'evidence', .9)]], 620, 190, { gap: 50, size: 30 });
+  const tC = Wc('l13_2', 'connects', .4);
+  hbox(196, 606, 1618, 218, p(t, tC, .8), K.red, 4, 5);
+  text('connected', 1005, 870, { size: 32, weight: 700, fam: HAND, color: K.red, align: 'center', alpha: p(t, tC + .4, .4) });
+};
+
+// ---------- 14. target positioning: assessment-based learning design for individual growth ----------
+SC.targetPos = t => {
+  header(t, H0('targetPos'), TAB.diff, 'Target Positioning');
+  const tA = Wc('l14_1', ['assessment', 'assessmentbased'], .4), tG = Wc('l14_1', 'growth', .9), s = 'Assessment-based learning design for individual growth';
+  enter(t, st('l14_1') - .1, () => { card(210, 280, 1590, 170, { stroke: K.red, lw: 3 }); chip('NEW POSITIONING', 250, 326, { size: 18, fill: K.red, spacing: 2 }); });
+  hiLite(244, 368, measure(s, 46, 800) + 14, 56, p(t, tG - .2, .7));
+  enter(t, tA - .3, () => text(s, 250, 396, { size: 46, weight: 800, maxW: 1500 }), { dx: 20, dy: 0 });
+  // not only repetition or digital content → identify, design, track
+  const tR = Wc('l14_2', 'repetition', .2), tDg = Wc('l14_2', 'digital', .3);
+  text('Rather than only', 210, 528, { size: 22, weight: 800, color: K.muted, spacing: 1.5, alpha: p(t, st('l14_2'), .4) });
+  enter(t, tR - .2, () => labelBox(210, 570, 460, 100, 'Repetition', { size: 32, color: K.muted }), { dx: 20, dy: 0 });
+  enter(t, tDg - .2, () => labelBox(210, 700, 460, 100, 'Digital content', { size: 32, color: K.muted }), { dx: 20, dy: 0 });
+  const STEP = [["Identify each child's learning needs", 'search', Wc('l14_2', 'identify', .5)], ['Design the right learning path', 'route', Wc('l14_2', 'design', .7)], ['Track their progress', 'chart', Wc('l14_2', 'track', .9)]];
+  penArrow(690, 685, 760, 685, p(t, STEP[0][2] - .5, .35), K.red, 5, 3);
+  STEP.forEach(([s2, ic, t0], i) => {
+    const x = 780 + i * 345;
+    enter(t, t0 - .25, () => { card(x, 560, 315, 250, { stroke: K.red, lw: 3 }); num(i + 1, x + 40, 600, K.red, { r: 22 }); icon(ic, x + 158, 650, 76, K.red); cpara(s2, x + 158, 750, 280, { size: 27 }); }, { pop: true, ox: x + 158, oy: 685 });
+  });
+};
+
+// ---------- 15. final brand positioning: the statement, and what each part does ----------
+SC.final = t => {
+  header(t, H0('final'), TAB.pos, 'Final Brand Positioning');
+  const [s0, s1] = C.statement, tP = Wc('l15_1', 'precise', .7), tD = Wc('l15_1', 'design', .95);
+  enter(t, st('l15_1') - .1, () => { card(210, 280, 1590, 220); chip('OUR POSITIONING', 1005, 280, { size: 18, fill: K.red, spacing: 2, align: 'center' }); });
+  enter(t, st('l15_1') + .2, () => text(s0, 1005, 360, { size: 40, weight: 800, align: 'center', maxW: 1440 }));
+  hiLite(1005 - measure(s1, 40, 800) / 2 - 8, 400, measure(s1, 40, 800) + 16, 50, p(t, tD - .2, .7));
+  enter(t, tP - .3, () => text(s1, 1005, 425, { size: 40, weight: 800, color: K.red, align: 'center', maxW: 1440 }));
+  const P3 = [['Assessment', 'A reason for parents to choose JEI', 'search', 'l15_2'], ['Learning design', 'The core of our service', 'route', 'l15_3'], ['Independent growth', 'The final outcome', 'flag', 'l15_4']];
+  const gap = 60, w = (1590 - gap * 2) / 3;
+  P3.forEach(([h, s, ic, id], i) => {
+    const x = 210 + i * (w + gap), last = i === 2;
+    enter(t, st(id) - .2, () => {
+      card(x, 570, w, 270, { fill: last ? K.red : '#FFFFFF', stroke: last ? null : K.red, lw: 3 });
+      icon(ic, x + w / 2, 640, 70, last ? '#FFFFFF' : K.red);
+      text(h.toUpperCase(), x + w / 2, 712, { size: 22, weight: 800, color: last ? '#FFFFFF' : K.red, align: 'center', spacing: 2, maxW: w - 40 });
+      cpara(s, x + w / 2, 778, w - 60, { size: 31, color: last ? '#FFFFFF' : K.ink });
+    }, { pop: true, ox: x + w / 2, oy: 705 });
+    if (i < 2) penArrow(x + w + 8, 705, x + w + gap - 8, 705, p(t, st(P3[i + 1][3]) - .3, .3), K.ink, 4, 7 + i);
+  });
+};
+
+// ---------- 16. key elements of positioning: six elements, need → solution → trust ----------
+SC.elements = t => {
+  header(t, H0('elements'), TAB.pos, 'Key Elements of Positioning');
+  subline(t, 'elements', 'A clear customer need and a clear solution');
+  const COL = [[210, 340, 'ELEMENT'], [550, 1250, 'WHAT IT MEANS FOR JEI']];
+  tHead(COL, 290, p(t, st('l16_1'), .4));
+  const tN = Wc('l16_1', 'need', .6), tSol = Wc('l16_1', 'solution', .95);
+  const R6 = [
+    ['Core target', 'Parents, mainly of Grades 1–4, thinking about the right learning path', st('l16_1', .1), false],
+    ['Customer need', 'Hard to know where the child is stuck and what to study first', tN, true],
+    ['Starting point', "An objective look at the child's level, gaps and learning state", Wc('l16_2', 'assess', .1), true],
+    ['How we deliver', 'Step-by-step paper workbooks + a personalized learning path + teacher coaching', Wc('l16_2', 'path', .45), true],
+    ['End benefit', 'The ability to understand, solve and grow on their own', tSol, false],
+    ['Reason to trust', 'Regular reassessment and progress reviews', Wc('l16_2', 'trust', .85), true]];
+  R6.forEach(([k, d, t0, hot], i) => {
+    const y = 348 + i * 86;
+    enter(t, t0 - .2, () => { tRow(y, 76, 1); text(k, 236, y + 39, { size: 27, weight: 800, color: hot ? K.red : K.ink, maxW: 300 }); text(d, 570, y + 39, { size: 26, weight: 600, maxW: 1130 }); }, { dx: 24, dy: 0 });
+    if (hot) check(1755, y + 38, 32, p(t, t0 + .3, .35), K.red, 5);
+  });
+};
+
+// ---------- 17. turning positioning into action: what parents see ----------
+SC.action = t => {
+  header(t, H0('action'), TAB.pos, 'Turning Positioning into Action');
+  const tB = Wc('l17_1', 'beyond', .4);
+  enter(t, st('l17_1') - .1, () => { ctx.save(); ctx.translate(210, 470); bubble(470, K.lightBox); ctx.restore(); text('A new brand message', 250, 471, { size: 30, weight: 800, color: K.muted, maxW: 400 }); }, { dx: -20, dy: 0 });
+  text('goes beyond', 445, 580, { size: 32, weight: 700, fam: HAND, color: K.red, align: 'center', alpha: p(t, tB, .4) });
+  penArrow(560, 640, 740, 640, p(t, tB + .2, .4), K.red, 5, 3);
+  // the parent's view: gaps, what's next, change over time
+  enter(t, st('l17_2') - .3, () => { card(770, 280, 1030, 620); text('WHAT PARENTS NEED TO SEE', 810, 326, { size: 20, weight: 800, color: K.red, spacing: 2 }); person(1730, 330, 50, K.ink); });
+  const tG = Wc('l17_2', 'gaps', .45), tNx = Wc('l17_2', 'next', .95), tM = Wc('l17_3', 'materials', .6), tTm = Wc('l17_3', 'time', .95);
+  // 1 learning gaps
+  enter(t, tG - .3, () => { text("Their child's learning gaps", 810, 400, { size: 30, weight: 800 }); for (let i = 0; i < 8; i++) rr(810 + i * 62, 432, 50, 40, 6, i === 2 || i === 5 ? K.navy : K.lightBox); icon('search', 1380, 450, 64, K.red); }, { dx: 20, dy: 0 });
+  // 2 what to study next
+  enter(t, tNx - .4, () => { text('What they need to study next', 810, 550, { size: 30, weight: 800 }); rr(810, 580, 230, 50, 10, K.lightBox); text('Now', 925, 606, { size: 24, weight: 700, color: K.muted, align: 'center' }); rr(1150, 580, 230, 50, 10, K.red); text('Next step', 1265, 606, { size: 24, weight: 800, color: '#FFFFFF', align: 'center' }); }, { dx: 20, dy: 0 });
+  penArrow(1050, 605, 1140, 605, p(t, tNx, .3), K.red, 4, 5);
+  // 3 changes in materials and progress over time
+  enter(t, tM - .4, () => {
+    text('Changes in materials and progress over time', 810, 700, { size: 30, weight: 800, maxW: 940 });
+    line0(830, 870, 1380, 870, K.ink, 3); [0, 1, 2, 3].forEach(i => { sheet(880 + i * 130, 800, 70, 84, nz(i, 4) * .05, 1, 3); text(['A', 'B', 'C', 'D'][i], 880 + i * 130, 852, { size: 18, weight: 800, color: K.muted, align: 'center' }); });
+  }, { dx: 20, dy: 0 });
+  strokePts([[1440, 860], [1500, 830], [1560, 840], [1620, 790], [1700, 755]], p(t, tTm - .5, .7), K.red, 5);
+  text('↑', 1730, 760, { size: 40, weight: 800, color: K.red, align: 'center', alpha: p(t, tTm, .3) });
+};
+
+// ---------- 18. customer communication: the copy line ----------
+SC.message = t => {
+  header(t, H0('message'), TAB.exec, 'Customer Communication');
+  subline(t, 'message', 'Our message to parents: simple and clear');
+  const [c0, c1] = C.copy, tP = Wc('l18_2', 'power', .55), tI = Wc('l18_2', 'independently', .95);
+  enter(t, st('l18_2') - .2, () => { card(210, 290, 1590, 250, { stroke: K.red, lw: 3 }); chip('OUR MESSAGE TO PARENTS', 250, 336, { size: 18, fill: K.red, spacing: 2 }); text(c0, 1005, 412, { size: 54, weight: 800, align: 'center', maxW: 1500 }); });
+  hiLite(1005 - measure(c1, 54, 800) / 2 - 8, 452, measure(c1, 54, 800) + 16, 64, p(t, tI - .2, .7));
+  enter(t, tP - .3, () => text(c1, 1005, 486, { size: 54, weight: 800, color: K.red, align: 'center', maxW: 1500 }));
+  // JEI starts with precise assessment → what each child needs to learn now
+  const tPr = Wc('l18_3', 'precise', .55), tN = Wc('l18_3', 'now', .95), tC = Wc('l18_3', 'consistently', .15);
+  enter(t, tPr - .3, () => { card(210, 590, 700, 150); icon('search', 290, 665, 70, K.red); text('JEI starts with', 360, 640, { size: 26, weight: 700, color: K.muted }); text('precise assessment', 360, 688, { size: 36, weight: 800, color: K.red, maxW: 520 }); }, { dx: 20, dy: 0 });
+  penArrow(925, 665, 1015, 665, p(t, tN - .6, .35), K.red, 5, 4);
+  enter(t, tN - .4, () => { card(1030, 590, 770, 150); icon('flag', 1110, 665, 66, K.red); text('to identify', 1170, 640, { size: 26, weight: 700, color: K.muted }); text('what each child needs to learn now', 1170, 688, { size: 32, weight: 800, maxW: 600 }); }, { dx: 20, dy: 0 });
+  // consistently, at every touchpoint
+  text('Consistently, at every touchpoint', 210, 800, { size: 30, weight: 700, fam: HAND, color: K.red, alpha: p(t, tC, .4) });
+  ['Ads and website', 'Assessment and counseling', 'Assessment sign-up'].forEach((s, i) => {
+    const k = p(t, tC + .3 + i * .25, .4); chip(s, [700, 1020, 1430][i], 802, { size: 22, fill: K.redTint, color: K.crimson, a: k, spacing: .5 });
+  });
+};
+
+// ---------- 19. key success strategy: five connected elements, and what parents see ----------
+SC.success = t => {
+  header(t, H0('success'), TAB.exec, 'Key Success Strategy');
+  subline(t, 'success', 'Connect five elements, instead of competing on large-scale digital content');
+  const E5 = [['Precise assessment', 'search', 'precise'], ['Focused paper-based learning', 'pencil', ['paper', 'paperbased']], ['Teacher coaching', 'coach', 'coaching'], ['Digital progress reports', 'tablet', 'digital'], ['Clear evidence of growth', 'grow', 'evidence']];
+  const cx = i => 369 + i * 318, CY = 410;
+  const ts = E5.map(([, , w], i) => Wc('l19_1', w, .3 + i * .15));
+  E5.forEach(([s, ic], i) => {
+    if (i < 4) pen(cx(i) + 82, CY, cx(i + 1) - 82, CY, p(t, ts[i + 1] - .4, .35), K.red, 4, 10 + i);
+    enter(t, ts[i] - .25, () => { circle(cx(i), CY, 76, '#FFFFFF', K.red, 4); icon(ic, cx(i), CY, 72, K.red); num(`0${i + 1}`, cx(i) - 62, CY - 62, K.red, { r: 20 }); cpara(s, cx(i), CY + 140, 296, { size: 26 }); }, { pop: true, ox: cx(i), oy: CY });
+  });
+  // parents see improvement and the next goals
+  const tI = Wc('l19_2', 'improving', .55), tGo = Wc('l19_2', 'goals', .95);
+  enter(t, st('l19_2') - .2, () => { card(210, 650, 1590, 220, { fill: K.lightBox, stroke: null, shadow: false }); person(320, 770, 100, K.ink); text('PARENTS CAN', 420, 700, { size: 20, weight: 800, color: K.red, spacing: 2 }); });
+  enter(t, tI - .4, () => { icon('grow', 480, 795, 70, K.red); text('See how their children', 550, 778, { size: 30, weight: 800 }); text('are improving', 550, 818, { size: 30, weight: 800, color: K.red }); }, { dx: 20, dy: 0 });
+  enter(t, tGo - .5, () => { icon('flag', 1150, 795, 64, K.red); text('Understand their', 1210, 778, { size: 30, weight: 800 }); text('next learning goals', 1210, 818, { size: 30, weight: 800, color: K.red }); }, { dx: 20, dy: 0 });
+  check(1740, 790, 46, p(t, tGo + .2, .35));
+};
+
+// ---------- 20. key action plans: five actions with their key tasks and KPIs ----------
+SC.plans = t => {
+  header(t, H0('plans'), TAB.exec, 'Key Action Plans');
+  subline(t, 'plans', 'Five key actions, each with its own measures');
+  const COL = [[210, 600, 'ACTION'], [810, 560, 'KEY TASK'], [1370, 430, 'KEY KPI']];
+  tHead(COL, 280, p(t, st('l20_1'), .4));
+  const A5 = [
+    ['Standardize assessment and learning recommendations', 'Extend math assessment to Korean and English', 'Sign-ups after assessment · reassessment rate', 'l20_2'],
+    ['Connect online and offline learning management', 'Link paper learning and teacher coaching to digital reports', 'Report views · satisfaction with care', 'l20_3'],
+    ['Improve retention and learning across subjects', 'From new sign-ups to retention and revenue per customer', '12-month retention · subjects per student', 'l20_4'],
+    ['Focus on important grade transitions', 'Packages for age 7 and Grades 1, 3 and 5', 'Sign-ups at transitions · next-grade retention', 'l20_5'],
+    ['Make branches and centers key assessment locations', 'Ongoing assessment, counseling and small-group care', 'Visits · sign-ups after counseling', 'l20_6']];
+  A5.forEach(([a, task, kpi, id], i) => {
+    const y = 338 + i * 112;
+    enter(t, st(id) - .2, () => {
+      tRow(y, 100, 1); num(i + 1, 250, y + 50, K.red, { r: 22 });
+      const ls = wrapLines(a, 500, 26, 800); ls.forEach((l, j) => text(l, 290, y + 50 + (j - (ls.length - 1) / 2) * 32, { size: 26, weight: 800, maxW: 500 }));
+      const lt = wrapLines(task, 520, 22, 600); lt.forEach((l, j) => text(l, 830, y + 50 + (j - (lt.length - 1) / 2) * 28, { size: 22, weight: 600, maxW: 520 }));
+      const lk = wrapLines(kpi, 390, 22, 700); lk.forEach((l, j) => text(l, 1390, y + 50 + (j - (lk.length - 1) / 2) * 28, { size: 22, weight: 700, color: K.crimson, maxW: 390 }));
+    }, { dx: 24, dy: 0 });
+  });
+};
+
+// ---------- 21. conclusion: reason · service · outcome, the philosophy, thank you ----------
+SC.outro = t => {
+  header(t, H0('outro'), 'CONCLUSION', C.outro.lead);
+  subline(t, 'outro', "JEI's new positioning is clear");
+  const P3 = [['REASON TO CHOOSE', 'Precise assessment', 'search', Wc('l21_2', 'precise', .55)], ['OUR SERVICE', 'The right learning path for each child', 'route', Wc('l21_2', 'path', .25)], ['THE OUTCOME', 'The ability to grow independently', 'flag', Wc('l21_2', 'independently', .95)]];
+  const gap = 45, w = (1590 - gap * 2) / 3;
+  P3.forEach(([h, s, ic, t0], i) => {
+    const x = 210 + i * (w + gap);
+    enter(t, st('l21_2') - .2 + i * .2, () => { card(x, 280, w, 220); icon(ic, x + 60, 340, 56, K.red); text(h, x + 110, 342, { size: 20, weight: 800, color: K.red, spacing: 2, maxW: w - 130 }); cpara(s, x + w / 2, 430, w - 60, { size: 31 }); }, { pop: true, ox: x + w / 2, oy: 390 });
+    check(x + w - 40, 330, 34, p(t, t0, .35));
+  });
+  // the long-standing philosophy
+  const tPh = Wc('l21_3', 'philosophy', .8), q = C.outro.philosophy, tS = Wc('l21_4', ['self', 'selflearning'], .8);
+  text("JEI'S LONG-STANDING PHILOSOPHY", 1005, 580, { size: 20, weight: 800, color: K.muted, spacing: 2, align: 'center', alpha: p(t, tPh - .3, .4) });
+  hiLite(1005 - measure(q, 56, 800) / 2 - 10, 612, measure(q, 56, 800) + 20, 68, p(t, tS - .2, .7));
+  enter(t, st('l21_4') - .2, () => text(q, 1005, 648, { size: 56, weight: 800, color: K.red, align: 'center', maxW: 1560 }), { pop: true, ox: 1005, oy: 648 });
+  enter(t, st('l21_5') - .1, () => text(C.outro.thanks, 1005, 812, { size: 100, weight: 700, fam: HAND, align: 'center' }), { pop: true, ox: 1005, oy: 812 });
+  pen(830, 880, 1180, 876, p(t, st('l21_5') + .4, .6), K.red, 6, 9);
+};
+
+
+// ============================================================
+// compositor: slide between pages (with the whoosh), then hold still
+// ============================================================
+// pages that continue the one before on the same sheet (tools/script.py CONT): the shared picture stays put and only the
+// rest cross-fades, no page turn and no whoosh. SHARED[id](t) draws the part that stays (section tab included)
+const CONT = new Set(TL.cont || []), SHARED = {};
+let SHARED_OFF = false;
+const PAGE_NO = TL.scenes.map((s, i) => i - TL.scenes.slice(1, i + 1).filter(x => CONT.has(x.id)).length);
+const TR = .8;
+function frame(i, t, ox) {
+  if (Math.abs(ox) >= W) return; const s = TL.scenes[i];
+  ctx.save(); ctx.translate(Math.round(ox), 0); pageFurniture(PAGE_NO[i]); SC[s.id](t); ctx.restore();
+}
+function draw(t) {
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1;
+  const SCN = TL.scenes; let i = SCN.findIndex(s => t < s.end); if (i < 0) i = SCN.length - 1;
+  const k = i > 0 ? eIO(p(t, SCN[i].start - .15, TR)) : 1, cont = i > 0 && CONT.has(SCN[i].id);
+  paper(i > 0 ? Math.round((PAGE_NO[i - 1] + (cont ? 0 : k)) * W) : 0);
+  if (cont && k < 1) {
+    pageFurniture(PAGE_NO[i]); SHARED_OFF = true;
+    ctx.save(); ctx.globalAlpha = 1 - k; SC[SCN[i - 1].id](t); ctx.restore();
+    ctx.save(); ctx.globalAlpha = k; SC[SCN[i].id](t); ctx.restore();
+    SHARED_OFF = false; (SHARED[SCN[i].id] || (() => {}))(t);
+  } else {
+    if (k < 1) frame(i - 1, t, -k * W);
+    frame(i, t, (1 - k) * W);
+  }
+  const f = p(t, DURATION - 1.2, 1.2); if (f > 0) { ctx.fillStyle = rgba(K.paper, eIO(f)); ctx.fillRect(0, 0, W, H); }
+}
+
+// ---------- preview player ----------
+const seekEl = document.getElementById('seek'), timeEl = document.getElementById('time'), playEl = document.getElementById('play');
+seekEl.max = DURATION.toFixed(2);
+let playing = false, t0 = 0, tCur = 0;
+const audio = new Audio(); if (!location.search.includes('render')) { audio.src = 'audio/mix.wav'; audio.preload = 'auto'; }   // renders and snaps need no sound
+function show(t) { tCur = t; draw(t); seekEl.value = t; timeEl.textContent = t.toFixed(2) + 's'; }
+function loop(now) { if (!playing) return; const t = (now - t0) / 1000; if (t >= DURATION) { playing = false; playEl.textContent = '▶ Play'; audio.pause(); show(DURATION); return; } show(t); requestAnimationFrame(loop); }
+playEl.onclick = () => { playing = !playing; playEl.textContent = playing ? '❚❚ Pause' : '▶ Play'; if (playing) { if (tCur >= DURATION) tCur = 0; t0 = performance.now() - tCur * 1000; try { audio.currentTime = tCur; audio.play().catch(() => {}); } catch (e) {} requestAnimationFrame(loop); } else audio.pause(); };
+seekEl.oninput = () => { show(+seekEl.value); if (playing) { t0 = performance.now() - tCur * 1000; try { audio.currentTime = tCur; } catch (e) {} } };
+
+// ---------- video editor hooks (../editor/PROTOCOL.md) ----------
+window.draw = draw; window.DURATION = DURATION;
+function merge(base, over) {
+  if (Array.isArray(base)) return Array.isArray(over) ? over.map((v, i) => base[i] !== undefined ? merge(base[i], v) : v) : base;
+  if (base && typeof base === 'object') { const o = {}; for (const k in base) o[k] = over && k in over ? merge(base[k], over[k]) : base[k]; return o; }
+  return over === undefined || over === null ? base : over;
+}
+function apply(content) { C = window.CONTENT = merge(DEFAULT_CONTENT, content); K = C.colors; }
+window.VIDEO = { schema: window.SCHEMA, defaults: DEFAULT_CONTENT, get content() { return C; }, apply, canvas: cv };
+window.ready = document.fonts.ready.then(() => {
+  if (location.search.includes('render')) document.body.classList.add('render');
+  const m = location.search.match(/[?&]t=([\d.]+)/); show(m ? +m[1] : 0); return true;
+});
+</script>
+</body>
+</html>
