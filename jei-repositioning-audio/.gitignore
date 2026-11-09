@@ -1,0 +1,7 @@
+*/audio/*
+!*/audio/male.wav
+!*/audio/male.txt
+!*/audio/female.wav
+!*/audio/female.txt
+__pycache__/
+*.log

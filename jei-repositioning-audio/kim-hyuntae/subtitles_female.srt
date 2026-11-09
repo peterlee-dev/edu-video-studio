@@ -1,0 +1,580 @@
+1
+00:00:00,600 --> 00:00:01,770
+Good morning, everyone.
+
+2
+00:00:02,220 --> 00:00:03,470
+I'm Hyuntae Kim.
+
+3
+00:00:03,920 --> 00:00:07,620
+Today, I will share JEI's
+core repositioning strategy.
+
+4
+00:00:08,320 --> 00:00:10,280
+Let me start with our key conclusion.
+
+5
+00:00:10,730 --> 00:00:15,480
+JEI must move beyond competing on
+workbooks, scale, and digital features.
+
+6
+00:00:15,930 --> 00:00:18,630
+Our goal is to become the
+brand that designs learning
+
+7
+00:00:18,680 --> 00:00:21,380
+to develop children's ability
+to learn independently.
+
+8
+00:00:22,080 --> 00:00:25,667
+I will explain the market changes,
+customer needs, the competitive
+
+9
+00:00:25,722 --> 00:00:29,200
+gap, our positioning, and the
+strategic actions we need to take.
+
+10
+00:00:30,650 --> 00:00:33,150
+First, let’s look at
+the challenges we face.
+
+11
+00:00:33,600 --> 00:00:35,190
+Three changes are important.
+
+12
+00:00:35,890 --> 00:00:38,510
+First, the limitations
+of our business scale.
+
+13
+00:00:38,960 --> 00:00:41,800
+JEI ranks fourth in the workbook market.
+
+14
+00:00:42,250 --> 00:00:46,830
+We have about 300 locations, while
+some competitors have more than 700.
+
+15
+00:00:47,280 --> 00:00:49,720
+It is difficult to compete based on size.
+
+16
+00:00:50,420 --> 00:00:52,300
+Second, changes in the market.
+
+17
+00:00:52,750 --> 00:00:57,030
+There are fewer children entering school,
+but spending per child is increasing.
+
+18
+00:00:57,480 --> 00:00:59,844
+This means there are fewer
+customers, but parents
+
+19
+00:00:59,892 --> 00:01:02,400
+are willing to spend more
+when they see clear value.
+
+20
+00:01:03,100 --> 00:01:05,800
+Third, similar features
+across competitors.
+
+21
+00:01:06,250 --> 00:01:08,971
+AI-based assessment,
+personalized learning paths,
+
+22
+00:01:09,026 --> 00:01:11,580
+and grading have now
+become standard features.
+
+23
+00:01:12,030 --> 00:01:14,536
+As these features become
+increasingly common,
+
+24
+00:01:14,591 --> 00:01:16,930
+we need a different basis for competition.
+
+25
+00:01:17,380 --> 00:01:21,210
+This is why Learning Design is central
+to our repositioning strategy.
+
+26
+00:01:22,660 --> 00:01:25,190
+So, what are parents
+really willing to pay for?
+
+27
+00:01:25,640 --> 00:01:28,300
+We can understand parents’
+needs in three layers.
+
+28
+00:01:29,000 --> 00:01:32,610
+The first layer is functional needs:
+learning materials for different
+
+29
+00:01:32,663 --> 00:01:35,750
+levels, connections to school
+curricula, and learning data.
+
+30
+00:01:36,200 --> 00:01:38,230
+The second layer is emotional needs.
+
+31
+00:01:38,680 --> 00:01:41,820
+Parents want to worry less about
+their children falling behind.
+
+32
+00:01:42,270 --> 00:01:45,160
+They also want someone to take
+care of their children’s learning.
+
+33
+00:01:45,860 --> 00:01:49,870
+The third and most important layer is
+children’s ability to learn on their own.
+
+34
+00:01:50,570 --> 00:01:53,110
+Why do parents discontinue
+learning programs?
+
+35
+00:01:53,560 --> 00:01:56,550
+Children may become bored
+with repetitive activities.
+
+36
+00:01:57,000 --> 00:02:00,740
+Standardized learning pace does
+not always meet individual needs.
+
+37
+00:02:01,190 --> 00:02:03,639
+Parents struggle to see
+clear learning outcomes
+
+38
+00:02:03,691 --> 00:02:06,400
+or understand what their
+children should learn next.
+
+39
+00:02:06,850 --> 00:02:09,244
+And much of the responsibility
+for managing their
+
+40
+00:02:09,293 --> 00:02:11,590
+children's learning still
+falls on the parents.
+
+41
+00:02:12,290 --> 00:02:14,250
+These reasons point to one problem.
+
+42
+00:02:14,700 --> 00:02:17,660
+The problem is not simply a
+lack of learning materials.
+
+43
+00:02:18,110 --> 00:02:21,150
+Parents need a clearer understanding
+of what their children should
+
+44
+00:02:21,196 --> 00:02:24,190
+learn next, why it matters, and
+how their learning will progress.
+
+45
+00:02:24,640 --> 00:02:27,329
+This is why we must shift
+our focus from workbooks
+
+46
+00:02:27,383 --> 00:02:29,750
+to how children’s ability
+to learn improves.
+
+47
+00:02:31,200 --> 00:02:34,770
+Now, let’s look at whether our
+competitors are meeting this need.
+
+48
+00:02:35,220 --> 00:02:38,230
+These evaluations are based
+on customer perceptions.
+
+49
+00:02:38,930 --> 00:02:43,090
+Each of our three major competitors is
+associated with a different strength.
+
+50
+00:02:43,540 --> 00:02:48,708
+Daekyo emphasizes level-based learning,
+Kumon is known for repetition and building
+
+51
+00:02:48,771 --> 00:02:53,750
+study habits, and Woongjin focuses on
+online and AI-powered learning platforms.
+
+52
+00:02:54,450 --> 00:02:57,900
+Daekyo does not have a clear
+long-term learning plan.
+
+53
+00:02:58,350 --> 00:03:01,810
+Kumon can become boring, causing
+children to lose interest.
+
+54
+00:03:02,260 --> 00:03:05,656
+Woongjin's platform may feel
+complex, while screen-based learning
+
+55
+00:03:05,708 --> 00:03:08,790
+can raise concerns about
+insufficient handwriting practice.
+
+56
+00:03:09,490 --> 00:03:12,652
+Above all, no company clearly
+answers the question parents
+
+57
+00:03:12,706 --> 00:03:16,250
+really ask: “Where should my child’s
+learning be in three years?”
+
+58
+00:03:16,700 --> 00:03:18,300
+This is where “Design” comes in.
+
+59
+00:03:18,750 --> 00:03:21,145
+It means setting a
+direction after diagnosis
+
+60
+00:03:21,199 --> 00:03:23,920
+and helping children stay
+motivated along the way.
+
+61
+00:03:24,620 --> 00:03:27,980
+According to Al Ries’s positioning
+principles, it is very difficult
+
+62
+00:03:28,030 --> 00:03:31,440
+for a company ranked fourth to beat
+the leader in the same category.
+
+63
+00:03:31,890 --> 00:03:35,315
+Rather than trying to move up
+the existing competitive ladder,
+
+64
+00:03:35,370 --> 00:03:39,017
+JEI aims to establish a new ladder
+centered on Learning Design—one
+
+65
+00:03:39,072 --> 00:03:42,000
+where we can build a distinctive
+leadership position.
+
+66
+00:03:43,450 --> 00:03:46,920
+We will move from selling workbooks
+to providing Learning Design.
+
+67
+00:03:47,370 --> 00:03:50,478
+We aim to provide personalized
+learning roadmaps that help
+
+68
+00:03:50,531 --> 00:03:53,800
+each child understand what to
+learn next and how to progress.
+
+69
+00:03:54,500 --> 00:03:57,958
+We will build on our existing
+strengths: the JEI Self-Learning
+
+70
+00:03:58,014 --> 00:04:01,640
+Method, diagnostic assessment, and
+structured learning materials.
+
+71
+00:04:02,090 --> 00:04:06,230
+But we will define self-learning as an
+ability, not just the act of studying.
+
+72
+00:04:06,680 --> 00:04:11,320
+This builds on the nearly 50-year
+legacy of the JEI Self-Learning Method.
+
+73
+00:04:12,020 --> 00:04:16,380
+Our focus is not simply to have more
+locations or members than competitors.
+
+74
+00:04:16,830 --> 00:04:19,817
+We want to create clear learning
+paths for individual students
+
+75
+00:04:19,865 --> 00:04:22,370
+and become a leader in the
+Learning Design category.
+
+76
+00:04:23,820 --> 00:04:27,154
+Our proposed positioning statement
+is: "JEI designs learning
+
+77
+00:04:27,209 --> 00:04:30,210
+to develop children's ability
+to learn independently."
+
+78
+00:04:30,910 --> 00:04:34,174
+This statement reflects our shift
+from simply providing workbooks
+
+79
+00:04:34,224 --> 00:04:37,790
+to developing children's Self-Learning
+Ability through Learning Design.
+
+80
+00:04:38,490 --> 00:04:40,947
+Our brand messaging is
+built around two key
+
+81
+00:04:41,004 --> 00:04:43,690
+concepts: "Design" and
+"Self-Learning Ability."
+
+82
+00:04:44,390 --> 00:04:48,764
+We have proposed several slogan options,
+including "Learning starts with design,"
+
+83
+00:04:48,818 --> 00:04:53,030
+"Studying starts with design," and "Beyond
+Workbooks. Toward Learning Design."
+
+84
+00:04:53,730 --> 00:04:56,255
+Our proposed campaign
+message is: "It's not a
+
+85
+00:04:56,311 --> 00:04:59,060
+lack of ability. It's a
+lack of learning design."
+
+86
+00:04:59,760 --> 00:05:02,317
+And our customer value
+message is: "The ability
+
+87
+00:05:02,371 --> 00:05:05,200
+to learn independently begins
+with Learning Design."
+
+88
+00:05:05,900 --> 00:05:09,590
+These are proposed expressions,
+not finalized brand slogans.
+
+89
+00:05:10,040 --> 00:05:13,254
+Whatever we ultimately choose,
+our messages must reinforce
+
+90
+00:05:13,309 --> 00:05:16,190
+a clear and consistent
+position in customers' minds.
+
+91
+00:05:17,640 --> 00:05:21,660
+Finally, let me outline five
+strategic priorities for execution.
+
+92
+00:05:22,360 --> 00:05:25,326
+First, we will focus on our
+strongest core subjects
+
+93
+00:05:25,384 --> 00:05:28,060
+rather than promoting
+all 17 subjects equally.
+
+94
+00:05:28,510 --> 00:05:32,690
+This will allow us to build a clear and
+differentiated Learning Design approach.
+
+95
+00:05:33,390 --> 00:05:36,053
+Second, we will strengthen
+the connection between
+
+96
+00:05:36,107 --> 00:05:38,390
+assessment, Learning Design, and coaching.
+
+97
+00:05:38,840 --> 00:05:42,961
+Each child's learning needs will be
+assessed, the next learning steps will
+
+98
+00:05:43,016 --> 00:05:47,360
+be designed, and instructors will provide
+personalized guidance along the way.
+
+99
+00:05:48,060 --> 00:05:51,790
+Third, we will continue to emphasize
+the role of our instructors.
+
+100
+00:05:52,240 --> 00:05:56,014
+While AI-powered learning solutions
+are important, personal guidance
+
+101
+00:05:56,070 --> 00:06:00,010
+and ongoing learning support remain
+key reasons why parents choose JEI.
+
+102
+00:06:00,710 --> 00:06:03,970
+Fourth, we will communicate a
+consistent brand message across
+
+103
+00:06:04,023 --> 00:06:07,390
+our products, learning centers,
+local offices, and advertising.
+
+104
+00:06:07,840 --> 00:06:10,094
+"Design" and "Self-Learning
+Ability" should
+
+105
+00:06:10,146 --> 00:06:12,400
+remain central to how
+we present our brand.
+
+106
+00:06:13,100 --> 00:06:16,894
+Fifth, we will focus on increasing
+value per customer and recognize
+
+107
+00:06:16,951 --> 00:06:20,802
+the importance of multi-subject
+learning, while avoiding competition
+
+108
+00:06:20,859 --> 00:06:24,540
+based solely on the number of
+subjects or overall business scale.
+
+109
+00:06:25,240 --> 00:06:28,899
+Together, these priorities will
+help JEI strengthen its position in
+
+110
+00:06:28,953 --> 00:06:32,940
+Learning Design and deliver greater
+value to children and their families.
+
+111
+00:06:34,390 --> 00:06:37,858
+To summarize, JEI aims to move
+beyond workbooks and establish
+
+112
+00:06:37,915 --> 00:06:41,440
+a leadership position in Learning
+Design by designing learning
+
+113
+00:06:41,497 --> 00:06:44,510
+to develop children's ability
+to learn independently.
+
+114
+00:06:45,210 --> 00:06:47,550
+To achieve this, we must change first.
+
+115
+00:06:48,000 --> 00:06:50,784
+When we develop products,
+meet customers, and discuss
+
+116
+00:06:50,836 --> 00:06:53,620
+ideas in meetings, we must
+all use the same language.
+
+117
+00:06:54,070 --> 00:06:57,920
+Starting today, our shared message
+is “Designing the Ability to Learn.”
+
+118
+00:06:58,620 --> 00:06:59,280
+Thank you.
+
+119
+00:06:59,730 --> 00:07:01,910
+Please feel free to ask any questions.
+
