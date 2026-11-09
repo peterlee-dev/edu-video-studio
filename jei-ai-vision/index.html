@@ -29,7 +29,7 @@
 // ------------------------------------------------------------
 // JEI AI Transformation Vision — the English version of ../jei-ai-vision-ko (same 12 pages and 28 scenes, the English narration script
 // sent with the review of 2026-11-05): one continuous sheet of graph paper, each page a workbook page (long pages told in
-// several scenes on the same sheet, tools/script.py CONT). The camera slides sideways between pages (in time with the whoosh in the mix)
+// several scenes on the same sheet, tools/script.py CONT). The camera slides sideways between pages (silent since 2026.11.06)
 // and stays still while the page is read.
 // Teacher's-pen marks: circles, checks, boxes, arrows, highlighter, sticky notes, stamps.
 // Timing: timeline.js, written by tools/make_audio.py from the real narration. Pictures follow spoken words
@@ -247,13 +247,14 @@ function icon3(kind, x, y, s, c, a = 1) {
   if (a <= 0) return; ctx.save(); ctx.globalAlpha *= a; ctx.strokeStyle = c; ctx.fillStyle = c; ctx.lineWidth = 5; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
   const B = () => ctx.beginPath(), Sk = () => ctx.stroke();
   if (kind === 'gear') { for (let i = 0; i < 8; i++) { const an = i * Math.PI / 4; B(); ctx.moveTo(x + Math.cos(an) * s * .62, y + Math.sin(an) * s * .62); ctx.lineTo(x + Math.cos(an) * s, y + Math.sin(an) * s); ctx.lineWidth = s * .32; Sk(); } ctx.lineWidth = 5; B(); ctx.arc(x, y, s * .66, 0, 7); Sk(); B(); ctx.arc(x, y, s * .26, 0, 7); Sk(); }
+  if (kind === 'stack') { [1, 0, -1].forEach(i => { const cy = y + i * s * .42; B(); ctx.moveTo(x - s, cy); ctx.lineTo(x, cy - s * .48); ctx.lineTo(x + s, cy); ctx.lineTo(x, cy + s * .48); ctx.closePath(); ctx.lineWidth = 4; ctx.save(); ctx.fillStyle = K.redTint; ctx.fill(); ctx.restore(); Sk(); }); }
   if (kind === 'net') { const P = [[-.7, -.5], [.6, -.65], [.1, .1], [-.55, .7], [.75, .55]]; [[0, 2], [1, 2], [2, 3], [2, 4], [0, 1]].forEach(([i, j]) => { B(); ctx.moveTo(x + P[i][0] * s, y + P[i][1] * s); ctx.lineTo(x + P[j][0] * s, y + P[j][1] * s); ctx.lineWidth = 4; Sk(); }); P.forEach(([u, v], i) => circle(x + u * s, y + v * s, s * (i === 2 ? .26 : .18), c)); }
   ctx.restore();
 }
 // icon in a filled circle (white icon on a colour, or a colour icon on a tint)
 function badge(x, y, r, fill, kind, col = '#FFFFFF', a = 1) {
   if (a <= 0) return; circle(x, y, r, fill, null, 0, a);
-  const f = ['globe', 'growth', 'stairs', 'doc', 'pencil'].includes(kind) ? icon2 : ['gear', 'net'].includes(kind) ? icon3 : icon; f(kind, x, y, r * .5, col, a);
+  const f = ['globe', 'growth', 'stairs', 'doc', 'pencil'].includes(kind) ? icon2 : ['gear', 'net', 'stack'].includes(kind) ? icon3 : icon; f(kind, x, y, r * .5, col, a);
 }
 // section tab + title of a page told in several scenes: drawn once by the page's shared part (stays still through the CONT scenes)
 function pageHead(t, id, tab, title) { if (SHARED_OFF) return; header(t, H0(id), tab, title); }
@@ -313,29 +314,7 @@ SC.title = t => {
 };
 
 // ============================================================
-// p. 2  beyond efficiency
-// ============================================================
-SC.why = t => {
-  header(t, H0('why'), 'Beyond efficiency', 'More than efficiency: transforming products and services');
-  const g0 = st('l2_1', .02), b = [Wc('l2_1', 'adopt', .3), Wc('l2_1', 'productivity', .6), Wc('l2_1', 'efficiency', .8)];
-  enter(t, g0, () => { rr(210, 300, 700, 560, 18, K.lightBox); badge(290, 390, 46, K.blueTint, 'gear', K.blue); text('Typical AI adoption', 360, 368, { size: 24, weight: 700, color: K.blue }); text('Productivity & efficiency', 360, 412, { size: 40, weight: 800, maxW: 520 }); });
-  ['AI applied to existing work', 'Repetitive tasks automated', 'Less time on routine work'].forEach((s, i) => bullet(t, b[i] - .1, 250, 540 + i * 80, s, { size: 28, w: 600, col: K.blue, color: K.muted }));
-  // JEI: the products and services themselves change
-  const j0 = Wc('l2_2', 'project', .3), be = Wc('l2_2', 'more', .6), dv = Wc('l2_3', 'transforming', .4);
-  penArrow(925, 580, 1065, 580, p(t, be - .2, .5), K.red, 6, 31);
-  text('more than', 995, 535, { size: 34, weight: 700, fam: HAND, color: K.red, align: 'center', alpha: p(t, be, .4) });
-  enter(t, j0, () => { card(1080, 300, 720, 560, { r: 18, stroke: K.red, lw: 3 }); badge(1160, 390, 46, K.red, 'bulb'); text('JEI’s AI transformation', 1230, 368, { size: 24, weight: 700, color: K.crimson }); text('Products & services', 1230, 412, { size: 40, weight: 800, maxW: 540 }); });
-  hiLite(1222, 392, measure('Products & services', 40, 800) + 16, 42, p(t, dv, .6));
-  const tb = Wc('l2_4', 'integrated', .15), cn = Wc('l2_4', 'connect', .3), fl = Wc('l2_4', 'exactly', .85), sp = Wc('l2_5', 'quickly', .35), sy = Wc('l2_5', 'services', .95);
-  [['One integrated platform', tb], ['Workbooks + online learning + POD, connected', cn], ['Curricula & content developed faster', sp]].forEach(([s, t0], i) => {
-    bullet(t, t0 - .1, 1120, 540 + i * 100, s, { size: 28, w: 590 }); check(1755, 540 + i * 100, 30, p(t, t0 + .4, .3), K.red, 5); });
-  // what the narration adds under the card: exactly what each student needs, then a system that turns them into new services
-  text('Exactly what each student needs', 1440, 905, { size: 34, weight: 700, fam: HAND, color: K.red, align: 'center', alpha: p(t, fl, .4) * (1 - p(t, sy - .3, .3)), maxW: 720 });
-  text('Turned into new services', 1440, 905, { size: 34, weight: 700, fam: HAND, color: K.red, align: 'center', alpha: p(t, sy - .1, .4), maxW: 720 });
-};
-
-// ============================================================
-// p. 3  the knowledge map (three scenes on one page)
+// p. 2  the knowledge map (three scenes on one page)
 // ============================================================
 const KDN = [[605, 244], [700, 290], [865, 255], [645, 395], [795, 370], [575, 490], [725, 475], [880, 455]].map(([x, y]) => [900 + (x - 530) / 410 * 530, 350 + (y - 195) / 360 * 500]);
 // [a, b, type]: type 0 = prerequisite · follow-up (red, thick), 1 = shared concept (blue), 2 = mint, 3 = weak (grey)
@@ -400,7 +379,7 @@ SC.kmapAI = t => {
 };
 
 // ============================================================
-// p. 4  how the map is built: the JEI Math Universe
+// p. 3  how the map is built: the JEI Math Universe
 // ============================================================
 SC.universe = t => {
   header(t, H0('universe'), 'JEI Math Universe', 'One Map for Every Curriculum');
@@ -430,7 +409,7 @@ SC.universe = t => {
 };
 
 // ============================================================
-// p. 5  from the global map to country maps (two scenes)
+// p. 4  from the global map to country maps (two scenes)
 // ============================================================
 const CY = () => ({ s0: H0('country') + .4, j: Wc('l5_1', 'global', .1), nat: Wc('l5_1', 'country', .25), fast: Wc('l5_1', 'quickly', .9),
   scr: Wc('l5_2', 'scratch', .8), std: Wc('l5_3', 'standards', .5), mk: Wc('l5_3', 'build', .85),
@@ -484,7 +463,7 @@ SC.countryTrack = t => {
 };
 
 // ============================================================
-// p. 6  three layers, built from the bottom (four scenes)
+// p. 5  three layers, built from the bottom (four scenes)
 // ============================================================
 const LY = { service: 300, agent: 500, knowledge: 700 }, LYH = 170;
 const LYD = {
@@ -522,7 +501,7 @@ SC.layerPace = t => {
 };
 
 // ============================================================
-// p. 7  roadmap: seven projects, two phases (four scenes)
+// p. 6  roadmap: seven projects, two phases (four scenes)
 // ============================================================
 const PJ = { 'P-01': [0, ['Learning-objective', 'knowledge graph'], 9], 'P-02': [0, ['Programmed content', 'generation agent'], 10], 'P-03': [0, ['Personalized', 'POD'], 11.5, true],
   'P-04': [1, ['Progress analysis', '& path updates'], 10], 'P-05': [1, ['AI learning', 'assistant'], 10], 'P-07': [1, ['AI online', 'learning platform'], 12.5, true] };
@@ -575,63 +554,60 @@ SC.wiki = t => {
 };
 
 // ============================================================
-// p. 8  P-03 personalized POD (two scenes)
+// p. 7  P-03 personalized POD (two scenes)
 // ============================================================
-// contents are made ahead per objective and kept in a reviewed database above the flow; the database feeds the print step
-// down a dotted line (cards 1 · 2 → DB → dotted line → personalized materials → results, in that order)
-const PODS = [['doc', 'Assessment ·', 'learning history', 210], ['lens', 'What each', 'student needs', 535], ['print', 'Personalized', 'materials printed', 1185], ['retry', 'Results shape', 'the next round', 1510]];
-const PCT = 390, PCH2 = 260, PAY = 520, DBX = 1005, DBT = 305;   // card top · height, the flow's arrow line, the DB's centre x and top
-const PD = () => ({ t: [Wc('l8_2', 'assessment', .15), Wc('l8_2', 'identify', .6), Wc('l8_5', 'print', .8), Wc('l8_6', 'results', .2)], db: st('l8_3', .02),
-  pg: Wc('l8_3', 'programmed', .4), pre: Wc('l8_3', 'advance', .7), rv: Wc('l8_4', 'review', .3), fill: Wc('l8_4', 'stored', .7), dot: Wc('l8_5', 'reviewed', .3), go: Wc('l8_5', 'create', .5),
-  nx: Wc('l8_6', 'next', .4), sup: Wc('l8_6', 'review', .6), adj: Wc('l8_6', 'adjusting', .8), us: Wc('l8_7', 'united', .3), kr: Wc('l8_7', 'korea', .95) });
-// a database drum; lv (0–1) fills it from the bottom
-function dbDrum(cx, top, lv, { rx = 78, ry = 20, h = 72 } = {}) {
-  const body = () => { ctx.beginPath(); ctx.moveTo(cx - rx, top); ctx.lineTo(cx - rx, top + h); ctx.ellipse(cx, top + h, rx, ry, 0, Math.PI, 0, true); ctx.lineTo(cx + rx, top); ctx.ellipse(cx, top, rx, ry, 0, 0, Math.PI, true); ctx.closePath(); };
-  ctx.save(); ctx.shadowColor = 'rgba(30,30,30,.08)'; ctx.shadowBlur = 18; ctx.shadowOffsetY = 6; body(); ctx.fillStyle = '#FFFFFF'; ctx.fill(); ctx.restore();
-  if (lv > 0) { ctx.save(); body(); ctx.clip(); ctx.fillStyle = K.redTint; ctx.fillRect(cx - rx, top + h + ry - (h + 2 * ry) * lv, 2 * rx, (h + 2 * ry) * lv); ctx.restore(); }
-  ctx.save(); ctx.strokeStyle = K.red; ctx.lineWidth = 3; body(); ctx.stroke();
-  ctx.beginPath(); ctx.ellipse(cx, top, rx, ry, 0, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
-  text('DB', cx, top + ry + h / 2 - 2, { size: 30, weight: 800, color: K.red, align: 'center' });
-}
+// review 2026-11-06: two panels as in the sheet's p. 8. Panel ① (made in advance) fills in while l8_3 · l8_4 is read, panel ②'s
+// cards come one by one with the arrow down from the DB while l8_5 is read, and the dashed loop joins the last card to the first on l8_6
+const PX = [240, 552.5, 865, 1177.5, 1490], PW = 280;   // card columns (5 across panel ②; panel ① uses the first three, its note the last two)
+const P1Y = 245, P1H = 270, C1Y = 285, C1H = 200, P2Y = 560, P2H = 415, C2Y = 605, C2H = 230, LPY = 905;   // panels · card rows · the loop's line
+const POD1 = [['spark', [['AI-assisted', 25, 800], ['content drafting', 25, 800]]], ['review', [['Researcher review,', 25, 800], ['revision & approval', 25, 800], ['Quality and accuracy check', 17, 500, K.muted]]],
+  ['data', [['Verified Content DB', 25, 800, K.red], ['Organized by objective,', 17, 500, K.muted], ['difficulty and item type', 17, 500, K.muted]]]];
+const POD2 = [['doc', ['Assessment &', 'learning history', 'analysis']], ['target', ['Identify objectives', 'needing', 'reinforcement']], ['stack', ['Select & assemble the', 'content each student', 'needs']],
+  ['print', ['Print personalized', 'workbook (POD)']], ['retry', ['Use learning results', 'to plan the next', 'round']]];
+const PD = () => ({ c1: [st('l8_3', .02), Wc('l8_4', 'researchers', .2), Wc('l8_4', 'database', .5)], note: Wc('l8_4', 'database', .95), rv: Wc('l8_4', 'review', .7),
+  c2: [st('l8_5', .02), Wc('l8_5', 'reviewed', .2), Wc('l8_5', 'create', .3), Wc('l8_5', 'print', .5), Wc('l8_5', 'student', .3)], down: Wc('l8_5', 'content', .2), loop: st('l8_6', .02), us: Wc('l8_7', 'united', .3), kr: Wc('l8_7', 'korea', .95) });
+// a panel: blush ground and a red tab on its top edge
+function podPanel(y, h, tab, a) { if (a <= 0) return; rr(210, y, 1590, h, 20, rgba(K.red, .035), rgba(K.red, .22), 2, a); chip(tab, 236, y, { size: 24, fill: K.red, a, pad: 22, spacing: .5 }); }
+// card lines: [string, size, weight, colour]; main lines 32 px apart, small ones 24
+function podLines(ls, cx, y) { let yy = y; ls.forEach(([s, size, w, col], i) => { if (i) yy += size < 22 ? 24 : 32; text(s, cx, yy, { size, weight: w, color: col || K.ink, align: 'center', maxW: PW - 24 }); }); }
 function podPage(t) {
-  if (SHARED_OFF) return; pageHead(t, 'pod', 'Phase 1 core service', 'P-03 Personalized POD: one student, one workbook');
-  const c = PD();
-  PODS.forEach(([ic, a1, a2, x], i) => { const last = i === 3;
-    if (t < c.t[i] - .1) hbox(x, PCT, 290, PCH2, p(t, H0('pod') + .5 + i * .12, .5), K.lineGrey, 2.5, 100 + i);
-    enter(t, c.t[i] - .1, () => { card(x, PCT, 290, PCH2, { r: 16, stroke: last ? K.red : K.lineGrey, lw: last ? 3 : 2 }); badge(x + 145, PCT + 85, 52, last ? K.red : K.redTint, ic, last ? '#FFFFFF' : K.red);
-      text(a1, x + 145, a2 ? PCT + 178 : PCT + 196, { size: 27, weight: 800, align: 'center', maxW: 260 }); if (a2) text(a2, x + 145, PCT + 216, { size: 27, weight: 800, align: 'center', maxW: 260 }); }, { pop: true, ox: x + 145, oy: PCT + PCH2 / 2 });
-    if (i === 1 || i === 3) penArrow(x - 30, PAY, x - 6, PAY, p(t, c.t[i] - .3, .3), K.red, 5, 110 + i); });
-  // 3: contents made ahead, reviewed, kept in the content database
-  const lw = measure('AI content generation', 26, 800);
-  enter(t, c.db - .1, () => { text('AI content generation', DBX, 228, { size: 26, weight: 800, align: 'center' }); text('+ researcher review', DBX, 262, { size: 26, weight: 800, align: 'center' });
-    dbDrum(DBX, DBT, .25 + .75 * eIO(p(t, c.fill, 1.2))); }, { pop: true, ox: DBX, oy: 330 });
-  check(DBX + lw / 2 + 30, 252, 32, p(t, c.rv + .2, .3), K.red, 6);
-  // 4: the database feeds the flow down a dotted line; the flow runs from card 2 past it to the print step
-  pen(DBX, DBT + 72 + 26, DBX, PAY - 6, p(t, c.dot, .5), K.red, 4, 112, 1, [10, 10]);
-  penArrow(835, PAY, 1177, PAY, p(t, c.go, .6), K.red, 5, 113);
-  // the loop back to the start
-  const lk = p(t, Math.max(c.nx - .2, c.t[3] + .3), 1.2), ly = PCT + PCH2 + 50; if (lk > 0) strokePts([[1655, PCT + PCH2 + 12], [1655, ly], [355, ly], [355, PCT + PCH2 + 12]], lk, K.red, 4, 1, [12, 9]);
-  arrowHead(355, PCT + PCH2 + 10, -Math.PI / 2, clamp(lk * 4 - 3), K.red, 4);
-  text('Each round’s results shape the next round', 1005, ly + 40, { size: 26, weight: 800, color: K.crimson, align: 'center', alpha: p(t, c.nx + .6, .4) });
-  enter(t, c.us - .2, () => { rr(210, 815, 1590, 100, 16, K.lightBox); text('Rollout', 250, 866, { size: 28, weight: 800 });
-    text('U.S. → Korea', 410, 866, { size: 28, weight: 800, color: K.red }); text('·  The first core service, validating the learning cycle in Phase 1', 410 + measure('U.S. → Korea', 28, 800) + 24, 867, { size: 25, weight: 500, color: K.muted, maxW: 1000 }); });
+  if (SHARED_OFF) return; pageHead(t, 'pod', 'Phase 1 Core Service', 'P-03 Personalized POD: One Student, One Workbook');
+  const c = PD(), h0 = H0('pod');
+  podPanel(P1Y, P1H, '1  Content Pool Development (In Advance)', p(t, h0 + .5, .5)); podPanel(P2Y, P2H, '2  Personalized Delivery (Operational Stage)', p(t, h0 + .8, .5));
+  // panel ①: AI drafts → researchers check → the approved DB, then the note
+  POD1.forEach(([ic, ls], i) => { const x = PX[i], cx = x + PW / 2;
+    if (t < c.c1[i] - .1) hbox(x, C1Y, PW, C1H, p(t, h0 + 1 + i * .1, .5), K.lineGrey, 2.5, 100 + i);
+    enter(t, c.c1[i] - .1, () => { card(x, C1Y, PW, C1H, { r: 16, stroke: K.lineGrey });
+      if (ic === 'review') { badge(cx, C1Y + 54, 38, K.redTint, 'student', K.red); check(cx + 22, C1Y + 70, 20, 1, K.red, 4); } else badge(cx, C1Y + 54, 38, K.redTint, ic, K.red);
+      podLines(ls, cx, C1Y + 120); }, { pop: true, ox: cx, oy: C1Y + C1H / 2 });
+    if (i) penArrow(x - 28, C1Y + C1H / 2, x - 7, C1Y + C1H / 2, p(t, c.c1[i] - .35, .3), K.red, 5, 110 + i); });
+  enter(t, c.note, () => { rr(PX[3], C1Y + 40, PX[4] + PW - PX[3], C1H - 80, 14, K.redTint); text('Built in advance, not on the spot', (PX[3] + PX[4] + PW) / 2, C1Y + C1H / 2, { size: 28, weight: 600, color: K.ink, align: 'center' }); });
+  check(PX[1] + PW - 34, C1Y + 32, 30, p(t, c.rv, .3), K.red, 6);
+  // panel ②: five steps, one by one; the DB card sends its contents down to step 3
+  penArrow(PX[2] + PW / 2, C1Y + C1H + 6, PX[2] + PW / 2, C2Y - 8, p(t, c.down, .6), K.red, 6, 120);
+  POD2.forEach(([ic, ls], i) => { const x = PX[i], cx = x + PW / 2, last = i === 4;
+    if (t < c.c2[i] - .1) hbox(x, C2Y, PW, C2H, p(t, h0 + 1.3 + i * .1, .5), K.lineGrey, 2.5, 130 + i);
+    enter(t, c.c2[i] - .1, () => { card(x, C2Y, PW, C2H, { r: 16, stroke: last ? K.red : K.lineGrey, lw: last ? 3 : 2 });
+      badge(cx, C2Y + 66, 44, last ? K.red : K.redTint, ic, last ? '#FFFFFF' : K.red);
+      podLines(ls.map(s => [s, 25, 800]), cx, C2Y + 165 - (ls.length - 1) * 16); }, { pop: true, ox: cx, oy: C2Y + C2H / 2 });
+    if (i) penArrow(x - 26, C2Y + C2H / 2, x - 7, C2Y + C2H / 2, p(t, c.c2[i] - .35, .3), K.red, 5, 140 + i); });
+  // the loop: from the last card back to the first, broken around its label
+  const lab = 'Each round’s results inform the next personalized learning cycle', lw = measure(lab, 24, 800) + 50, a0 = PX[0] + PW / 2, a1 = PX[4] + PW / 2, lk = p(t, c.loop, 1.6);
+  if (lk > 0) {
+    const seg = [[a1, C2Y + C2H + 12], [a1, LPY], [1005 + lw / 2, LPY]], seg2 = [[1005 - lw / 2, LPY], [a0, LPY], [a0, C2Y + C2H + 12]];
+    strokePts(seg, clamp(lk * 2), K.red, 4, 1, [12, 9]); strokePts(seg2, clamp(lk * 2 - 1), K.red, 4, 1, [12, 9]);
+    arrowHead(a0, C2Y + C2H + 10, -Math.PI / 2, clamp(lk * 6 - 5), K.red, 4);
+  }
+  text(lab, 1005, LPY, { size: 24, weight: 800, color: K.red, align: 'center', alpha: p(t, c.loop + .5, .5) });
+  // rollout: the teacher's note under the page
+  text('U.S. first', 210, 1028, { size: 34, weight: 700, fam: HAND, color: K.red, alpha: p(t, c.us, .4) });
+  text('→ validate, then expand to Korea', 210 + measure('U.S. first', 34, 700, HAND) + 18, 1028, { size: 34, weight: 700, fam: HAND, color: K.red, alpha: p(t, c.kr, .4) });
 }
-SC.pod = t => {
-  podPage(t); const c = PD();
-  ['What to study', 'How much practice'].forEach((s, i) => chip(s, 535 + 145, PCT + PCH2 + 34 + i * 50, { size: 21, fill: K.redTint, color: K.crimson, a: eBack(p(t, Wc('l8_2', i ? 'practice' : 'study', .8) + .1, .4)), align: 'center' }));
-  chip('Programmed learning', 1110, 300, { size: 21, fill: K.redTint, color: K.crimson, a: eBack(p(t, c.pg, .4)) });
-  chip('Made in advance, per objective', 1110, 352, { size: 21, fill: K.redTint, color: K.crimson, a: eBack(p(t, c.pre, .4)) });
-};
-SC.podCycle = t => {
-  podPage(t); const c = PD(), ly = PCT + PCH2 + 50;
-  chip('Review where needed', 470, ly + 40, { size: 21, fill: K.redTint, color: K.crimson, a: eBack(p(t, c.sup, .4)), align: 'center' });
-  chip('Practice amount adjusted', 1540, ly + 40, { size: 21, fill: K.redTint, color: K.crimson, a: eBack(p(t, c.adj, .4)), align: 'center' });
-  penCircle(410 + measure('U.S. → Korea', 28, 800) / 2, 865, measure('U.S. → Korea', 28, 800) / 2 + 22, 30, p(t, c.us + .2, .5), K.red, 4, 120);
-  text('Validate the results, then expand', 600, 962, { size: 32, weight: 700, fam: HAND, color: K.red, alpha: p(t, c.kr, .4) });
-};
+SC.pod = t => podPage(t);
+SC.podCycle = t => podPage(t);
 
 // ============================================================
-// p. 9  P-07 online learning that adapts in real time (two scenes)
+// p. 8  P-07 online learning that adapts in real time (two scenes)
 // ============================================================
 const OL = () => ({ c1: st('l9_1', .3), b1: Wc('l9_2', 'correct', .1), sig: [Wc('l9_2', 'correct', .1), Wc('l9_2', 'time', .6), Wc('l9_2', 'hint', .75), Wc('l9_2', 'repeated', .9)], b2: Wc('l9_3', 'adjust', .4), rt: Wc('l9_3', 'real', .9),
   as: Wc('l9_4', 'assistant', .4), stu: Wc('l9_4', 'students', .7), tea: Wc('l9_4', 'teachers', .9), h0: Wc('l9_5', 'hints', .3), sf: Wc('l9_5', 'solve', .8), d: Wc('l9_6', 'progress', .4), co: Wc('l9_6', 'coach', .75), sum: Wc('l9_6', 'effectively', .95) });
@@ -661,7 +637,7 @@ SC.assistant = t => {
 };
 
 // ============================================================
-// p. 10  a student's progress on the map (three scenes)
+// p. 9  a student's progress on the map (three scenes)
 // ============================================================
 const MAP = { x: 210, y: 270, w: 900, h: 640 };
 const BAND = { up: [270, 460], mid: [460, 640], low: [640, 910] };
@@ -743,7 +719,7 @@ SC.statusUpdate = t => {
 };
 
 // ============================================================
-// p. 11  four key benefits (four scenes)
+// p. 10  four key benefits (four scenes)
 // ============================================================
 const CH = [['Faster content for each market', 'Content aligned with each country’s curriculum, developed and validated more quickly', 'globe', 'l11_2', 'quickly'],
   ['Right content, right time', 'Objectives and practice amount personalized across POD and online learning', 'print', 'l11_3', 'time'],
@@ -776,7 +752,7 @@ SC.change4 = t => {
 };
 
 // ============================================================
-// p. 12  closing
+// p. 11  closing
 // ============================================================
 SC.outro = t => {
   // the picture on the left, the words on the right
@@ -799,7 +775,7 @@ SC.outro = t => {
 };
 
 // ============================================================
-// compositor: slide between pages (with the whoosh), then hold still
+// compositor: slide between pages (silent: no whoosh since 2026.11.06), then hold still
 // ============================================================
 // scenes that continue the page before on the same sheet (one PDF page told in steps): the page's shared part stays put and only the
 // scene's own pen marks cross-fade, no page turn (and no whoosh: tools/make_audio.py CONT)
@@ -807,7 +783,7 @@ const CONT = new Set(TL.cont), PAGE_OF = { kmapDots: kmapPage, kmapAI: kmapPage,
   phase1: roadmapPage, phase2: roadmapPage, wiki: roadmapPage, podCycle: podPage, assistant: onlinePage, statuses: statusPage, statusUpdate: statusPage, change2: changePage, change3: changePage, change4: changePage };
 let SHARED_OFF = false;
 const PAGE_NO = TL.scenes.map((s, i) => i - TL.scenes.slice(1, i + 1).filter(x => CONT.has(x.id)).length);
-const TR = 1.1;
+const TR = 1.1 / 1.5;   // page turn length: 1.5x the earlier 1.1 s (2026.11.06); tools/make_audio.py TURN still starts a page 1.2 s before its first line
 function frame(i, t, ox) {
   if (Math.abs(ox) >= W) return; const s = TL.scenes[i];
   ctx.save(); ctx.translate(Math.round(ox), 0); pageFurniture(PAGE_NO[i]); SC[s.id](t); ctx.restore();

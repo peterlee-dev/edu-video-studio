@@ -5,16 +5,18 @@
 # Review 2026-11-05 (sheet 어댑티브진단&AI플랫폼 소개_ 영상 수정 요청): l8_3 ~ l8_6 rewritten (contents made ahead per objective, kept in a reviewed DB,
 # printed from the DB); l8_4 moved to the pod scene.
 # Review 2026-11-04: l10_3 reads all four states (미학습 added) and l10_4 (결손 first) is new; the lines after it moved to l10_5 ~ l10_7.
+# Review 2026-11-06 (same sheet name): page 2 (why, l2_1 ~ l2_4) dropped, the voice changed to the adaptive-diagnosis female voice
+# (../adaptive-diagnosis-v2-ko/audio/voice_ref.wav), page 8 redrawn as two panels, l8_4 reads the sheet's words (개인을 → 학생 한 명 한 명을).
 LANGUAGE = 'Korean'   # TTS and whisper language ('English' or 'Korean')
 
 # (id, label). id = index.html SC.<id>; pages appear in this order, the label shows in the video editor
-SCENES = [('title', '표지'), ('why', '왜 하는가'),
+SCENES = [('title', '표지'),
           ('kmapList', '왜 지식맵인가: 목록'), ('kmapDots', '왜 지식맵인가: 점과 선'), ('kmapAI', '왜 지식맵인가: AI의 판단'),
           ('universe', 'JEI Math Universe'),
           ('country', '국가별 지식맵'), ('countryTrack', '국가별 지식맵: 학습자 상태'),
           ('layers', '전체 구조: 지식 계층'), ('layerAgent', '전체 구조: AI 에이전트 계층'), ('layerService', '전체 구조: 서비스 계층'), ('layerPace', '전체 구조: 안정과 유연'),
           ('roadmap', '추진 로드맵'), ('phase1', '로드맵: Phase 1'), ('phase2', '로드맵: Phase 2'), ('wiki', '로드맵: LLM Wiki'),
-          ('pod', '핵심 서비스 ① POD'), ('podCycle', 'POD 순환 · 적용 순서'),
+          ('pod', '1단계 핵심 서비스 POD'), ('podCycle', 'POD 순환 · 적용 순서'),
           ('online', '핵심 서비스 ② 온라인 학습'), ('assistant', 'AI 보조선생님'),
           ('statusMap', '학습자 활성 지식맵'), ('statuses', '학습 상태 구분'), ('statusUpdate', '상태 갱신 · 경로 조정'),
           ('change1', '네 가지 변화 1'), ('change2', '네 가지 변화 2'), ('change3', '네 가지 변화 3'), ('change4', '네 가지 변화 4'),
@@ -23,6 +25,7 @@ SCENES = [('title', '표지'), ('why', '왜 하는가'),
 # (index.html SHARED draws the part of the page that stays)
 CONT = {'kmapDots', 'kmapAI', 'countryTrack', 'layerAgent', 'layerService', 'layerPace', 'phase1', 'phase2', 'wiki',
         'podCycle', 'assistant', 'statuses', 'statusUpdate', 'change2', 'change3', 'change4'}
+WHOOSH = False   # no whoosh at page turns (2026-11-06, as in ../jei-math-difference)
 
 # read forms: English names said the Korean way, numbers in words (the screen keeps the written form). "Knowledge" stays in English
 # (as in ../ai-learning-platform-v3-ko: 날리지 sounded like Konglish), and Map is written 맵 so no vowel is added after the p
@@ -39,11 +42,6 @@ _SCRIPT = [
     ('l1_1', 'title', '재능교육이 지난 50년간 축적해 온 학습설계 자산.', .2),
     ('l1_2', 'title', '이제 이 자산에 AI 기술을 더해, 학생 한 명 한 명에게 최적화된 학습을 제공하고, 글로벌 수학 AI 학습의 새로운 표준을 만들어가고자 합니다.', .1),
     ('l1_3', 'title', '이를 실현하기 위한 ‘JEI Knowledge Map 기반 AI 개인화 학습 플랫폼 구축 방안’을 소개합니다.', 0),
-
-    ('l2_1', 'why', '일반적으로 기업에서 AI를 도입하는 목적은 업무의 생산성과 효율성을 높이는 데 있습니다.', 0),
-    ('l2_2', 'why', '하지만 재능교육이 추진하는 AI는 업무의 효율화를 넘어, 기존의 교재와 학습 시스템을 새로운 상품과 서비스로 발전시키는 데 목적이 있습니다.', .2),
-    ('l2_3', 'why', '이를 위해 AI 학습 플랫폼을 기반으로 오프라인 교재와 온라인 학습, POD를 연결하고, 학습자에게 필요한 상품을 보다 유연하게 제공하고자 합니다.', 0),
-    ('l2_4', 'why', '또한 국가별 교육환경과 다양한 학습 수요에 맞춰 커리큘럼과 콘텐츠를 신속하게 개발하고, 이를 새로운 서비스로 연결할 수 있는 체계를 구축하려고 합니다.', 0),
 
     ('l3_1', 'kmapList', 'AI 학습 플랫폼을 구축하기 위해 가장 먼저 해야 할 일은 재능교육 고유의 지식맵을 만드는 것입니다.', .1),
     ('l3_2', 'kmapList', 'AI가 학생에게 필요한 학습을 정확하게 제공하려면, 각각의 학습목표가 서로 어떤 관계에 있고, 어떤 순서로 학습해야 하는지 이해할 수 있어야 하기 때문입니다.', 0),
@@ -77,7 +75,7 @@ _SCRIPT = [
     ('l8_1', 'pod', '1단계의 핵심 서비스는 개인별 맞춤 POD입니다.', .2),
     ('l8_2', 'pod', '먼저 학생의 진단 결과와 학습 이력을 바탕으로 필요한 학습목표와 학습 분량을 정합니다.', 0),
     ('l8_3', 'pod', '콘텐츠는 AI가 재능교육의 프로그램식 학습원리를 적용해 학습목표별로 미리 생성하고, 연구원의 검토를 거쳐 DB에 쌓아 둡니다.', .1),
-    ('l8_4', 'pod', '이 검증된 DB에서 필요한 콘텐츠를 개인을 위한 POD 학습지로 제작해 출력합니다.', 0),
+    ('l8_4', 'pod', '이 검증된 DB에서 필요한 콘텐츠를 학생 한 명 한 명을 위한 POD 학습지로 제작해 출력합니다.', 0),
     ('l8_5', 'podCycle', '학습 결과는 다시 분석해 다음 POD에 반영하고, 보충할 내용과 분량을 조정하며 맞춤 학습을 이어갑니다.', .1),
     ('l8_6', 'podCycle', '이 서비스는 미국에서 먼저 적용하고, 운영 결과를 검증한 뒤 국내로 단계적으로 확대할 계획입니다.', 0),
 
@@ -109,7 +107,6 @@ READ = {}
 # breaths: a comma after these words in the read form, so the voice pauses between phrases instead of running the words together
 BREATH = {
     'l1_1': ['재능교육이'], 'l1_2': ['이제'], 'l1_3': ['위한'],
-    'l2_1': ['일반적으로', '목적은'], 'l2_2': ['하지만', 'AI는'], 'l2_3': ['위해', '기반으로'], 'l2_4': ['또한', '맞춰'],
     'l3_1': ['위해', '일은'], 'l3_2': ['하는지'], 'l3_3': ['위해', '정의하고'], 'l3_4': ['이때', '선은'], 'l3_5': ['또한'], 'l3_6': ['AI는', '바탕으로'],
     'l4_1': ['기반으로'], 'l4_2': ['여기에', '분석하여', '정의하고'], 'l4_3': ['통해'],
     'l5_1': ['콘텐츠를'], 'l5_2': ['때도', '바탕으로', '연결하여'], 'l5_3': ['또한', '있고'], 'l5_4': ['결국', '지식맵은'],
@@ -131,12 +128,10 @@ SCRIPT = [(lid, sc, s, READ.get(lid) or (lambda r: r if r != s else None)(R(brea
 # take mode only: lines reworded after the recording (none: this video is read by the TTS clone)
 CLONE = set()
 # tts mode: a take chosen by ear or by the phoneme check, instead of the automatic pick ({line id: index in the sorted takes})
-# l4_2: the take whose pitch stays level (review 2026-11-04: the voice suddenly dropped low at 2:00, median F0 124 Hz vs ~170 elsewhere)
-# picked by ear-substitute checks (isolated whisper of the name + wav2vec2 phonemes of the whole take, trailing silence >= 0.2 s):
-# JEI as 제이 이아이 (not 제아이), JEI-SLI 에셀아이, POD 피오디 (not 푸디 / 피디), LLM 엘엘엠, Knowledge with /a/ first (not 놀) and 맵 with no vowel after p
-# l8_3 ~ l8_5 (rewritten 2026-11-05): POD 피오디 (not 피디 / 피우디), DB 디비, 목표별로 미리 clear, F0 level to the end (l8_5 take 6 fell to 122 Hz).
-# l6_1: kept the take it had before (the new lines moved the median pace, and with it the automatic pick)
-TAKE = {'l1_3': 9, 'l4_2': 4, 'l4_3': 1, 'l5_1': 1, 'l6_1': 5, 'l6_4': 2, 'l7_3': 0, 'l7_6': 2, 'l8_3': 5, 'l8_4': 2, 'l8_5': 7, 'l11_5': 3, 'l12_2': 2}
+# adaptive female voice (2026-11-06), checked with wav2vec2 phonemes: POD 피오디 (l6_4 take 1 said 피디와, l8_5 take 0 피우디),
+# JEI 제이이아이 (l7_2 take 0 and l5_4 take 0 said 제아이 / 제이아이), l1_3 read 8 times for Knowledge (all first 3 takes said 놀레지; take 6 starts /al/ and ends dʒ, 맵 with no vowel after p)
+TAKE = {'l1_3': 6, 'l5_4': 2, 'l6_4': 0, 'l7_2': 1, 'l8_1': 1, 'l8_5': 1}
+PACE = 5.64   # pace of the first full read (chars/s): extra takes for one line don't move the other lines' picks
 
 # the same pacing as ../ai-learning-platform-v3-ko (a chime at the start, breaks between lines and pages). The voice keeps its own pace
 LEAD, GAP, SCENE_GAP, TAIL = 1.3, .6, 1.8, 3.2   # s before the first line, between lines, extra between pages, after the last line

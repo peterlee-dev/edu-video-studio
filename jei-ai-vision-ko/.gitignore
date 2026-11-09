@@ -6,4 +6,4 @@ audio/*
 out/*
 !out/.gitkeep
 __pycache__/
-out_tts.log
+out_tts*.log

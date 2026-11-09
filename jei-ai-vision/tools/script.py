@@ -3,10 +3,12 @@
 # that follow the 12 pages of ../jei-ai-vision-ko (JEI_AI플랫폼_동영상장면.pptx.pdf). Lines are word for word; only the leading space
 # before "Now," is dropped. Line ids: l<section>_<n>.
 # 2nd review (same sheet name, 2026-11-05 17:00): l4_4 · l5_1 · l11_2 global map / each country’s curriculum, l7_3 · l8_3 without step-by-step
+# 3rd review (same sheet name, 2026-11-06): page 2 (why, l2_1 ~ l2_5) dropped, the voice changed to the adaptive-diagnosis female voice,
+# page 8 redrawn as two panels (content pool / personalized delivery)
 LANGUAGE = 'English'   # TTS and whisper language ('English' or 'Korean')
 
 # (id, label). id = index.html SC.<id>; pages appear in this order, the label shows in the video editor
-SCENES = [('title', 'Opening'), ('why', 'Beyond efficiency'),
+SCENES = [('title', 'Opening'),
           ('kmapList', 'The knowledge map: a list'), ('kmapDots', 'The knowledge map: points and lines'), ('kmapAI', 'The knowledge map: what AI decides'),
           ('universe', 'How the map is built'),
           ('country', 'What the map makes possible'), ('countryTrack', 'What the map makes possible: each student'),
@@ -21,6 +23,7 @@ SCENES = [('title', 'Opening'), ('why', 'Beyond efficiency'),
 # (index.html SHARED draws the part of the page that stays)
 CONT = {'kmapDots', 'kmapAI', 'countryTrack', 'layerAgent', 'layerService', 'layerPace', 'phase1', 'phase2', 'wiki',
         'podCycle', 'assistant', 'statuses', 'statusUpdate', 'change2', 'change3', 'change4'}
+WHOOSH = False   # no whoosh at page turns (2026-11-06, as in ../jei-math-difference)
 
 # read forms (the screen keeps the written form). Review 2026-11-05: POD as P.O.D and JEI as J.E.I, letter by letter
 # (the voice said "pod"); written with hyphens, as in ../jei-corporation-overview, so the letters don't end a sentence.
@@ -37,13 +40,6 @@ _SCRIPT = [
     ('l1_1', 'title', 'Over the past 50 years, JEI has built deep expertise in learning design.', .2),
     ('l1_2', 'title', 'Now, by combining that expertise with AI, we aim to deliver learning optimized for every student and set a new global standard for AI-powered math learning.', .1),
     ('l1_3', 'title', 'Here is our plan: building an AI personalized learning platform based on the JEI Math Knowledge Map.', 0),
-
-    # [2] Beyond efficiency
-    ('l2_1', 'why', 'Most companies adopt AI to improve productivity and efficiency.', 0),
-    ('l2_2', 'why', 'But this project is about more than efficiency.', 0),
-    ('l2_3', 'why', 'It’s about transforming JEI’s learning products and services.', .2),
-    ('l2_4', 'why', 'On one integrated platform, we aim to connect printed workbooks, online learning, and personalized print-on-demand, or POD, so we can offer each student exactly what they need.', 0),
-    ('l2_5', 'why', 'We’re also building a system that can quickly develop curricula and content for different countries and learning needs, and turn them into new services.', 0),
 
     # [3] The knowledge map
     ('l3_1', 'kmapList', 'The foundation of this platform is the JEI Math Knowledge Map.', .1),
@@ -130,7 +126,9 @@ SCRIPT = [(lid, sc, s, READ.get(lid) or (lambda r: r if r != s else None)(R(s)),
 # take mode only: lines reworded after the recording (none: this video is read by the TTS clone)
 CLONE = set()
 # tts mode: a take chosen by ear or by the phoneme check, instead of the automatic pick ({line id: index in the sorted takes})
-TAKE = {}
+# l12_4 (the closing line, read 10 times): every take says "learn-" creaky low and lifts on "-ing"; take 0 falls 262 → 244 → 105 Hz to the end
+TAKE = {'l12_4': 0}
+PACE = 14.82   # pace of the first full read with the adaptive female voice (chars/s): extra takes for one line don't move the other lines' picks
 
 # the same pacing as ../jei-ai-vision-ko (a chime at the start, breaks between lines and pages). The voice keeps its own pace
 LEAD, GAP, SCENE_GAP, TAIL = 1.3, .5, 1.6, 3.2   # s before the first line, between lines, extra between pages, after the last line

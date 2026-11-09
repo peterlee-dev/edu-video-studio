@@ -32,6 +32,7 @@ def say_as(s):
     for a, b in SAY: s = re.sub(re.escape(a), b, s, flags=re.I)
     return s
 DING_END = getattr(script, 'DING_END', False)
+PACE = getattr(script, 'PACE', None)   # target pace (chars/s) for picking takes; default the median of all takes, which moves when one line gets many extra takes
 
 SR = 48000
 TURN = 1.2                  # a page starts this long before its first line (its turn, index.html TR = 1.1 s, starts .15 s before that)
@@ -269,7 +270,7 @@ def clips_dry():
 
 def clips_tts(redo):
     make_takes(IDS, redo)
-    pick, _ = pick_takes(IDS)
+    pick, _ = pick_takes(IDS, PACE)
     out = {}
     for lid, c in pick.items():
         db = frames_db(c['y']); y = c['y'] * (.08 / np.sqrt(np.mean(10 ** (db[db > -40] / 10))))   # same loudness for every line
@@ -407,7 +408,7 @@ def mix(scenes, lines, voice, dur):
     n = int(dur * SR); nar, fx = np.zeros(n), np.zeros(n)
     for s0, y in voice: place(nar, s0, y)
     nar *= .9 / (np.abs(nar).max() + 1e-9)
-    for s in scenes[1:]:   # the page slides sideways at the same time (index.html draw); CONT pages do not turn
+    for s in scenes[1:] if getattr(script, 'WHOOSH', True) else []:   # the page slides sideways at the same time (index.html draw); CONT pages do not turn
         if s['id'] not in CONT: place(fx, s['start'] - .15, whoosh(), .3)
     if CHIME_AT is not None: place(fx, CHIME_AT, chime(), .4)
     if DING_BEFORE: place(fx, lines[DING_BEFORE]['start'] - .55, chime(), .4)
