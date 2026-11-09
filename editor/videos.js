@@ -2,6 +2,7 @@
 window.VIDEOS = [
  { id: 'jei-learning-centers-overview-female', title: 'Overview of JEI Learning Centers, LLC · 미주 재능 회사 소개 (여자 목소리, 모눈종이 워크북)' },
  { id: 'jei-domestic-repositioning', title: 'JEI Repositioning Strategy · 재능교육 국내 리포지셔닝 (영문, 여자 목소리, 모눈종이 워크북)' },
+ { id: 'jei-repositioning-strategy', title: 'JEI Repositioning: Core Strategy · 재능교육 리포지셔닝 핵심전략 (영문, 여자 목소리, 모눈종이 워크북)' },
  { id: 'jei-positioning-strategy', title: 'JEI Positioning & Execution Strategy · 재능교육 포지셔닝 및 실행전략 (영문, 여자 목소리, 모눈종이 워크북)' },
  { id: 'jei-ai-vision', title: 'JEI AI Transformation Vision · JEI AI 전환 비전 (영문, 남자 목소리, 모눈종이 워크북)' },
  { id: 'jei-corporation-overview-female', title: 'Overview of JEI Corporation · 재능 회사 소개 (여자 목소리, 모눈종이 워크북)' },

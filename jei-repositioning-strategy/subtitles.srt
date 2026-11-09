@@ -1,0 +1,696 @@
+1
+00:00:02,600 --> 00:00:06,610
+Today, I'd like to share JEI's
+core repositioning strategy.
+
+2
+00:00:07,160 --> 00:00:08,790
+Our main message is simple.
+
+3
+00:00:09,240 --> 00:00:12,642
+JEI must move beyond selling
+worksheets and become a company
+
+4
+00:00:12,698 --> 00:00:15,760
+that designs children's
+ability to learn on their own.
+
+5
+00:00:17,510 --> 00:00:19,870
+Our strategy addresses five questions.
+
+6
+00:00:20,420 --> 00:00:21,850
+Why do we need to change?
+
+7
+00:00:22,300 --> 00:00:23,940
+What do parents really want?
+
+8
+00:00:24,390 --> 00:00:26,100
+Where are the opportunities?
+
+9
+00:00:26,550 --> 00:00:28,490
+How can JEI compete?
+
+10
+00:00:28,940 --> 00:00:31,750
+And how will we deliver
+and measure our results?
+
+11
+00:00:32,400 --> 00:00:33,830
+Let's begin with the market.
+
+12
+00:00:35,580 --> 00:00:39,640
+JEI currently ranks fourth in
+Korea's worksheet learning market.
+
+13
+00:00:40,090 --> 00:00:44,026
+Our three main competitors have
+more than 700 locations and
+
+14
+00:00:44,093 --> 00:00:48,430
+over one million members each,
+while JEI has about 300 locations.
+
+15
+00:00:48,880 --> 00:00:53,670
+Our revenue also fell by
+53% between 2010 and 2025.
+
+16
+00:00:54,220 --> 00:00:56,690
+Competing through size alone is difficult.
+
+17
+00:00:57,140 --> 00:00:58,960
+We need to create a new category.
+
+18
+00:01:00,710 --> 00:01:03,340
+The number of children
+in Korea is declining.
+
+19
+00:01:03,790 --> 00:01:10,040
+In 2026, about 298,000 children entered
+first grade, down 8% from the previous year.
+
+20
+00:01:10,490 --> 00:01:16,300
+Total private education spending also
+fell to 27.5 trillion won in 2025.
+
+21
+00:01:16,850 --> 00:01:19,910
+However, monthly spending
+per elementary student
+
+22
+00:01:19,974 --> 00:01:23,480
+participating in private
+education reached 512,000 won.
+
+23
+00:01:23,930 --> 00:01:26,200
+Parents are willing to
+pay for clear value.
+
+24
+00:01:26,750 --> 00:01:31,400
+Our focus must shift toward greater value
+per customer and stronger retention.
+
+25
+00:01:33,150 --> 00:01:36,339
+AI-based assessment, personalized
+learning, and automatic
+
+26
+00:01:36,395 --> 00:01:39,080
+grading are becoming common
+across the industry.
+
+27
+00:01:39,530 --> 00:01:42,670
+These features alone are no
+longer enough to stand out.
+
+28
+00:01:43,220 --> 00:01:47,860
+Parents want to save time, reduce their
+burden, and see clear learning progress.
+
+29
+00:01:48,310 --> 00:01:52,550
+JEI must offer something beyond
+worksheets and AI features.
+
+30
+00:01:54,300 --> 00:01:56,320
+Parents have three levels of needs.
+
+31
+00:01:56,870 --> 00:02:00,530
+Functional needs include suitable
+materials and learning reports.
+
+32
+00:02:00,980 --> 00:02:05,500
+Emotional needs include less worry and
+less responsibility for managing study.
+
+33
+00:02:05,950 --> 00:02:10,120
+But their most important need is for
+their children to learn independently.
+
+34
+00:02:10,670 --> 00:02:13,424
+JEI should focus on developing
+this ability through
+
+35
+00:02:13,478 --> 00:02:16,070
+personalized learning
+plans and teacher support.
+
+36
+00:02:17,820 --> 00:02:21,020
+Parents often stop learning
+services for five reasons.
+
+37
+00:02:21,570 --> 00:02:23,650
+Repetitive learning becomes boring.
+
+38
+00:02:24,100 --> 00:02:25,780
+Progress is difficult to see.
+
+39
+00:02:26,230 --> 00:02:28,190
+Parents still manage daily study.
+
+40
+00:02:28,640 --> 00:02:30,920
+Fees increase without clear results.
+
+41
+00:02:31,370 --> 00:02:33,780
+And AI features make brands look similar.
+
+42
+00:02:34,430 --> 00:02:38,420
+The main problem is that parents cannot
+clearly see their children's growth.
+
+43
+00:02:38,870 --> 00:02:41,890
+This is the problem JEI must solve.
+
+44
+00:02:43,640 --> 00:02:46,580
+Our three main competitors
+have different strengths.
+
+45
+00:02:47,130 --> 00:02:49,610
+Daekyo focuses on level-based learning.
+
+46
+00:02:50,060 --> 00:02:52,870
+Kumon is known for basic
+skills and repetition.
+
+47
+00:02:53,320 --> 00:02:56,250
+Woongjin offers an integrated
+learning platform.
+
+48
+00:02:56,800 --> 00:03:00,256
+But from a customer perspective,
+these approaches may leave gaps
+
+49
+00:03:00,310 --> 00:03:04,090
+in long-term learning direction,
+motivation, and personalized support.
+
+50
+00:03:04,540 --> 00:03:09,540
+JEI should focus on these opportunities
+rather than directly copying competitors.
+
+51
+00:03:11,290 --> 00:03:14,570
+Competitors mainly focus on
+how learning is delivered.
+
+52
+00:03:15,020 --> 00:03:17,030
+But parents want to know something more.
+
+53
+00:03:17,580 --> 00:03:20,640
+"Where should my child's learning
+go over the next three years?"
+
+54
+00:03:21,290 --> 00:03:24,630
+We believe this creates an
+opportunity for Learning Design.
+
+55
+00:03:25,080 --> 00:03:28,151
+JEI can use assessment results
+to create personalized
+
+56
+00:03:28,209 --> 00:03:30,990
+learning paths and help
+students stay motivated.
+
+57
+00:03:31,440 --> 00:03:33,940
+This can become our new
+position in the market.
+
+58
+00:03:35,690 --> 00:03:39,270
+Al Ries explained that positioning
+happens in the customer's mind.
+
+59
+00:03:39,720 --> 00:03:43,350
+Customers often rank brands on
+a ladder within each category.
+
+60
+00:03:43,900 --> 00:03:47,340
+JEI is currently number four
+in the worksheet market.
+
+61
+00:03:47,790 --> 00:03:51,400
+Instead of competing on the same
+ladder, we can create a new one.
+
+62
+00:03:51,950 --> 00:03:54,380
+That new category is Learning Design.
+
+63
+00:03:54,830 --> 00:03:58,340
+Our goal is to become the brand
+customers associate with "Design."
+
+64
+00:04:00,090 --> 00:04:03,410
+We can apply six positioning
+principles from Al Ries.
+
+65
+00:04:03,960 --> 00:04:07,350
+First, the Law of the Ladder:
+create a new category.
+
+66
+00:04:07,800 --> 00:04:12,550
+Second, the Law of the Opposite: offer
+what competitors do not clearly provide.
+
+67
+00:04:13,000 --> 00:04:16,930
+Third, the Law of Sacrifice:
+focus on core subjects.
+
+68
+00:04:17,380 --> 00:04:20,299
+Fourth, avoid the trap of line
+extension by expanding the
+
+69
+00:04:20,350 --> 00:04:23,320
+meaning of self-learning rather
+than adding more products.
+
+70
+00:04:23,770 --> 00:04:27,354
+Fifth, the Laws of the Mind and
+Focus: communicate one clear word,
+
+71
+00:04:27,408 --> 00:04:31,100
+"Design," starting with parents of
+first- and second-grade students.
+
+72
+00:04:31,550 --> 00:04:34,388
+Sixth, the Law of Candor:
+acknowledge our smaller
+
+73
+00:04:34,446 --> 00:04:36,820
+scale and focus on each child's learning.
+
+74
+00:04:38,570 --> 00:04:40,370
+We have five core strategies.
+
+75
+00:04:40,920 --> 00:04:44,000
+First, redefine our category
+as Learning Design.
+
+76
+00:04:44,450 --> 00:04:46,740
+Second, focus on core subjects.
+
+77
+00:04:47,190 --> 00:04:50,980
+Third, transform our locations
+into Learning Design Studios.
+
+78
+00:04:51,430 --> 00:04:54,090
+Fourth, combine AI with human coaching.
+
+79
+00:04:54,540 --> 00:04:57,730
+And fifth, redefine
+self-learning as an ability.
+
+80
+00:04:58,280 --> 00:05:02,450
+These strategies work together to
+build a stronger position for JEI.
+
+81
+00:05:04,200 --> 00:05:08,140
+Our products should move beyond
+question difficulty and volume.
+
+82
+00:05:08,590 --> 00:05:12,070
+Instead, we will focus on
+personalized learning roadmaps.
+
+83
+00:05:12,620 --> 00:05:14,450
+The process has four steps.
+
+84
+00:05:14,900 --> 00:05:16,640
+Assess each child's level.
+
+85
+00:05:17,090 --> 00:05:19,040
+Set learning goals and a roadmap.
+
+86
+00:05:19,490 --> 00:05:21,780
+Follow a personalized learning routine.
+
+87
+00:05:22,230 --> 00:05:25,400
+And regularly review progress
+and provide coaching.
+
+88
+00:05:25,950 --> 00:05:28,490
+This cycle will guide
+each child's learning.
+
+89
+00:05:30,240 --> 00:05:33,460
+JEI currently offers 17 subjects.
+
+90
+00:05:33,910 --> 00:05:37,150
+We will focus our resources
+on five priority subjects:
+
+91
+00:05:37,210 --> 00:05:40,150
+Math, Korean, English,
+Thinking Pizza, and Hanja.
+
+92
+00:05:40,600 --> 00:05:45,050
+Other subjects may be reduced or managed
+through partnerships and referrals.
+
+93
+00:05:45,600 --> 00:05:48,384
+Our initial target is parents
+of first- and second-grade
+
+94
+00:05:48,434 --> 00:05:50,770
+students choosing their
+first learning program.
+
+95
+00:05:51,220 --> 00:05:54,860
+By focusing our expertise, we can
+build stronger customer trust.
+
+96
+00:05:56,610 --> 00:06:01,600
+We plan to transform approximately 300
+locations into Learning Design Studios.
+
+97
+00:06:02,050 --> 00:06:04,510
+Each studio will provide three services.
+
+98
+00:06:04,960 --> 00:06:08,610
+An AI Diagnostic Report to identify
+the child's current level.
+
+99
+00:06:09,060 --> 00:06:12,460
+A personalized three-month
+and annual learning roadmap.
+
+100
+00:06:12,910 --> 00:06:16,890
+And monthly coaching to review
+progress and support learning habits.
+
+101
+00:06:17,440 --> 00:06:21,370
+Our locations will become centers for
+assessment, design, and coaching.
+
+102
+00:06:23,120 --> 00:06:25,840
+AI will provide personalized
+questions, assess
+
+103
+00:06:25,899 --> 00:06:28,560
+learning, grade answers,
+and prepare reports.
+
+104
+00:06:29,010 --> 00:06:31,945
+Learning Design Coaches will
+use these results to create
+
+105
+00:06:31,997 --> 00:06:34,880
+learning plans and support
+motivation and study habits.
+
+106
+00:06:35,430 --> 00:06:39,230
+AI handles learning data, while
+teachers provide human guidance.
+
+107
+00:06:39,680 --> 00:06:43,000
+This combination is one
+of JEI's key strengths.
+
+108
+00:06:43,650 --> 00:06:47,330
+"AI provides the questions.
+JEI designs the learning."
+
+109
+00:06:49,080 --> 00:06:53,160
+JEI has promoted the Self-Learning
+Method for nearly 50 years.
+
+110
+00:06:53,610 --> 00:06:57,680
+But today, many education companies
+use the term "self-learning."
+
+111
+00:06:58,130 --> 00:07:00,130
+We need to give it a stronger meaning.
+
+112
+00:07:00,680 --> 00:07:03,270
+Self-learning is not
+simply studying alone.
+
+113
+00:07:03,720 --> 00:07:06,150
+It is the ability to learn independently.
+
+114
+00:07:06,700 --> 00:07:11,320
+JEI will focus on designing and
+developing this ability in every child.
+
+115
+00:07:13,070 --> 00:07:16,440
+"JEI designs children's ability
+to learn on their own."
+
+116
+00:07:17,090 --> 00:07:19,530
+This statement represents
+our new direction.
+
+117
+00:07:19,980 --> 00:07:24,762
+It creates a new category, establishes
+"Design" as our key word, reflects the
+
+118
+00:07:24,824 --> 00:07:30,040
+importance of human support in the AI era,
+and builds on JEI's educational heritage.
+
+119
+00:07:30,490 --> 00:07:33,720
+It will guide our products,
+services, and communication.
+
+120
+00:07:35,470 --> 00:07:38,720
+We will demonstrate Learning
+Design through five services.
+
+121
+00:07:39,270 --> 00:07:41,130
+An AI Diagnostic Report.
+
+122
+00:07:41,580 --> 00:07:43,570
+A personalized learning roadmap.
+
+123
+00:07:44,020 --> 00:07:45,100
+Monthly coaching.
+
+124
+00:07:45,550 --> 00:07:47,180
+A learning routine record.
+
+125
+00:07:47,630 --> 00:07:50,210
+And a Self-Learning Ability Growth Report.
+
+126
+00:07:50,760 --> 00:07:53,296
+These services will help
+parents see their children's
+
+127
+00:07:53,344 --> 00:07:55,450
+progress and reduce
+their management burden.
+
+128
+00:07:55,900 --> 00:07:59,960
+To achieve this, we must first
+strengthen our core-subject curricula.
+
+129
+00:08:01,710 --> 00:08:04,210
+Our brand communication has three levels.
+
+130
+00:08:04,760 --> 00:08:08,290
+First, key words: "Design"
+and "Self-Learning Ability."
+
+131
+00:08:08,740 --> 00:08:12,580
+Second, brand slogans, such as
+"Learning Starts with Design."
+
+132
+00:08:13,030 --> 00:08:16,820
+Third, campaign messages that
+encourage parents to take action.
+
+133
+00:08:17,370 --> 00:08:19,740
+We should not use too
+many messages at once.
+
+134
+00:08:20,190 --> 00:08:24,530
+One clear and consistent message
+will help customers remember JEI.
+
+135
+00:08:26,280 --> 00:08:29,540
+After 12 months, we will
+evaluate five indicators.
+
+136
+00:08:30,090 --> 00:08:33,100
+Brand association with
+independent learning ability.
+
+137
+00:08:33,550 --> 00:08:36,370
+The share of new first-
+and second-grade students.
+
+138
+00:08:36,820 --> 00:08:40,250
+A 100% delivery rate for
+Learning Design Reports.
+
+139
+00:08:40,700 --> 00:08:43,320
+Customer retention and cancellation rates.
+
+140
+00:08:43,770 --> 00:08:46,330
+And the share of revenue
+from core subjects.
+
+141
+00:08:46,880 --> 00:08:51,210
+These indicators will show whether our
+strategy is producing real results.
+
+142
+00:08:52,960 --> 00:08:57,690
+Daekyo is known for levels, Kumon for
+repetition, and Woongjin for its platform.
+
+143
+00:08:58,140 --> 00:09:01,940
+JEI will focus on a new
+opportunity: Learning Design.
+
+144
+00:09:02,490 --> 00:09:04,930
+We want to become more
+than a worksheet company.
+
+145
+00:09:05,380 --> 00:09:09,680
+We want to become a company that designs
+children's ability to learn independently.
+
+146
+00:09:10,330 --> 00:09:13,490
+Our focus is clear: Designing
+the Ability to Learn.
+
+147
+00:09:14,340 --> 00:09:14,950
+Thank you.
+
