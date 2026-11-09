@@ -1,5 +1,6 @@
 // 편집기에서 고를 수 있는 영상 (폴더 이름 = id). 각 폴더는 editor/PROTOCOL.md 를 따름
 window.VIDEOS = [
+ { id: 'jei-learning-centers-overview-female', title: 'Overview of JEI Learning Centers, LLC · 미주 재능 회사 소개 (여자 목소리, 모눈종이 워크북)' },
  { id: 'jei-positioning-strategy', title: 'JEI Positioning & Execution Strategy · 재능교육 포지셔닝 및 실행전략 (영문, 여자 목소리, 모눈종이 워크북)' },
  { id: 'jei-ai-vision', title: 'JEI AI Transformation Vision · JEI AI 전환 비전 (영문, 남자 목소리, 모눈종이 워크북)' },
  { id: 'jei-corporation-overview-female', title: 'Overview of JEI Corporation · 재능 회사 소개 (여자 목소리, 모눈종이 워크북)' },

@@ -1,0 +1,10 @@
+node_modules/
+audio/*
+!audio/voice_ref.wav
+!audio/voice_ref.txt
+!audio/narration_words.json
+!audio/narration.mp3
+!audio/narration.m4a
+out/
+__pycache__/
+out_tts*.log
