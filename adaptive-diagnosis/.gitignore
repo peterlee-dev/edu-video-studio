@@ -1,6 +1,7 @@
 node_modules/
 audio/*
 !audio/.gitkeep
+!audio/mix.flac
 out/*
 !out/.gitkeep
 __pycache__/

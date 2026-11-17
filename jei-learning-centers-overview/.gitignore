@@ -5,6 +5,7 @@ audio/*
 !audio/narration_words.json
 !audio/narration.mp3
 !audio/narration.m4a
+!audio/mix.flac
 out/
 __pycache__/
 out_tts.log

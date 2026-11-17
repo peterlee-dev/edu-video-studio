@@ -4,6 +4,7 @@ audio/*
 !audio/narration.mp3
 !audio/narration_words.json
 !audio/clone_*
+!audio/mix.flac
 out/*
 !out/.gitkeep
 .venv/

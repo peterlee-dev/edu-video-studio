@@ -3,5 +3,6 @@
 !*/audio/male.txt
 !*/audio/female.wav
 !*/audio/female.txt
+!*/audio/mix_*.flac
 __pycache__/
 *.log
