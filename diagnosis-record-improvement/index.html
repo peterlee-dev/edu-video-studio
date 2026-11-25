@@ -1,0 +1,597 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>진단처방기록부 개선 시안</title>
+<style>
+  @font-face { font-family: 'Noto Sans KR'; src: url('fonts/NotoSansKR.ttf') format('truetype'); font-weight: 100 900; font-display: block; }
+  @font-face { font-family: 'Gaegu'; src: url('fonts/Gaegu-Bold.ttf') format('truetype'); font-weight: 100 900; font-display: block; }
+  html, body { margin: 0; background: #0E1424; }
+  body { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 12px; font-family: 'Avenir Next', 'Noto Sans KR', sans-serif; color: #ddd; }
+  canvas { width: min(100%, 1280px); aspect-ratio: 16 / 9; display: block; background: #FEFFFF; }
+  .bar { display: flex; gap: 12px; align-items: center; width: min(100%, 1280px); }
+  .bar input { flex: 1; }
+  body.render { padding: 0; gap: 0; }
+  body.render canvas { width: 1920px; height: 1080px; }
+  body.render .bar { display: none; }
+</style>
+</head>
+<body>
+<script src="timeline.js"></script>
+<script src="content.js"></script>
+<script src="schema.js"></script>
+<canvas id="c" width="1920" height="1080"></canvas>
+<div class="bar">
+  <button id="play">▶ Play</button>
+  <input id="seek" type="range" min="0" max="300" step="0.01" value="0">
+  <span id="time">0.00s</span>
+</div>
+<script>
+// ------------------------------------------------------------
+// 개인별 진단처방기록부 개선 시안 — Google Slides "진단처방기록부 개선 영상" (수학팀, 2026-11-18: page 1 the script, pages 2–7 the deck)
+// as a graph-paper workbook video. One continuous sheet of graph paper; each scene is a workbook page. The camera slides sideways between
+// pages (in time with the whoosh in the mix). The report pages (assets/, the pictures in the deck's pptx) sit in a zoom lens: as each new
+// part of the report is explained, the lens glides in to it, the rest dims and a red pen box goes round it (asked for in the request).
+// Teacher's-pen marks: circles, checks, crosses, boxes, arrows, underlines, highlighter, sticky notes, stamps.
+// Timing: timeline.js, written by tools/make_audio.py from the narration. Pictures follow spoken words
+// (Wc(line, word) looks the word up in TL.lines[line].words). draw(t) is a pure function of time.
+// ------------------------------------------------------------
+const W = 1920, H = 1080, TL = window.TL, DURATION = TL.duration;
+const cv = document.getElementById('c'), ctx = cv.getContext('2d');
+const DEFAULT_CONTENT = JSON.parse(JSON.stringify(window.CONTENT));
+let C = window.CONTENT, K = C.colors;
+const SANS = "'Avenir Next', 'Noto Sans KR', 'Helvetica Neue', sans-serif";
+const HAND = "'Gaegu', 'Noto Sans KR', cursive";   // Korean handwriting (Gaegu Bold, OFL)
+const LINE = '#E2E4E8';   // card outline (neutral)
+
+// ---------- basics ----------
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const lerp = (a, b, k) => a + (b - a) * k;
+const p = (t, s, d) => clamp((t - s) / d);
+const eOut = x => 1 - Math.pow(1 - x, 3), eIO = x => x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+const eBack = x => { const c1 = 1.7, c3 = c1 + 1; return x <= 0 ? 0 : 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2); };
+const nz = (i, s = 1) => { const v = Math.sin(i * 12.9898 + s * 78.233) * 43758.5453; return v - Math.floor(v) - .5; };   // fixed jitter (no flicker)
+function rgba(hex, a) { const n = parseInt(hex.slice(1), 16); return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`; }
+const L = id => TL.lines[id] || { start: 0, end: 0, words: [] };
+const S = id => TL.scenes.find(s => s.id === id) || { start: 0, end: 0 };
+const st = (id, f = 0) => L(id).start + (L(id).end - L(id).start) * f;   // f: 0 = start of the narration line, 1 = end
+const en = (id, d = 0) => L(id).end + d;
+// time a word is spoken in a line (one of several spellings, the nth time it occurs); falls back to a fraction of the line.
+// Korean words carry their particles ("재능스스로수학은", "덧셈식으로"), so a cue matches the start of a spoken word
+const norm = s => String(s).toLowerCase().replace(/[^a-z0-9가-힣]/g, '');
+const MISS = window.CUE_MISS = new Set();
+function Wd(id, words, f = 0, nth = 1) {
+  const want = (Array.isArray(words) ? words : [words]).map(norm); let n = 0;
+  for (const [w, s] of L(id).words || []) if (want.some(c => norm(w).startsWith(c)) && ++n === nth) return s;
+  MISS.add(`${id}:${want.join('|')}`); return st(id, f);
+}
+const cueCache = {};
+const Wc = (id, words, f, nth) => { const k = id + '|' + words + '|' + nth; return k in cueCache ? cueCache[k] : (cueCache[k] = Wd(id, words, f, nth)); };
+
+// ---------- shapes and text ----------
+function rr(x, y, w, h, r, fill, stroke, lw = 2, a = 1) { if (a <= 0) return; ctx.save(); ctx.globalAlpha *= a; ctx.beginPath(); ctx.roundRect(x, y, w, h, r); if (fill) { ctx.fillStyle = fill; ctx.fill(); } if (stroke) { ctx.lineWidth = lw; ctx.strokeStyle = stroke; ctx.stroke(); } ctx.restore(); }
+function circle(x, y, r, fill, stroke, lw = 3, a = 1) { if (r <= 0 || a <= 0) return; ctx.save(); ctx.globalAlpha *= a; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); if (fill) { ctx.fillStyle = fill; ctx.fill(); } if (stroke) { ctx.lineWidth = lw; ctx.strokeStyle = stroke; ctx.stroke(); } ctx.restore(); }
+function line0(x1, y1, x2, y2, c, lw = 3, dash) { ctx.save(); ctx.strokeStyle = c; ctx.lineWidth = lw; if (dash) ctx.setLineDash(dash); ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke(); ctx.restore(); }
+function card(x, y, w, h, { fill = '#FFFFFF', stroke = LINE, r = 16, a = 1, shadow = true, lw = 2 } = {}) {
+  if (a <= 0) return; ctx.save(); ctx.globalAlpha *= a;
+  if (shadow) { ctx.shadowColor = 'rgba(30,30,30,.08)'; ctx.shadowBlur = 22; ctx.shadowOffsetY = 8; }
+  ctx.beginPath(); ctx.roundRect(x, y, w, h, r); ctx.fillStyle = '#FFFFFF'; ctx.fill(); ctx.shadowColor = 'transparent';
+  if (fill !== '#FFFFFF') { ctx.fillStyle = fill; ctx.fill(); }
+  if (stroke) { ctx.lineWidth = lw; ctx.strokeStyle = stroke; ctx.stroke(); } ctx.restore();
+}
+function measure(str, size, weight = 600, fam = SANS) { ctx.save(); ctx.font = `${weight} ${size}px ${fam}`; const w = ctx.measureText(str).width; ctx.restore(); return w; }
+function text(str, x, y, { size = 36, weight = 600, fam = SANS, color = K.ink, align = 'left', alpha = 1, maxW, spacing = 0 } = {}) {
+  if (alpha <= 0 || !str) return; ctx.save(); ctx.globalAlpha *= alpha;
+  let sz = size; if (maxW) { const w = measure(str, size, weight, fam) + spacing * str.length; if (w > maxW) sz = size * maxW / w; }
+  ctx.font = `${weight} ${sz}px ${fam}`; ctx.textAlign = align; ctx.textBaseline = 'middle'; ctx.fillStyle = color;
+  if (spacing) ctx.letterSpacing = spacing + 'px';
+  ctx.fillText(str, x, y); ctx.restore();
+}
+// entrance: fade + rise (+ optional pop around ox, oy). Moves only while entering, then stays put
+function enter(t, t0, fn, { d = .55, dy = 26, dx = 0, pop = false, ox = 960, oy = 540 } = {}) {
+  const k = p(t, t0, d); if (k <= 0) return 0;
+  ctx.save(); ctx.globalAlpha *= clamp(k * 1.5);
+  if (pop) { const s = lerp(.5, 1, eBack(k)); ctx.translate(ox, oy); ctx.scale(s, s); ctx.translate(-ox, -oy); }
+  else ctx.translate((1 - eOut(k)) * dx, (1 - eOut(k)) * dy);
+  fn(k); ctx.restore(); return k;
+}
+
+// ---------- teacher's pen ----------
+function strokePts(pts, k, color, lw = 5, a = 1, dash) {
+  if (k <= 0 || a <= 0 || pts.length < 2) return;
+  let tot = 0; const seg = []; for (let i = 1; i < pts.length; i++) { const d = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); seg.push(d); tot += d; }
+  let left = tot * clamp(k);
+  ctx.save(); ctx.globalAlpha *= a; ctx.strokeStyle = color; ctx.lineWidth = lw; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; if (dash) ctx.setLineDash(dash);
+  ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]);
+  for (let i = 1; i < pts.length && left > 0; i++) { const f = Math.min(1, left / seg[i - 1]); ctx.lineTo(lerp(pts[i - 1][0], pts[i][0], f), lerp(pts[i - 1][1], pts[i][1], f)); left -= seg[i - 1]; }
+  ctx.stroke(); ctx.restore();
+}
+function wobble(x1, y1, x2, y2, seed = 1, amp = 1.6, n = 14) {
+  const dx = x2 - x1, dy = y2 - y1, len = Math.hypot(dx, dy) || 1, nx = -dy / len, ny = dx / len, pts = [];
+  for (let i = 0; i <= n; i++) { const f = i / n, j = (i === 0 || i === n) ? 0 : nz(i, seed) * amp * 2; pts.push([x1 + dx * f + nx * j, y1 + dy * f + ny * j]); }
+  return pts;
+}
+const pen = (x1, y1, x2, y2, k, c = K.red, lw = 5, seed = 1, a = 1, dash) => strokePts(wobble(x1, y1, x2, y2, seed), k, c, lw, a, dash);
+function penCircle(cx, cy, rx, ry, k, c = K.red, lw = 5, seed = 1, a = 1) {
+  const pts = [], a0 = -2.3 + nz(1, seed) * .4, n = 56;
+  for (let i = 0; i <= n; i++) { const ang = a0 + (i / n) * Math.PI * 2.12, r = 1 + nz(i, seed) * .05 + (i / n) * .06; pts.push([cx + Math.cos(ang) * rx * r, cy + Math.sin(ang) * ry * r]); }
+  strokePts(pts, k, c, lw, a);
+}
+function arrowHead(x2, y2, ang, hk, c, lw, a = 1, s = 16 + lw) {
+  if (hk <= 0) return;
+  pen(x2, y2, x2 - Math.cos(ang - .5) * s, y2 - Math.sin(ang - .5) * s, hk, c, lw, 3, a);
+  pen(x2, y2, x2 - Math.cos(ang + .5) * s, y2 - Math.sin(ang + .5) * s, hk, c, lw, 5, a);
+}
+function penArrow(x1, y1, x2, y2, k, c = K.red, lw = 5, seed = 1, a = 1, dash) {
+  pen(x1, y1, x2, y2, clamp(k / .8), c, lw, seed, a, dash);
+  arrowHead(x2, y2, Math.atan2(y2 - y1, x2 - x1), clamp((k - .75) / .25), c, lw, a);
+}
+function penCurve(x1, y1, cx, cy, x2, y2, k, c = K.red, lw = 5, a = 1, arrow = false) {
+  const pts = []; for (let i = 0; i <= 30; i++) { const f = i / 30; pts.push([(1 - f) * (1 - f) * x1 + 2 * (1 - f) * f * cx + f * f * x2, (1 - f) * (1 - f) * y1 + 2 * (1 - f) * f * cy + f * f * y2]); }
+  strokePts(pts, arrow ? clamp(k / .85) : k, c, lw, a);
+  if (arrow) arrowHead(x2, y2, Math.atan2(y2 - cy, x2 - cx), clamp((k - .8) / .2), c, lw, a);
+}
+function check(x, y, s, k, c = K.red, lw = 7) { strokePts([[x - s * .5, y], [x - s * .12, y + s * .38], [x + s * .55, y - s * .45]], k, c, lw); }
+function crossMark(x, y, s, k, c = K.navy, lw = 6) { pen(x - s / 2, y - s / 2, x + s / 2, y + s / 2, clamp(k * 2), c, lw, 2); pen(x + s / 2, y - s / 2, x - s / 2, y + s / 2, clamp(k * 2 - 1), c, lw, 4); }
+function hiLite(x, y, w, h, k, c = K.blush) { if (k <= 0) return; const e = eOut(k); ctx.save(); ctx.globalCompositeOperation = 'multiply'; ctx.fillStyle = c;   // multiply: text under the marker stays readable
+  ctx.beginPath(); ctx.moveTo(x, y + 4); ctx.lineTo(x + w * e, y); ctx.lineTo(x + w * e - 6, y + h); ctx.lineTo(x - 4, y + h - 3); ctx.closePath(); ctx.fill(); ctx.restore(); }
+function hbox(x, y, w, h, k, c = K.red, lw = 4, seed = 3) { strokePts([...wobble(x, y, x + w, y, seed, 1), ...wobble(x + w, y, x + w, y + h, seed + 1, 1).slice(1), ...wobble(x + w, y + h, x, y + h, seed + 2, 1).slice(1), ...wobble(x, y + h, x, y, seed + 3, 1).slice(1)], k, c, lw); }
+function sticky(x, y, w, h, rot, k, lines, { size = 32, color = K.ink } = {}) {
+  if (k <= 0) return; const s = lerp(.6, 1, eBack(k));
+  ctx.save(); ctx.globalAlpha *= clamp(k * 2); ctx.translate(x + w / 2, y + h / 2); ctx.rotate(rot); ctx.scale(s, s);
+  ctx.shadowColor = 'rgba(30,30,30,.14)'; ctx.shadowBlur = 16; ctx.shadowOffsetY = 8; ctx.fillStyle = K.lightBox; ctx.fillRect(-w / 2, -h / 2, w, h); ctx.shadowColor = 'transparent';
+  ctx.fillStyle = rgba(K.lineGrey, .45); ctx.fillRect(-w / 2, -h / 2, w, 26);
+  lines.forEach((l, i) => text(l, 0, (i - (lines.length - 1) / 2) * size * 1.25 + 12, { size, weight: 700, fam: HAND, color, align: 'center', maxW: w - 30 }));
+  ctx.restore();
+}
+// rectangular rubber stamp, lands from a bigger size
+function stamp(str, x, y, k, c = K.red, rot = -.08, size = 34) {
+  if (k <= 0) return; const s = lerp(1.8, 1, eOut(k)), w = measure(str, size, 800) + 2 * str.length + 60;
+  ctx.save(); ctx.globalAlpha *= clamp(k * 3) * .92; ctx.translate(x, y); ctx.rotate(rot); ctx.scale(s, s);
+  ctx.strokeStyle = c; ctx.lineWidth = 6; ctx.strokeRect(-w / 2, -size, w, size * 2); ctx.lineWidth = 2.5; ctx.strokeRect(-w / 2 + 8, -size + 8, w - 16, size * 2 - 16);
+  text(str, 0, 2, { size, weight: 800, color: c, align: 'center', spacing: 2 }); ctx.restore();
+}
+
+// ---------- workbook parts ----------
+// pill label; returns its width. White underneath: tinted labels never show the grid
+function chip(str, x, y, { size = 22, fill = K.red, color = '#FFFFFF', a = 1, pad = 16, weight = 700, spacing = 1.5, align = 'left' } = {}) {
+  if (a <= 0) return 0; const w = measure(str, size, weight) + spacing * str.length + pad * 2, h = size * 1.8, x0 = align === 'center' ? x - w / 2 : x;
+  rr(x0, y - h / 2, w, h, h / 2, '#FFFFFF', null, 0, a); rr(x0, y - h / 2, w, h, h / 2, fill, null, 0, a);
+  ctx.save(); ctx.font = `${weight} ${size}px ${SANS}`; if (spacing) ctx.letterSpacing = spacing + 'px'; const m = ctx.measureText(str); ctx.restore();
+  text(str, x0 + w / 2 - (m.actualBoundingBoxRight - m.actualBoundingBoxLeft) / 2, y + 1, { size, weight, color, alpha: a, spacing }); return w;   // the ink, not the advance, sits in the middle
+}
+// numbered circle (the three competencies: red, blue, mint)
+function num(n, x, y, col, { r = 26, a = 1 } = {}) { if (a <= 0) return; circle(x, y, r, '#FFFFFF', null, 0, a); circle(x, y, r, col, null, 0, a); text(String(n), x, y + 1, { size: r * 1.1, weight: 800, color: '#FFFFFF', align: 'center', alpha: a }); }
+// a checked list row: red check + text
+function checkRow(t, t0, x, y, str, { size = 30, w = 1300, col = K.red } = {}) {
+  enter(t, t0, () => text(str, x + 50, y, { size, weight: 700, maxW: w }), { dx: 20, dy: 0 });
+  check(x + 14, y + 2, 30, p(t, t0 + .25, .3), col, 5);
+}
+// "a {b} c" →[['a ', false], ['b', true], [' c', false]]: the {words} are the ones to stress
+const segs = str => String(str).split(/(\{[^}]*\})/).filter(Boolean).map(z => z[0] === '{' ? [z.slice(1, -1), true] : [z, false]);
+// dark statement bar across the page (the deck's closing line); {words} 3 px bigger
+function bar(str, y, a, { x = 210, w = 1590, h = 84, size = 28 } = {}) {
+  if (a <= 0) return; rr(x, y, w, h, 14, K.ink, null, 0, a);
+  const sg = segs(str), sz = e => size + (e ? 3 : 0), wd = sg.reduce((v, [z, e]) => v + measure(z, sz(e), e ? 800 : 700), 0), f = Math.min(1, (w - 72) / wd);
+  let cx = x + w / 2 - wd * f / 2;
+  sg.forEach(([z, e]) => { text(z, cx, y + h / 2 + 1, { size: sz(e) * f, weight: e ? 800 : 700, color: '#FFFFFF', alpha: a }); cx += measure(z, sz(e) * f, e ? 800 : 700); });
+}
+// small line icons drawn with the pen (s ≈ half size)
+function icon(kind, x, y, s, c, a = 1) {
+  if (a <= 0) return; ctx.save(); ctx.globalAlpha *= a; ctx.strokeStyle = c; ctx.fillStyle = c; ctx.lineWidth = 4; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  const B = () => ctx.beginPath(), Sk = () => ctx.stroke();
+  if (kind === 'bars') { [.45, .8, .6].forEach((v, i) => rr(x - s + i * s * .72, y + s - 2 * s * v, s * .5, 2 * s * v, 4, i === 1 ? c : rgba(c, .35))); }
+  if (kind === 'target') { [1, .62, .25].forEach((r, i) => { B(); ctx.arc(x, y, s * r, 0, 7); i === 2 ? ctx.fill() : Sk(); }); }
+  if (kind === 'spark') { [[0, 0, 1], [s * .9, -s * .8, .45], [-s * .85, s * .75, .35]].forEach(([dx, dy, r]) => { const R = s * r; B(); ctx.moveTo(x + dx, y + dy - R); ctx.quadraticCurveTo(x + dx, y + dy, x + dx + R, y + dy); ctx.quadraticCurveTo(x + dx, y + dy, x + dx, y + dy + R); ctx.quadraticCurveTo(x + dx, y + dy, x + dx - R, y + dy); ctx.quadraticCurveTo(x + dx, y + dy, x + dx, y + dy - R); ctx.fill(); }); }
+  if (kind === 'lens') { B(); ctx.arc(x - s * .2, y - s * .2, s * .62, 0, 7); Sk(); B(); ctx.moveTo(x + s * .25, y + s * .25); ctx.lineTo(x + s * .9, y + s * .9); ctx.lineWidth = 7; Sk(); }
+  if (kind === 'print') { rr(x - s * .55, y - s, s * 1.1, s * .7, 3, null, c, 4); rr(x - s, y - s * .35, s * 2, s * .95, 8, rgba(c, .2), c, 4); rr(x - s * .55, y + s * .2, s * 1.1, s * .85, 3, '#FFFFFF', c, 4); }
+  if (kind === 'data') { [0, 1, 2].forEach(i => { B(); ctx.ellipse(x, y - s * .55 + i * s * .55, s * .8, s * .28, 0, 0, 7); i === 0 ? Sk() : (ctx.stroke()); }); B(); ctx.moveTo(x - s * .8, y - s * .55); ctx.lineTo(x - s * .8, y + s * .55); ctx.moveTo(x + s * .8, y - s * .55); ctx.lineTo(x + s * .8, y + s * .55); Sk(); }
+  if (kind === 'route') { B(); ctx.moveTo(x - s, y + s * .7); ctx.bezierCurveTo(x - s * .2, y + s * .7, x + s * .2, y - s * .7, x + s, y - s * .7); ctx.setLineDash([7, 7]); Sk(); ctx.setLineDash([]); circle(x - s, y + s * .7, s * .2, c); circle(x + s, y - s * .7, s * .26, null, c, 4); }
+  if (kind === 'screen') { rr(x - s, y - s * .75, s * 2, s * 1.3, 6, null, c, 4); B(); ctx.moveTo(x - s * .4, y + s * .85); ctx.lineTo(x + s * .4, y + s * .85); Sk(); check(x - s * .05, y - s * .1, s * .7, 1, c, 4); }
+  if (kind === 'clock') { B(); ctx.arc(x, y, s, 0, 7); Sk(); B(); ctx.moveTo(x, y - s * .6); ctx.lineTo(x, y); ctx.lineTo(x + s * .45, y + s * .25); Sk(); }
+  if (kind === 'bulb') { B(); ctx.arc(x, y - s * .25, s * .62, Math.PI * .8, Math.PI * 2.2); ctx.lineTo(x + s * .3, y + s * .55); ctx.lineTo(x - s * .3, y + s * .55); ctx.closePath(); Sk(); B(); ctx.moveTo(x - s * .26, y + s * .82); ctx.lineTo(x + s * .26, y + s * .82); Sk(); }
+  if (kind === 'retry') { B(); ctx.arc(x, y, s * .8, -Math.PI * .1, Math.PI * 1.55); Sk(); const ang = Math.PI * 1.55; arrowHead(x + Math.cos(ang) * s * .8, y + Math.sin(ang) * s * .8, ang + Math.PI / 2, 1, c, 4, 1, 14); }
+  if (kind === 'book') { B(); ctx.moveTo(x, y - s * .6); ctx.quadraticCurveTo(x - s * .5, y - s * .9, x - s, y - s * .7); ctx.lineTo(x - s, y + s * .7); ctx.quadraticCurveTo(x - s * .5, y + s * .5, x, y + s * .8); ctx.quadraticCurveTo(x + s * .5, y + s * .5, x + s, y + s * .7); ctx.lineTo(x + s, y - s * .7); ctx.quadraticCurveTo(x + s * .5, y - s * .9, x, y - s * .6); ctx.lineTo(x, y + s * .8); Sk(); }
+  if (kind === 'ox') { circle(x - s * .45, y, s * .3, null, K.red, 5); crossMark(x + s * .55, y, s * .55, 1, K.navy, 5); }
+  if (kind === 'student') { B(); ctx.arc(x, y - s * .45, s * .4, 0, 7); Sk(); B(); ctx.arc(x, y + s * .95, s * .85, Math.PI * 1.15, Math.PI * 1.85); Sk(); }
+  if (kind === 'teacher') {   // a person pointing at a little board with writing on it
+    rr(x - s * .05, y - s * 1.15, s * 1.5, s * 1.0, 3, null, c, 4); B(); ctx.moveTo(x + s * .35, y - s * .85); ctx.lineTo(x + s * 1.15, y - s * .85); ctx.moveTo(x + s * .35, y - s * .5); ctx.lineTo(x + s * .9, y - s * .5); Sk();   // the board, on two legs
+    B(); ctx.moveTo(x + s * .25, y - s * .15); ctx.lineTo(x + s * .1, y + s * .75); ctx.moveTo(x + s * 1.2, y - s * .15); ctx.lineTo(x + s * 1.35, y + s * .75); Sk();
+    B(); ctx.arc(x - s * .7, y - s * .05, s * .36, 0, 7); Sk(); B(); ctx.arc(x - s * .7, y + s * 1.15, s * .8, Math.PI * 1.15, Math.PI * 1.85); Sk();
+    B(); ctx.moveTo(x - s * .25, y + s * .5); ctx.lineTo(x + s * .22, y - s * .62); Sk(); }   // the pointer, on the writing
+  ctx.restore();
+}
+
+
+// ---------- report pages (assets/, the pictures in the deck's pptx) ----------
+const IMG = {};
+[['old_p1', 'jpg'], ['old_p2', 'jpg'], ['new_p1', 'png'], ['new_p2', 'png'], ['wrong_view', 'png']].forEach(([n, e]) => { IMG[n] = new Image(); IMG[n].src = `assets/${n}.${e}`; });
+const IW = n => IMG[n].naturalWidth || 1450, IH = n => IMG[n].naturalHeight || 2048;
+const photoH = (n, w, border = 8) => (w - 2 * border) * IH(n) / IW(n) + 2 * border;
+// a print taped onto the page: white border, soft shadow, two strips of tape. (x, y) top left
+function photo(name, x, y, w, { rot = 0, border = 8, tape = true, seed = 1 } = {}) {
+  const h = photoH(name, w, border), im = IMG[name];
+  ctx.save(); ctx.translate(x + w / 2, y + h / 2); ctx.rotate(rot);
+  ctx.shadowColor = 'rgba(30,30,30,.16)'; ctx.shadowBlur = 18; ctx.shadowOffsetY = 8; ctx.fillStyle = '#FFFFFF'; ctx.fillRect(-w / 2, -h / 2, w, h); ctx.shadowColor = 'transparent';
+  if (im.naturalWidth) ctx.drawImage(im, -w / 2 + border, -h / 2 + border, w - 2 * border, h - 2 * border);
+  ctx.strokeStyle = LINE; ctx.lineWidth = 1.5; ctx.strokeRect(-w / 2, -h / 2, w, h);
+  if (tape) { const tw = clamp(w * .2, 44, 84); [[-w / 2 + tw * .45, -.6], [w / 2 - tw * .45, .6]].forEach(([tx, r], i) => {
+    ctx.save(); ctx.translate(tx, -h / 2 + 3); ctx.rotate(r + nz(i, seed) * .15); ctx.fillStyle = rgba(K.lineGrey, .42); ctx.fillRect(-tw / 2, -11, tw, 22); ctx.restore();
+  }); }
+  ctx.restore(); return h;
+}
+const photoIn = (t, t0, name, x, y, w, o = {}) => enter(t, t0, () => photo(name, x, y, w, o), { pop: true, ox: x + w / 2, oy: y + photoH(name, w) / 2 });
+
+// ---------- the zoom lens: a framed window onto report pages; the camera moves to the part being explained ----------
+// a board = report pages side by side in their own pixels; rg(page, u0, v0, u1, v1) = a part of a page (fractions of its width / height)
+function board(...names) { let x = 0; return names.map(n => { const it = { n, x, y: 0, w: IW(n), h: IH(n) }; x += it.w + 120; return it; }); }
+const rg = (it, u0, v0, u1, v1) => [it.x + u0 * it.w, it.y + v0 * it.h, it.x + u1 * it.w, it.y + v1 * it.h];
+const bounds = B => [Math.min(...B.map(i => i.x)), Math.min(...B.map(i => i.y)), Math.max(...B.map(i => i.x + i.w)), Math.max(...B.map(i => i.y + i.h))];
+// camera that fits rect r into a w × h window (never more than 1.45×, so the pictures stay sharp)
+function fitCam(r, w, h, pad = .94, max = 1.45) { return { cx: (r[0] + r[2]) / 2, cy: (r[1] + r[3]) / 2, s: Math.min(max, pad * Math.min(w / (r[2] - r[0]), h / (r[3] - r[1]))) }; }
+// keys = [[t, rect], …] in time order: the camera glides (1.1 s) from one rect to the next; the zoom eases on a log scale
+function camAt(t, keys, w, h, D = 1.1) {
+  let c = fitCam(keys[0][1], w, h);
+  for (let i = 1; i < keys.length; i++) {
+    const k = eIO(p(t, keys[i][0], D)); if (k <= 0) break; const n = fitCam(keys[i][1], w, h);
+    c = { cx: lerp(c.cx, n.cx, k), cy: lerp(c.cy, n.cy, k), s: Math.exp(lerp(Math.log(c.s), Math.log(n.s), k)) };
+  }
+  return c;
+}
+// focus = [[t, rect | null], …]: the rest of the board dims and a red pen box is drawn round the rect; the one before fades out
+function focusAt(t, list) {
+  let i = -1; list.forEach(([t0], j) => { if (t >= t0) i = j; });
+  if (i < 0) return [];
+  // seq (third item): the box before goes first (.35 s), then this one is drawn, so the two never cross
+  const seq = list[i][2] ? .35 : 0, k = p(t, list[i][0] + seq, .6), kOld = seq ? 1 - p(t, list[i][0], seq) : 1 - k, out = [[list[i][1], k, i]];
+  if (i > 0 && kOld > 0) out.push([list[i - 1][1], kOld, i - 1]);
+  return out;
+}
+function lens(B, x, y, w, h, cam, { focus = [], a = 1, over } = {}) {
+  if (a <= 0) return; ctx.save(); ctx.globalAlpha *= a;
+  card(x, y, w, h, { fill: K.lightBox, r: 18 });
+  ctx.save(); ctx.beginPath(); ctx.roundRect(x, y, w, h, 18); ctx.clip();
+  const X = wx => x + w / 2 + (wx - cam.cx) * cam.s, Y = wy => y + h / 2 + (wy - cam.cy) * cam.s;
+  B.forEach(it => {
+    const x0 = X(it.x), y0 = Y(it.y), ww = it.w * cam.s, hh = it.h * cam.s, ia = it.a ?? 1; if (ia <= 0) return;   // it.a: a picture can join the board later
+    ctx.save(); ctx.globalAlpha *= ia; ctx.shadowColor = 'rgba(30,30,30,.14)'; ctx.shadowBlur = 16; ctx.shadowOffsetY = 5; ctx.fillStyle = '#FFFFFF'; ctx.fillRect(x0, y0, ww, hh); ctx.shadowColor = 'transparent';
+    if (IMG[it.n].naturalWidth) ctx.drawImage(IMG[it.n], x0, y0, ww, hh);
+    ctx.restore();
+  });
+  focus.forEach(([r, k]) => { if (!r || k <= 0) return; const a0 = X(r[0]) - 8, b0 = Y(r[1]) - 8, a1 = X(r[2]) + 8, b1 = Y(r[3]) + 8;
+    ctx.save(); ctx.fillStyle = rgba(K.paper, .66 * eOut(k)); ctx.beginPath(); ctx.rect(x, y, w, h); ctx.rect(a0, b0, a1 - a0, b1 - b0); ctx.fill('evenodd'); ctx.restore(); });
+  focus.forEach(([r, k, i]) => { if (r && k > 0) hbox(X(r[0]) - 8, Y(r[1]) - 8, X(r[2]) - X(r[0]) + 16, Y(r[3]) - Y(r[1]) + 16, k, K.red, 4.5, 3 + i * 4); });
+  if (over) over(X, Y, cam.s);
+  ctx.restore();
+  ctx.strokeStyle = LINE; ctx.lineWidth = 2; ctx.beginPath(); ctx.roundRect(x, y, w, h, 18); ctx.stroke();
+  ctx.restore();
+}
+// where the lens is looking: the board in miniature, the part in view outlined in red
+function miniMap(B, x, y, w, h, cam, lw, lh, a = 1) {
+  B = B.filter(it => (it.a ?? 1) > .5);   // only the pictures already on the board
+  if (a <= 0) return; const b = bounds(B), s = Math.min(w / (b[2] - b[0]), h / (b[3] - b[1]));
+  const ox = x + (w - (b[2] - b[0]) * s) / 2 - b[0] * s, oy = y + (h - (b[3] - b[1]) * s) / 2 - b[1] * s;
+  ctx.save(); ctx.globalAlpha *= a;
+  B.forEach(it => { ctx.save(); ctx.shadowColor = 'rgba(30,30,30,.12)'; ctx.shadowBlur = 8; ctx.shadowOffsetY = 3; ctx.fillStyle = '#FFFFFF'; ctx.fillRect(ox + it.x * s, oy + it.y * s, it.w * s, it.h * s); ctx.restore();
+    if (IMG[it.n].naturalWidth) ctx.drawImage(IMG[it.n], ox + it.x * s, oy + it.y * s, it.w * s, it.h * s);
+    ctx.strokeStyle = LINE; ctx.lineWidth = 1.5; ctx.strokeRect(ox + it.x * s, oy + it.y * s, it.w * s, it.h * s); });
+  const vx0 = Math.max(b[0], cam.cx - lw / 2 / cam.s), vx1 = Math.min(b[2], cam.cx + lw / 2 / cam.s), vy0 = Math.max(b[1], cam.cy - lh / 2 / cam.s), vy1 = Math.min(b[3], cam.cy + lh / 2 / cam.s);
+  ctx.fillStyle = rgba(K.red, .08); ctx.fillRect(ox + vx0 * s, oy + vy0 * s, (vx1 - vx0) * s, (vy1 - vy0) * s);
+  ctx.strokeStyle = K.red; ctx.lineWidth = 3; ctx.strokeRect(ox + vx0 * s, oy + vy0 * s, (vx1 - vx0) * s, (vy1 - vy0) * s);
+  ctx.restore();
+}
+// item badge: red circle with the number (a pill when the label is longer, like 3·4)
+function badge(lbl, x, y, { r = 24, a = 1, fill = K.red } = {}) {
+  if (a <= 0) return; lbl = String(lbl);
+  if (lbl.length < 2) return num(lbl, x, y, fill, { r, a });
+  const w = Math.max(2 * r, measure(lbl, r * 1.05, 800) + r); rr(x - w / 2, y - r, w, 2 * r, r, '#FFFFFF', null, 0, a); rr(x - w / 2, y - r, w, 2 * r, r, fill, null, 0, a);
+  text(lbl, x, y + 1, { size: r * 1.05, weight: 800, color: '#FFFFFF', align: 'center', alpha: a });
+}
+// the caption under the lens: the item being explained (deck wording). items = [[title, line, note?], …], ts = when each starts
+function caption(t, items, ts, labels, { x = 210, y = 878, w = 1400 } = {}) {
+  let i = -1; ts.forEach((t0, j) => { if (t >= t0) i = j; });
+  const one = (j, a, dy) => { if (j < 0 || a <= 0) return; const [ti, ln, note] = items[j];
+    ctx.save(); ctx.translate(0, dy);
+    badge(labels[j], x + 26, y + 26, { a }); text(ti, x + 70, y + 26, { size: 36, weight: 800, alpha: a, maxW: w - 70 });
+    text(ln, x + 70, y + 78, { size: 26, weight: 500, color: K.muted, alpha: a, maxW: w - 70 });
+    if (note) text('※ ' + note, x + 70, y + 120, { size: 22, weight: 500, color: K.muted, alpha: a * .9, maxW: w - 70 });
+    ctx.restore(); };
+  const k = i >= 0 ? eOut(p(t, ts[i], .45)) : 0;
+  one(i - 1, 1 - k, -10 * k); one(i, k, 14 * (1 - k));
+  return i;
+}
+// a pen circle round a point of the board (world coordinates, size in world px)
+const markAt = (X, Y, s, wx, wy, rx, ry, k, c = K.red, seed = 1) => penCircle(X(wx), Y(wy), rx * s, ry * s, k, c, 4.5, seed);
+// review 4 (박소영, 2026-11-20): effects on the report itself instead of pen circles. All in the page's own pixels (it = the board item)
+const bell = k => k > 0 && k < 1 ? Math.sin(Math.PI * k) : 0;   // 0 → 1 → 0
+// a part of the page grows and shrinks back once (k: 0 → 1), drawn over itself
+function pulse(it, [x0, y0, x1, y1], X, Y, s, k, amp = .28) {
+  const b = bell(k); if (b <= 0 || !IMG[it.n].naturalWidth) return;
+  const g = 1 + amp * b, cx = X(it.x + (x0 + x1) / 2), cy = Y(it.y + (y0 + y1) / 2), w = (x1 - x0) * s * g, h = (y1 - y0) * s * g;
+  ctx.drawImage(IMG[it.n], x0, y0, x1 - x0, y1 - y0, cx - w / 2, cy - h / 2, w, h);   // the bigger copy covers the original; no patch, no shadow (no box edges)
+}
+// a part of the page blinks once with a red tint (multiplied, so the picture shows through)
+function blink(it, [x0, y0, x1, y1], X, Y, k, a = .3) {
+  const b = bell(k); if (b <= 0) return;
+  ctx.save(); ctx.globalCompositeOperation = 'multiply'; ctx.fillStyle = rgba(K.lightRed, a * b); ctx.fillRect(X(it.x + x0), Y(it.y + y0), X(it.x + x1) - X(it.x + x0), Y(it.y + y1) - Y(it.y + y0)); ctx.restore();
+}
+// the pie chart on page 1 fills up to 75 %: the blue arc past the sweep is hidden under the chart's own grey track
+// (new_p1.png: centre 501, 563, ring 93–117 px, 75 % clockwise from 12 o'clock, track grey 214)
+function donutFill(it, X, Y, s, k) {
+  if (k >= 1) return; const cx = X(it.x + 501), cy = Y(it.y + 563), a0 = -Math.PI / 2 + Math.PI * 1.5 * eIO(clamp(k)), a1 = Math.PI;
+  ctx.save(); ctx.fillStyle = '#D6D6D6'; ctx.beginPath(); ctx.arc(cx, cy, 119 * s, a0, a1); ctx.arc(cx, cy, 91 * s, a1, a0, true); ctx.closePath(); ctx.fill(); ctx.restore();
+}
+// a speech bubble with a few words, its tail on (x, y) (screen size, above the point)
+function callout(str, x, y, a, { size = 30, dx = 46 } = {}) {
+  if (a <= 0) return; const w = measure(str, size, 800) + 44, h = size * 1.9, bx = x + dx - w / 2, by = y - 22 - h, s = lerp(.6, 1, eBack(clamp(a)));
+  ctx.save(); ctx.globalAlpha *= clamp(a * 2); ctx.translate(x, y); ctx.scale(s, s); ctx.translate(-x, -y);
+  ctx.shadowColor = 'rgba(30,30,30,.18)'; ctx.shadowBlur = 14; ctx.shadowOffsetY = 5;
+  ctx.fillStyle = '#FFFFFF'; ctx.strokeStyle = K.red; ctx.lineWidth = 4; ctx.beginPath(); ctx.roundRect(bx, by, w, h, 12);
+  ctx.moveTo(x + 4, by + h); ctx.lineTo(x, y); ctx.lineTo(x + 22, by + h); ctx.fill(); ctx.shadowColor = 'transparent'; ctx.stroke();
+  ctx.fillStyle = '#FFFFFF'; ctx.fillRect(x + 6, by + h - 4, 14, 6);
+  text(str, bx + w / 2, by + h / 2 + 1, { size, weight: 800, color: K.crimson, align: 'center' }); ctx.restore();
+}
+
+// ============================================================
+// scenes (absolute time t). One SC entry per scene id in tools/script.py SCENES, in the same order
+// ============================================================
+const SC = {};
+const LENS = { x: 210, y: 250, w: 1590, h: 600 };   // the lens on the 1페이지 · 2페이지 pages; caption under it, mini map on its right
+
+// ---------- 1. title: 개인별 진단처방기록부 개선 시안, the two new pages taped on the right ----------
+SC.title = t => {
+  chip(C.title.kicker, 210, 262, { size: 20, fill: K.red, a: eOut(p(t, .3, .5)), spacing: 1.5 });
+  hiLite(200, 336, measure(C.title.words[0], 92, 800) + 22, 72, p(t, 1.4, .7));
+  C.title.words.forEach((w, i) => enter(t, .5 + i * .25, () => text(w, 210, 372 + i * 110, { size: 92, weight: 800, color: i === 0 ? K.red : K.ink, maxW: 860 })));
+  enter(t, 1.5, () => text(C.title.sub, 214, 730, { size: 34, weight: 600, color: K.muted, maxW: 860 }));
+  text(C.title.team, 214, 800, { size: 36, weight: 700, fam: HAND, color: K.red, alpha: p(t, 2, .5) });
+  photoIn(t, .9, 'new_p2', 1330, 230, 430, { rot: .045, seed: 2 });
+  photoIn(t, 1.2, 'new_p1', 1110, 290, 450, { rot: -.035, seed: 5 });
+  const kG = Wc('l1_2', ['개선'], .6);
+  pen(206, 640, 214 + measure(C.title.words[2], 92, 800), 636, p(t, kG, .55), K.red, 6, 9);
+};
+
+// ---------- 2. the core of the change: the same precise analysis, made easy to understand and to explain ----------
+SC.core = t => {
+  header(t, H0('core'), 'INTRO  ·  개선의 핵심', C.core.title);
+  const tA = Wc('l1_3', ['정밀한'], .1), tB = Wc('l1_3', ['학습자와'], .3), tE = Wc('l1_3', ['쉽게'], .4), tC = Wc('l1_3', ['선생님은'], .55),
+        tM = Wc('l1_3', ['명확하게'], .62), tD = Wc('l1_3', ['시각화하고'], .8);
+  enter(t, tA - .3, () => {
+    card(210, 300, 560, 440); icon('lens', 490, 430, 58, K.ink);
+    text('기존의 정밀한 분석', 490, 580, { size: 40, weight: 800, align: 'center', maxW: 500 });
+    text('진단평가 · 총괄평가 결과', 490, 636, { size: 26, weight: 500, color: K.muted, align: 'center', maxW: 500 });
+  }, { pop: true, ox: 490, oy: 520 });
+  penArrow(800, 520, 890, 520, p(t, tB - .4, .45), K.ink, 5, 21);
+  const row = (y, who, what, ic, t0, tU, seed) => {
+    enter(t, t0 - .2, () => { card(920, y, 880, 200); icon(ic, 1020, y + 100, 44, K.red); text(who, 1110, y + 66, { size: 28, weight: 700, color: K.muted }); text(what, 1110, y + 128, { size: 46, weight: 800, maxW: 640 }); }, { dx: 30, dy: 0 });
+    pen(1110, y + 162, 1110 + measure(what, 46, 800), y + 160, p(t, tU, .5), K.red, 5, seed);
+  };
+  row(300, '학습자 · 학부모', '결과를 쉽게 이해', 'student', tB, tE, 5);
+  row(540, '선생님', '보다 명확하게 설명', 'teacher', tC, tM, 7);
+  bar(C.core.bar, 800, eOut(p(t, tD - .2, .5)), { size: 32, h: 96 });
+};
+
+// ---------- 3. 01 기존 리포트: the two current pages, text and tables. Zoom into page 1, then page 2, then out ----------
+SC.old = t => {
+  header(t, H0('old'), '01  ·  기존 리포트', C.old.title);
+  const B = board('old_p1', 'old_p2'), [P1, P2] = B, L0 = { x: 210, y: 260, w: 1040, h: 720 };
+  // page 1 top → the 오답 table → the 총평 box → page 2 top → the 예상진도 table → both pages, when the dark card comes in
+  const t1 = st('l2_2') - .3, tW = Wc('l2_2', ['오답내용', '오답'], .4) - .3, tT = st('l2_5') - .3, t2 = st('l2_6') - .3, tP = Wc('l2_6', ['예상'], .3) - .3,
+        t4 = Wc('l2_6', ['어느'], .45) - .3;
+  const cam = camAt(t, [[0, bounds(B)], [t1, rg(P1, 0, .165, 1, .385)], [tW, rg(P1, 0, .38, 1, .86)], [tT, rg(P1, 0, .5, 1, .995)], [t2, rg(P2, 0, .165, 1, .49)],
+    [tP, rg(P2, 0, .485, 1, .935)], [t4, bounds(B)]], L0.w, L0.h);
+  enter(t, H0('old') + .3, () => lens(B, L0.x, L0.y, L0.w, L0.h, cam, { focus: focusAt(t, [[tT + .6, rg(P1, .02, .838, .98, .93)], [t2, null]]) }));
+  // what each page holds, checked as it is named; it gives way to the dark "이렇게 바꿉니다" card
+  const kOut = 1 - p(t, t4, .45), X0 = 1300;
+  if (kOut > 0) { ctx.save(); ctx.globalAlpha *= kOut;
+    [['1페이지', 290, st('l2_2', .02), [['종합 성취도', Wc('l2_2', ['종합'], .15)], ['영역별 분석', Wc('l2_2', ['영역별'], .3)], ['오답내용 분석', Wc('l2_2', ['오답내용', '오답'], .4)],
+       ['총평', Wc('l2_5', ['총평을', '총평'], 0)]]],
+     ['2페이지', 650, st('l2_6', .02), [['학습출발점', Wc('l2_6', ['학습출발점과', '출발점과', '학습출발점'], .15)], ['처방 프로그램', Wc('l2_6', ['처방'], .25)], ['예상 진도', Wc('l2_6', ['예상'], .3)]]]].forEach(([pg, y, tg, rows]) => {
+      chip(pg, X0, y, { size: 22, fill: K.ink, a: eOut(p(t, tg - .2, .4)) });
+      rows.forEach(([s, tr], j) => checkRow(t, tr - .15, X0, y + 66 + j * 60, s, { size: 32, w: 430 }));
+    });
+    ctx.restore(); }
+  // the deck's card: 이렇게 바꿉니다 + the three questions; ② ③ are read out in l2_6 (어느 영역이 약한지, 어디서부터 얼마 동안 공부하는지)
+  const tA = [t4 + .5, Wc('l2_6', ['어느'], .45), Wc('l2_6', ['어디서부터'], .6)];
+  enter(t, t4, () => {
+    rr(X0, 260, 500, 720, 22, K.ink);
+    text(C.old.head, X0 + 44, 330, { size: 28, weight: 700, color: K.lightRed });
+    text(C.old.change[0], X0 + 44, 410, { size: 48, weight: 800, color: '#FFFFFF', maxW: 420 });
+    text(C.old.change[1], X0 + 44, 476, { size: 48, weight: 800, color: '#FFFFFF', maxW: 420 });
+    C.old.asks.forEach((s, j) => { const a = eOut(p(t, Math.max(t4 + .3 + j * .25, tA[j] - .3), .4)); badge(j + 1, X0 + 70, 620 + j * 108, { a });
+      text(s, X0 + 112, 621 + j * 108, { size: 29, weight: 700, color: '#FFFFFF', alpha: a, maxW: 360 }); });
+  }, { dx: 30, dy: 0 });
+  pen(X0 + 44, 506, X0 + 44 + measure(C.old.change[1], 48, 800), 504, p(t, t4 + .6, .5), K.red, 6, 13);
+};
+
+// ---------- 4. 02 개선 리포트: the two new pages ----------
+SC.new = t => {
+  header(t, H0('new'), '02  ·  개선 리포트', '개선된 개인별 진단처방기록부');
+  const tP = Wc('l3_1', ['페이지별로'], .7);
+  [['new_p1', 425, '1페이지'], ['new_p2', 1065, '2페이지']].forEach(([n, x, lb], j) => {
+    photoIn(t, H0('new') + .4 + j * .3, n, x, 285, 520, { seed: 3 + j });
+    chip(lb, x + 260, 248, { size: 22, fill: K.red, a: eOut(p(t, tP - .2 + j * .3, .4)), align: 'center' });
+  });
+};
+
+// ---------- 5. 03 1페이지 시안: the five new parts of page 1, then the QR → the 오답 보기 screen beside the page ----------
+const P1_LBL = [1, 2, 3, 4, 5, 'QR'];
+SC.p1 = t => {
+  header(t, H0('p1'), '03  ·  1페이지 시안', C.p1.title);
+  // the 오답 보기 screen sits on the board to the right of page 1, level with the QR; it appears when the QR line gets to it (review 4: no page of its own)
+  const B = board('new_p1', 'wrong_view'), [P, Wv] = B, L0 = LENS;
+  Wv.x = P.w + 200; Wv.y = 1780 - Wv.h / 2;
+  const S1 = rg(P, .025, .175, .975, .348), A1 = rg(P, .03, .198, .485, .345), A2 = rg(P, .495, .215, .965, .325),
+        S2 = rg(P, .025, .35, .975, .563), R2 = rg(P, .03, .37, .465, .56), T2 = rg(P, .465, .385, .965, .53),
+        S3 = rg(P, .025, .573, .975, .772), S4 = rg(P, .025, .775, .975, .935), QR = rg(P, .815, .808, .97, .925),
+        CARD = rg(Wv, .085, .195, .493, .645), INFO = rg(Wv, .085, .52, .493, .635);
+  const ti = [st('l4_2') - .3, Wc('l4_4b', ['오른쪽'], 0) - .2, st('l4_5') - .3, st('l4_7') - .3, st('l4_10') - .3, st('l4_12') - .3];
+  const tA1 = Wc('l4_3', ['종합', '종합성취도를'], 0) - .1, tR = Wc('l4_6', ['방사형'], 0) - .1, tT = Wc('l4_6', ['오른쪽'], .55) - .2;
+  const tC = Wc('l4_12', ['틀린'], .4) - .3, tI = Math.max(Wc('l4_12', ['학습목표와', '목표와', '학습목표'], .55) - .3, tC + 1.4);
+  Wv.a = eOut(p(t, tC - .6, .6));
+  const cam = camAt(t, [[0, rg(P, 0, 0, 1, 1)], [ti[0], S1], [tA1, A1], [ti[1], A2], [ti[2], S2], [tR, R2], [tT, T2], [ti[3], S3], [ti[4], S4], [ti[5], QR], [tC, CARD], [tI - .2, INFO]], L0.w, L0.h);
+  const focus = focusAt(t, [[ti[0] + .5, S1], [tA1 + .5, A1], [ti[1] + .5, A2], [ti[2] + .5, S2], [tR + .5, R2], [tT + .5, T2], [ti[3] + .5, S3], [ti[4] + .5, S4],
+    [ti[5] + .5, QR, true], [tC + .3, CARD, true], [tI, INFO, true]]);
+  enter(t, H0('p1') + .3, () => lens(B, L0.x, L0.y, L0.w, L0.h, cam, { focus, over: (X, Y, s) => {
+    // the number of an item shows up when its turn comes and goes with it (review 4: none at the start)
+    [[-.035, .205], [.478, .215], [-.035, .362], [-.035, .585], [-.035, .789]].forEach(([u, v], j) =>
+      badge(j + 1, X(P.w * u), Y(P.h * v), { r: 22, a: eOut(p(t, ti[j] + .3, .35)) * (1 - p(t, ti[j + 1], .4)) }));
+    const marks = (tOut, fn) => { const a = 1 - p(t, tOut, .4); if (a > 0) { ctx.save(); ctx.globalAlpha *= a; fn(); ctx.restore(); } };
+    // item 1: the pie chart fills up to 75 % on 원그래프로 (empty from when the lens arrives); 보통 gets a box on 구간과; the same-grade average a circle
+    const tF = Wc('l4_3', ['원그래프로'], .2) - .1;
+    if (t > ti[0] && t < ti[1] + 1.2) donutFill(P, X, Y, s, p(t, tF, 1.4));
+    marks(ti[1], () => { const tL = Wc('l4_3', ['구간과'], .35) - .1; hbox(X(88), Y(542), 190 * s, 64 * s, p(t, tL, .6), K.red, 4.5, 21);
+      markAt(X, Y, s, P.w * .25, P.h * .2256, 78, 24, p(t, Wc('l4_3', ['평균을'], .45), .5), K.red, 5); });
+    // item 2: 학습출발점 and G25 grow and shrink back (no circles)
+    const tS = Wc('l4_4b', ['학습출발점과', '출발점과'], .55) - .1;
+    pulse(P, [752, 552, 860, 590], X, Y, s, p(t, tS, .9)); pulse(P, [890, 548, 1016, 594], X, Y, s, p(t, tS + .45, .9));
+    // item 4: what the learner knows (성취 완료) and what still needs work (보완 필요)
+    marks(ti[4], () => { markAt(X, Y, s, P.w * .91, P.h * .6256, 95, 40, p(t, Wc('l4_9b', ['알고'], .45), .5), K.red, 11);
+      [.298, .604].forEach((u, j) => markAt(X, Y, s, P.w * u, P.h * .6256, 95, 40, p(t, Wc('l4_9b', ['모르는지'], .6) + j * .25, .5), K.navy, 13 + j)); });
+    // QR → the screen it opens
+    penArrow(X(P.x + P.w * .975), Y(1780), X(Wv.x - 24), Y(1780), p(t, tC - .4, .5), K.red, 5, 17);
+  } }));
+  caption(t, C.p1.items, ti, P1_LBL);
+  miniMap(B, 1660, 870, 140, 150, cam, L0.w, L0.h, eOut(p(t, H0('p1') + .5, .4)));
+};
+
+// ---------- 6. 04 2페이지 시안: the learning plan graph, its explanation, the tables kept as they were, set numbers ----------
+const P2_LBL = [1, 2, 3, '+'];
+SC.p2 = t => {
+  header(t, H0('p2'), '04  ·  2페이지 시안', C.p2.title);
+  const B = board('new_p2'), [P] = B, L0 = LENS;
+  const PLAN = rg(P, .025, .175, .975, .405), G = rg(P, .03, .215, .5, .4), E = rg(P, .5, .215, .95, .402), TB = rg(P, .025, .415, .975, .935), GRID = rg(P, .025, .415, .975, .556);
+  const ti = [st('l6_1b') - .3, Wc('l6_3', ['오른쪽에'], 0) - .3, Wc('l6_4b', ['아래'], 0) - .3, st('l6_6b') - .3];
+  const tG = Wc('l6_1b', ['그림으로'], .5) - .2, tUp = Wc('l6_5b', ['위에서'], .2) - .3, tDn = Wc('l6_5b', ['아래에서'], .5) - .1;
+  const cam = camAt(t, [[0, bounds(B)], [ti[0], PLAN], [tG, G], [ti[1], E], [ti[2], TB], [tUp, bounds(B)], [ti[3], GRID]], L0.w, L0.h);
+  const focus = focusAt(t, [[ti[0] + .5, PLAN], [tG + .5, G], [ti[1] + .5, E], [ti[2] + .5, TB], [tUp - .1, null], [tUp + .4, PLAN], [Math.max(tDn, tUp + 1.9), TB, true], [ti[3] + .5, GRID]]);
+  enter(t, H0('p2') + .3, () => lens(B, L0.x, L0.y, L0.w, L0.h, cam, { focus, over: (X, Y, s) => {
+    // the graph, read along l6_2 (review 4: effects on the graph, no red circles). new_p2.png pixels:
+    // bands x 210–650 (G등급 y 520–622, A~F등급 y 622–722), 학습출발점 dot (450, 573), its dashed line y 583–722, 16주 label, the end point (648, 525)
+    blink(P, [210, 622, 650, 722], X, Y, p(t, Wc('l6_2', ['이전'], .15) - .1, .9));   // earlier grades: the lower band first …
+    blink(P, [210, 520, 650, 622], X, Y, p(t, Wc('l6_2', ['해당'], .3) - .1, .9));   // … then this grade's band above it
+    const tM = Wc('l6_2', ['본학습인지', '본학습'], .6) - .1, kD = bell(p(t, tM, .9));
+    if (kD > 0) { ctx.save(); circle(X(450), Y(573), (9 + 5 * kD) * s, '#D9386C'); ctx.restore(); }   // the dot grows and shrinks back
+    const kL = p(t, tM + .35, 1.2); if (kL > 0 && kL < 1) { ctx.save(); ctx.globalAlpha *= Math.abs(Math.sin(kL * Math.PI * 2)); line0(X(450), Y(586), X(450), Y(722), '#D9386C', 5 * s, [8 * s, 7 * s]); ctx.restore(); }   // the dashed line blinks twice
+    pulse(P, [424, 729, 476, 756], X, Y, s, p(t, tM + .75, .9), .3);   // (stays clear of the x axis at y 722)   // 16주
+    pulse(P, [612, 490, 684, 560], X, Y, s, p(t, Wc('l6_2', ['다음'], .72), .9), .3);   // what comes next: the end point
+    ctx.save(); ctx.globalAlpha *= 1 - p(t, ti[1], .4);
+    pen(X(P.w * .23), Y(P.h * .392), X(P.w * .35), Y(P.h * .392), p(t, Wc('l6_2', ['표준'], .85), .5), K.red, 4.5, 11);
+    ctx.restore();
+    // set numbers: G25 with its 4-digit set number in a speech bubble (review 4: no circle)
+    callout('G361', X(560), Y(1018), p(t, Wc('l6_6b', ['3자리로도', '세자리로도', '자리로도'], .75) - .2, .5));
+  } }));
+  caption(t, C.p2.items, ti, P2_LBL);
+  miniMap(B, 1660, 870, 140, 150, cam, L0.w, L0.h, eOut(p(t, H0('p2') + .5, .4)));
+};
+
+// ---------- 7. outro: the analysis stays, the way it is shown changes ----------
+SC.outro = t => {
+  header(t, H0('outro'), 'SUMMARY  ·  정리', C.outro.title);
+  const tA = st('l7_1'), tK = Wc('l7_1', ['아니라'], .25), tB = Wc('l7_1', ['선생님과'], .55), tC = Wc('l7_1', ['바꾼'], .9), y0 = 360;
+  enter(t, tA - .2, () => {
+    card(210, y0, 760, 380); icon('lens', 290, y0 + 80, 34, K.ink);
+    text(C.outro.keep[0], 350, y0 + 82, { size: 44, weight: 800 }); text(C.outro.keep[1], 250, y0 + 170, { size: 28, weight: 600, color: K.muted, maxW: 680 });
+  }, { dx: -30, dy: 0 });
+  stamp('그대로', 800, y0 + 280, p(t, tK, .35), K.ink, -.08, 32);
+  enter(t, tB - .2, () => {
+    card(1040, y0, 760, 380, { stroke: K.red, lw: 3 }); icon('screen', 1120, y0 + 80, 34, K.red);
+    text(C.outro.change[0], 1180, y0 + 82, { size: 44, weight: 800, color: K.red }); text(C.outro.change[1], 1080, y0 + 170, { size: 28, weight: 600, color: K.muted, maxW: 680 });
+    const w1 = chip('글과 표', 1080, y0 + 270, { size: 24, fill: K.lightBox, color: K.ink });
+    chip('그림과 그래프', 1080 + w1 + 90, y0 + 270, { size: 24, fill: K.red });
+  }, { dx: 30, dy: 0 });
+  penArrow(1080 + measure('글과 표', 24, 700) + 60, y0 + 270, 1080 + measure('글과 표', 24, 700) + 112, y0 + 270, p(t, tB + .5, .4), K.red, 4, 19);
+  check(1720, y0 + 70, 50, p(t, tC, .4), K.red, 8);
+};
+
+// ---------- 8. 감사합니다, a page of its own (review 4) ----------
+SC.thanks = t => {
+  const t0 = st('l7_2');
+  enter(t, t0 - .25, () => text(C.thanks.text, 960, 500, { size: 150, weight: 700, fam: HAND, align: 'center' }), { pop: true, ox: 960, oy: 500 });
+  pen(700, 590, 1220, 584, p(t, t0 + .45, .6), K.red, 7, 9);
+  enter(t, t0 + .7, () => text(C.thanks.sub, 960, 690, { size: 32, weight: 600, color: K.muted, align: 'center' }));
+  text(C.thanks.team, 960, 750, { size: 34, weight: 700, fam: HAND, color: K.red, align: 'center', alpha: p(t, t0 + 1, .5) });
+};
+
+// ---------- page furniture ----------
+function paper(cam) {
+  ctx.fillStyle = K.paper; ctx.fillRect(0, 0, W, H);
+  const minor = ((cam % 40) + 40) % 40, major = ((cam % 200) + 200) % 200;
+  [[40, minor, K.grid], [200, major, K.gridMajor]].forEach(([step, off, col]) => {
+    ctx.lineWidth = 1; ctx.strokeStyle = col; ctx.beginPath();
+    for (let x = -off; x <= W; x += step) { ctx.moveTo(Math.round(x) + .5, 0); ctx.lineTo(Math.round(x) + .5, H); }
+    for (let y = 0; y <= H; y += step) { ctx.moveTo(0, y + .5); ctx.lineTo(W, y + .5); }
+    ctx.stroke();
+  });
+}
+function pageFurniture(i) {
+  ctx.save(); ctx.strokeStyle = K.margin; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(150, 0); ctx.lineTo(150, H); ctx.stroke(); ctx.restore();
+  text(`p. ${i + 1}`, 1800, 92, { size: 30, weight: 700, fam: HAND, color: K.muted, align: 'right' });
+}
+// section tab (always red) + title (top-left). Slides in once, then stays still
+function header(t, t0, tab, title) {
+  const k1 = eOut(p(t, t0, .5)), k2 = eOut(p(t, t0 + .15, .6));
+  if (k1 > 0 && !SHARED_OFF) { ctx.save(); ctx.translate((1 - k1) * -30, 0); chip(tab, 210, 92, { size: 19, fill: K.red, a: k1, spacing: 1.5 }); ctx.restore(); }
+  if (k2 > 0) { ctx.save(); ctx.translate((1 - k2) * -30, 0); text(title, 210, 160, { size: 52, weight: 700, alpha: k2, maxW: 1560 }); ctx.restore(); }
+}
+const H0 = id => S(id).start + .15;   // header time for a scene
+const subline = (t, id, str, d = .45) => text(str, 210, 228, { size: 26, weight: 500, color: K.muted, alpha: p(t, H0(id) + d, .5), maxW: 1590 });
+
+// ============================================================
+// compositor: slide between pages (with the whoosh), then hold still
+// ============================================================
+// pages that continue the one before on the same sheet (tools/script.py CONT): the shared picture stays put and only the
+// rest cross-fades, no page turn and no whoosh. SHARED[id](t) draws the part that stays (section tab included)
+const CONT = new Set(TL.cont || []), SHARED = {};
+let SHARED_OFF = false;
+const PAGE_NO = TL.scenes.map((s, i) => i - TL.scenes.slice(1, i + 1).filter(x => CONT.has(x.id)).length);
+const TR = 1.1;   // page turn length (tools/make_audio.py TURN starts a page this much + .1 s before its first line)
+function frame(i, t, ox) {
+  if (Math.abs(ox) >= W) return; const s = TL.scenes[i];
+  ctx.save(); ctx.translate(Math.round(ox), 0); pageFurniture(PAGE_NO[i]); SC[s.id](t); ctx.restore();
+}
+function draw(t) {
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1;
+  const SCN = TL.scenes; let i = SCN.findIndex(s => t < s.end); if (i < 0) i = SCN.length - 1;
+  const k = i > 0 ? eIO(p(t, SCN[i].start - .15, TR)) : 1, cont = i > 0 && CONT.has(SCN[i].id);
+  paper(i > 0 ? Math.round((PAGE_NO[i - 1] + (cont ? 0 : k)) * W) : 0);
+  if (cont && k < 1) {
+    pageFurniture(PAGE_NO[i]); SHARED_OFF = true;
+    ctx.save(); ctx.globalAlpha = 1 - k; SC[SCN[i - 1].id](t); ctx.restore();
+    ctx.save(); ctx.globalAlpha = k; SC[SCN[i].id](t); ctx.restore();
+    SHARED_OFF = false; (SHARED[SCN[i].id] || (() => {}))(t);
+  } else {
+    if (k < 1) frame(i - 1, t, -k * W);
+    frame(i, t, (1 - k) * W);
+  }
+  const f = p(t, DURATION - 1.2, 1.2); if (f > 0) { ctx.fillStyle = rgba(K.paper, eIO(f)); ctx.fillRect(0, 0, W, H); }
+}
+
+// ---------- preview player ----------
+const seekEl = document.getElementById('seek'), timeEl = document.getElementById('time'), playEl = document.getElementById('play');
+seekEl.max = DURATION.toFixed(2);
+let playing = false, t0 = 0, tCur = 0;
+const audio = new Audio(); if (!location.search.includes('render')) { audio.src = 'audio/mix.wav'; audio.preload = 'auto'; }   // renders and snaps need no sound
+function show(t) { tCur = t; draw(t); seekEl.value = t; timeEl.textContent = t.toFixed(2) + 's'; }
+function loop(now) { if (!playing) return; const t = (now - t0) / 1000; if (t >= DURATION) { playing = false; playEl.textContent = '▶ Play'; audio.pause(); show(DURATION); return; } show(t); requestAnimationFrame(loop); }
+playEl.onclick = () => { playing = !playing; playEl.textContent = playing ? '❚❚ Pause' : '▶ Play'; if (playing) { if (tCur >= DURATION) tCur = 0; t0 = performance.now() - tCur * 1000; try { audio.currentTime = tCur; audio.play().catch(() => {}); } catch (e) {} requestAnimationFrame(loop); } else audio.pause(); };
+seekEl.oninput = () => { show(+seekEl.value); if (playing) { t0 = performance.now() - tCur * 1000; try { audio.currentTime = tCur; } catch (e) {} } };
+
+// ---------- video editor hooks (../editor/PROTOCOL.md) ----------
+window.draw = draw; window.DURATION = DURATION;
+function merge(base, over) {
+  if (Array.isArray(base)) return Array.isArray(over) ? over.map((v, i) => base[i] !== undefined ? merge(base[i], v) : v) : base;
+  if (base && typeof base === 'object') { const o = {}; for (const k in base) o[k] = over && k in over ? merge(base[k], over[k]) : base[k]; return o; }
+  return over === undefined || over === null ? base : over;
+}
+function apply(content) { C = window.CONTENT = merge(DEFAULT_CONTENT, content); K = C.colors; }
+window.VIDEO = { schema: window.SCHEMA, defaults: DEFAULT_CONTENT, get content() { return C; }, apply, canvas: cv };
+window.ready = Promise.all([document.fonts.load(`700 100px 'Noto Sans KR'`, '가A'), document.fonts.load(`700 100px 'Gaegu'`, '가A'), ...Object.values(IMG).map(i => i.decode())]).then(([r]) => {
+  if (!r.length) throw new Error('font failed to load (check fonts/)');
+}).then(() => document.fonts.ready).then(() => {
+  if (location.search.includes('render')) document.body.classList.add('render');
+  const m = location.search.match(/[?&]t=([\d.]+)/); show(m ? +m[1] : 0); return true;
+});
+</script>
+</body>
+</html>

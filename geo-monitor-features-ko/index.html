@@ -1,0 +1,601 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>GEO 모니터링 콘솔</title>
+<style>
+  @font-face { font-family: 'Noto Sans KR'; src: url('fonts/NotoSansKR.ttf') format('truetype'); font-weight: 100 900; font-display: block; }
+  html, body { margin: 0; background: #0E1424; }
+  body { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 12px; font-family: 'Noto Sans KR', sans-serif; color: #ddd; }
+  canvas { width: min(100%, 1280px); aspect-ratio: 16 / 9; display: block; background: #FFFFFF; }
+  .bar { display: flex; gap: 12px; align-items: center; width: min(100%, 1280px); }
+  .bar input { flex: 1; }
+  body.render { padding: 0; gap: 0; }
+  body.render canvas { width: 1920px; height: 1080px; }
+  body.render .bar { display: none; }
+</style>
+</head>
+<body>
+<script src="timeline.js"></script>
+<script src="content.js"></script>
+<script src="schema.js"></script>
+<canvas id="c" width="1920" height="1080"></canvas>
+<div class="bar">
+  <button id="play">▶ Play</button>
+  <input id="seek" type="range" min="0" max="300" step="0.01" value="0">
+  <span id="time">0.00s</span>
+</div>
+<script>
+// ------------------------------------------------------------
+// GEO 모니터링 콘솔 (geo.esls.io), screen by screen: what each page of the console shows, from the captures in the user's
+// "GEO 모니터 기능 소개" deck. The look of ../geo-monitor-ko (motion-graphics app promo: brand-red and white pages, circle wipes,
+// kinetic type), but most pages are a capture in a browser window with a spotlight walking over the parts the narration names
+// (screen()), a note by each. The narration says what the screens do, never the report's results (same rule as ../geo-monitor-ko);
+// the captures are shown as they are, with the sidebar (a staff e-mail) and the member list cut off (assets/screens).
+// Timing: timeline.js, written by tools/make_audio.py from the real narration. Pictures follow spoken words
+// (Wc(line, word) looks the word up in TL.lines[line].words). draw(t) is a pure function of time.
+// ------------------------------------------------------------
+const W = 1920, H = 1080, TL = window.TL, DURATION = TL.duration;
+const cv = document.getElementById('c'), ctx = cv.getContext('2d');
+const DEFAULT_CONTENT = JSON.parse(JSON.stringify(window.CONTENT));
+let C = window.CONTENT, K = C.colors;
+const SANS = "'Avenir Next', 'Noto Sans KR', 'Helvetica Neue', sans-serif";
+const WHITE = '#FFFFFF';
+
+// ---------- basics ----------
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const lerp = (a, b, k) => a + (b - a) * k;
+const p = (t, s, d) => clamp((t - s) / d);
+const eOut = x => 1 - Math.pow(1 - x, 3), eIO = x => x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+const eBack = x => { const c1 = 1.7, c3 = c1 + 1; return x <= 0 ? 0 : 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2); };
+const nz = (i, s = 1) => { const v = Math.sin(i * 12.9898 + s * 78.233) * 43758.5453; return v - Math.floor(v) - .5; };   // fixed jitter (no flicker)
+function rgba(hex, a) { const n = parseInt(hex.slice(1), 16); return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`; }
+const L = id => TL.lines[id] || { start: 0, end: 0, words: [] };
+const S = id => TL.scenes.find(s => s.id === id) || { start: 0, end: 0 };
+const st = (id, f = 0) => L(id).start + (L(id).end - L(id).start) * f;   // f: 0 = start of the narration line, 1 = end
+const en = (id, d = 0) => L(id).end + d;
+
+// time a word is spoken in a line (one of several spellings, the nth time it occurs); falls back to a fraction of the line.
+// Korean words carry their particles ("효율을", "AI는"), so a cue matches the start of a spoken word
+const norm = s => String(s).toLowerCase().replace(/[^a-z0-9가-힣]/g, '');
+const MISS = window.CUE_MISS = new Set();
+function Wd(id, words, f = 0, nth = 1) {
+  const want = (Array.isArray(words) ? words : [words]).map(norm); let n = 0;
+  for (const [w, s] of L(id).words || []) if (want.some(c => norm(w).startsWith(c)) && ++n === nth) return s;
+  MISS.add(`${id}:${want.join('|')}`); return st(id, f);
+}
+const cueCache = {};
+const Wc = (id, words, f, nth) => { const k = id + '|' + words + '|' + nth; return k in cueCache ? cueCache[k] : (cueCache[k] = Wd(id, words, f, nth)); };
+
+function rr(x, y, w, h, r, fill, stroke, lw = 2, a = 1) { if (a <= 0 || w <= 0) return; ctx.save(); ctx.globalAlpha *= a; ctx.beginPath(); ctx.roundRect(x, y, w, h, r); if (fill) { ctx.fillStyle = fill; ctx.fill(); } if (stroke) { ctx.lineWidth = lw; ctx.strokeStyle = stroke; ctx.stroke(); } ctx.restore(); }
+function circle(x, y, r, fill, stroke, lw = 3, a = 1) { if (r <= 0 || a <= 0) return; ctx.save(); ctx.globalAlpha *= a; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); if (fill) { ctx.fillStyle = fill; ctx.fill(); } if (stroke) { ctx.lineWidth = lw; ctx.strokeStyle = stroke; ctx.stroke(); } ctx.restore(); }
+// a white card with a soft shadow
+function card(x, y, w, h, { fill = WHITE, r = 22, a = 1, shadow = .16 } = {}) {
+  if (a <= 0) return; ctx.save(); ctx.globalAlpha *= a;
+  if (shadow) { ctx.shadowColor = `rgba(20,24,40,${shadow})`; ctx.shadowBlur = 40; ctx.shadowOffsetY = 16; }
+  ctx.beginPath(); ctx.roundRect(x, y, w, h, r); ctx.fillStyle = fill; ctx.fill(); ctx.restore();
+}
+function measure(str, size, weight = 600) { ctx.save(); ctx.font = `${weight} ${size}px ${SANS}`; const w = ctx.measureText(str).width; ctx.restore(); return w; }
+function text(str, x, y, { size = 36, weight = 600, color = K.ink, align = 'left', alpha = 1, maxW, spacing = 0 } = {}) {
+  if (alpha <= 0 || !str) return; ctx.save(); ctx.globalAlpha *= alpha;
+  let sz = size; if (maxW) { const w = measure(str, size, weight) + spacing * str.length; if (w > maxW) sz = size * maxW / w; }
+  ctx.font = `${weight} ${sz}px ${SANS}`; ctx.textAlign = align; ctx.textBaseline = 'middle'; ctx.fillStyle = color;
+  if (spacing) ctx.letterSpacing = spacing + 'px';
+  ctx.fillText(str, x, y + opticalDy(ctx.font)); ctx.restore();
+}
+// 'middle' puts Hangul above the middle of its box (the glyphs sit high), so y is moved to where '가' is centred in its ink
+const OPT = {};
+function opticalDy(font) { if (!(font in OPT)) { const m = ctx.measureText('가'); OPT[font] = (m.actualBoundingBoxAscent - m.actualBoundingBoxDescent) / 2; } return OPT[font]; }
+// a pill label; returns its width
+function chip(str, x, y, { size = 26, fill = K.red, color = WHITE, a = 1, pad = 22, weight = 700, align = 'left' } = {}) {
+  if (a <= 0) return 0; const w = measure(str, size, weight) + pad * 2, h = size * 1.9, x0 = align === 'center' ? x - w / 2 : x;
+  rr(x0, y - h / 2, w, h, h / 2, fill, null, 0, a); text(str, x0 + pad, y + 1, { size, weight, color, alpha: a }); return w;
+}
+// entrance: fade + rise (or pop around ox, oy); moves only while entering
+function enter(t, t0, fn, { d = .5, dy = 40, dx = 0, pop = false, ox = 960, oy = 540 } = {}) {
+  const k = p(t, t0, d); if (k <= 0) return 0;
+  ctx.save(); ctx.globalAlpha *= clamp(k * 2);
+  if (pop) { const s = lerp(.4, 1, eBack(k)); ctx.translate(ox, oy); ctx.scale(s, s); ctx.translate(-ox, -oy); }
+  else ctx.translate((1 - eOut(k)) * dx, (1 - eOut(k)) * dy);
+  fn(k); ctx.restore(); return k;
+}
+// on screen until t1, then slides up and fades
+function leave(t, t1, fn, up = 70) {
+  const q = p(t, t1, .35); if (q >= 1) return;
+  ctx.save(); ctx.globalAlpha *= 1 - q; ctx.translate(0, -up * eIO(q)); fn(); ctx.restore();
+}
+// scale the drawing around (cx, cy)
+function zoomAt(cx, cy, s) { ctx.translate(cx, cy); ctx.scale(s, s); ctx.translate(-cx, -cy); }
+
+// ---------- kinetic type ----------
+// a line of words that pop up one by one at their spoken times. ws: [[word, time, { weight, color, hl, box, hlColor, size }]]
+// hl: at that time a box (box colour) sweeps in behind the word and the word turns hlColor. Returns { x0, x1 }
+function kin(t, ws, x, y, { size = 110, weight = 800, color = WHITE, align = 'center', d = .45, gap = .28, sp = -2 } = {}) {
+  const it = ws.map(([s, t0, o = {}]) => { const sz = o.size || size, wt = o.weight || weight, w = measure(s, sz, wt) + sp * s.length; return { s, t0, o, sz, wt, w, lw: w + (o.hl !== undefined ? sz * .36 : 0) }; });   // lw: room for the box
+  const tot = it.reduce((a, w) => a + w.lw, 0) + size * gap * (it.length - 1);
+  let cx = align === 'center' ? x - tot / 2 : align === 'right' ? x - tot : x; const x0 = cx;
+  for (const w of it) {
+    const k = p(t, w.t0, d);
+    if (k > 0) {
+      ctx.save(); ctx.globalAlpha *= clamp(k * 2.5); const e = lerp(.55, 1, eBack(k));
+      ctx.translate(cx + w.lw / 2, y + (1 - eOut(k)) * w.sz * .5); ctx.scale(e, e);
+      const draw1 = color1 => text(w.s, 0, 0, { size: w.sz, weight: w.wt, color: color1, align: 'center', spacing: sp });
+      draw1(w.o.color || color);
+      // the box sweeps in and the word changes colour only where the box already is (switching it all at once looked like a blink)
+      if (w.o.hl !== undefined) { const hk = eOut(p(t, w.o.hl, .35)), pad = w.sz * .18, bx = -w.w / 2 - pad, by = -w.sz * .64, bw = (w.w + pad * 2) * hk, bh = w.sz * 1.28, r = w.sz * .18;
+        if (hk > 0) { rr(bx, by, bw, bh, r, w.o.box || WHITE); ctx.save(); ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, r); ctx.clip(); draw1(w.o.hlColor || K.red); ctx.restore(); } }
+      ctx.restore();
+    }
+    cx += w.lw + size * gap;
+  }
+  return { x0, x1: cx - size * gap };
+}
+// a word rises out of a slot (masked)
+function rise(t, t0, str, x, y, { size = 100, weight = 800, color = WHITE, align = 'left', d = .55, sp = -2 } = {}) {
+  const k = p(t, t0, d); if (k <= 0) return;
+  ctx.save(); ctx.beginPath(); ctx.rect(0, y - size * .78, W, size * 1.56); ctx.clip();
+  text(str, x, y + (1 - eOut(k)) * size * 1.2, { size, weight, color, align, spacing: sp }); ctx.restore();
+}
+// a big question mark that tumbles in and then bobs
+function qmark(t, t0, x, y, size, color = WHITE) {
+  const k = p(t, t0, .55); if (k <= 0) return;
+  ctx.save(); ctx.globalAlpha *= clamp(k * 3); ctx.translate(x, y + Math.sin((t - t0) * 3.2) * 8 * k); ctx.rotate(lerp(-.9, 0, eBack(k)) + Math.sin((t - t0) * 2.4) * .06 * k);
+  const s = lerp(.2, 1, eBack(k)); ctx.scale(s, s); text('?', 0, 0, { size, weight: 900, color, align: 'center' }); ctx.restore();
+}
+// the words of an on-screen string, each timed to where the narration line says it (edited text still works: missing cues fall back)
+function words(str, line) { const ws = str.split(' '); return ws.map((w, i) => [w, Wc(line, w.replace(/[,.?!]/g, '').slice(0, 2), (i + .5) / ws.length)]); }
+
+// ---------- backgrounds ----------
+function blob(x, y, r, col) { const g = ctx.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, col); g.addColorStop(1, col.replace(/[\d.]+\)$/, '0)')); ctx.fillStyle = g; ctx.fillRect(x - r, y - r, r * 2, r * 2); }
+function rings(t, col) { ctx.save(); ctx.strokeStyle = col; ctx.lineWidth = 3; [[1650, 180, 260, 1], [240, 900, 340, 2], [1500, 950, 120, 3]].forEach(([x, y, r, s]) => { ctx.beginPath(); ctx.arc(x + Math.sin(t * .3 + s) * 30, y + Math.cos(t * .25 + s) * 24, r, 0, 7); ctx.stroke(); }); ctx.restore(); }
+const BG = {
+  red: t => { const g = ctx.createLinearGradient(0, 0, W, H); g.addColorStop(0, K.redHi); g.addColorStop(.55, K.red); g.addColorStop(1, K.crimson); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    blob(420 + Math.sin(t * .4) * 160, 260 + Math.cos(t * .3) * 80, 760, 'rgba(255,255,255,.17)'); blob(1600 + Math.cos(t * .35) * 120, 900, 700, 'rgba(120,0,20,.22)'); rings(t, 'rgba(255,255,255,.09)'); },
+  white: t => { ctx.fillStyle = WHITE; ctx.fillRect(0, 0, W, H);
+    blob(1560 + Math.sin(t * .4) * 120, 160 + Math.cos(t * .3) * 60, 700, rgba(K.red, .08)); blob(300 + Math.cos(t * .3) * 100, 960, 640, rgba(K.blue, .05)); },
+  navy: t => { const g = ctx.createLinearGradient(0, 0, W, H); g.addColorStop(0, K.navy); g.addColorStop(1, K.navyDeep); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    blob(1500 + Math.sin(t * .4) * 140, 220, 760, rgba(K.blue, .22)); rings(t, 'rgba(255,255,255,.05)'); },
+};
+// a circle wipe to another background inside a scene (from ox, oy at t0); fn draws what is on it
+function wipe(t, t0, ox, oy, bg, fn) {
+  const k = eIO(p(t, t0, .6)); if (k <= 0) return;
+  ctx.save(); ctx.beginPath(); ctx.arc(ox, oy, k * Math.hypot(Math.max(ox, W - ox), Math.max(oy, H - oy)) + 1, 0, 7); ctx.clip(); BG[bg](t); fn(); ctx.restore();
+}
+
+// ---------- icons (line icons) ----------
+function ico(kind, x, y, s, c, a = 1) {
+  if (a <= 0) return; ctx.save(); ctx.globalAlpha *= a; ctx.strokeStyle = c; ctx.fillStyle = c; ctx.lineWidth = Math.max(3, s * .16); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  const B = () => ctx.beginPath(), Sk = () => ctx.stroke(), F = () => ctx.fill();
+  if (kind === 'sparkle') { const st4 = (cx, cy, r) => { B(); for (let i = 0; i < 8; i++) { const ang = i * Math.PI / 4, r2 = i % 2 ? r * .28 : r; ctx.lineTo(cx + Math.sin(ang) * r2, cy - Math.cos(ang) * r2); } ctx.closePath(); F(); }; st4(x - s * .15, y + s * .1, s); st4(x + s * .75, y - s * .7, s * .42); }
+  if (kind === 'send') { B(); ctx.moveTo(x, y + s); ctx.lineTo(x, y - s); Sk(); B(); ctx.moveTo(x - s * .75, y - s * .25); ctx.lineTo(x, y - s); ctx.lineTo(x + s * .75, y - s * .25); Sk(); }
+  if (kind === 'person') { B(); ctx.arc(x, y - s * .45, s * .42, 0, 7); F(); B(); ctx.arc(x, y + s * 1.05, s * .9, Math.PI * 1.08, Math.PI * 1.92); ctx.closePath(); F(); }
+  if (kind === 'download') { B(); ctx.moveTo(x, y - s); ctx.lineTo(x, y + s * .35); Sk(); B(); ctx.moveTo(x - s * .55, y - s * .15); ctx.lineTo(x, y + s * .4); ctx.lineTo(x + s * .55, y - s * .15); Sk(); B(); ctx.moveTo(x - s, y + s * .4); ctx.lineTo(x - s, y + s); ctx.lineTo(x + s, y + s); ctx.lineTo(x + s, y + s * .4); Sk(); }
+  if (kind === 'bell') { B(); ctx.moveTo(x - s * .8, y + s * .55); ctx.quadraticCurveTo(x - s * .7, y - s, x, y - s); ctx.quadraticCurveTo(x + s * .7, y - s, x + s * .8, y + s * .55); ctx.closePath(); Sk(); B(); ctx.moveTo(x - s, y + s * .55); ctx.lineTo(x + s, y + s * .55); Sk(); B(); ctx.arc(x, y + s * .85, s * .2, 0, Math.PI); Sk(); }
+  if (kind === 'team') { [[-.55, .8], [.55, .8], [0, 1]].forEach(([dx, sc], i) => { B(); ctx.arc(x + dx * s, y - s * .35 * sc, s * .3 * sc, 0, 7); i < 2 ? Sk() : F(); }); B(); ctx.arc(x, y + s * .95, s * .7, Math.PI * 1.1, Math.PI * 1.9); Sk(); }
+  if (kind === 'check') { B(); ctx.moveTo(x - s * .5, y); ctx.lineTo(x - s * .12, y + s * .38); ctx.lineTo(x + s * .55, y - s * .42); Sk(); }
+  if (kind === 'q') text('?', x, y + s * .05, { size: s * 1.7, weight: 900, color: c, align: 'center' });
+  ctx.restore();
+}
+// a mouse pointer
+function pointer(x, y, s = 1, a = 1) {
+  if (a <= 0) return; ctx.save(); ctx.globalAlpha *= a; ctx.translate(x, y); ctx.scale(s, s); ctx.beginPath();
+  ctx.moveTo(0, 0); ctx.lineTo(0, 46); ctx.lineTo(12, 35); ctx.lineTo(21, 54); ctx.lineTo(29, 50); ctx.lineTo(20, 32); ctx.lineTo(36, 32); ctx.closePath();
+  ctx.fillStyle = K.ink; ctx.fill(); ctx.strokeStyle = WHITE; ctx.lineWidth = 3; ctx.stroke(); ctx.restore();
+}
+// an iOS-style switch, k = 0 off → 1 on
+function toggle(x, y, k, a = 1) { rr(x, y - 32, 112, 64, 32, K.lineGrey, null, 0, a); rr(x, y - 32, 112, 64, 32, K.red, null, 0, a * k); circle(x + 32 + 48 * eIO(k), y, 26, WHITE, null, 0, a); }
+// grey placeholder bar (text we do not show)
+const skel = (x, y, w, h = 18, c = K.lightBox, a = 1) => rr(x, y - h / 2, w, h, h / 2, c, null, 0, a);
+
+// ---------- console screenshots (assets/screens: the deck's captures with the sidebar cut off; 01–06 at 2×, 2015 px wide, 07–11 at 1×, 967 px) ----------
+const IMG = {};
+['01-sets', '02-summary', '03-metrics', '04-question', '05-sources', '06-competitors', '07-responses', '08-settings', '09-top-questions', '10-criteria', '11-roles']
+  .forEach(n => { IMG[n] = new Image(); IMG[n].src = `assets/screens/${n}.png`; });
+// where a crop [sx, sy, sw, sh] of a capture lands in a browser window w wide at (x, y): { X, Y, s, h } (PNG point → page)
+const BAR = 48;
+function mapOf([sx, sy, sw, sh], x, y, w) { const s = w / sw; return { X: px => x + (px - sx) * s, Y: py => y + BAR + (py - sy) * s, s, h: sh * s + BAR }; }
+// the console in a browser window. Returns mapOf's mapping. look: { cx, cy, z, r, on } zooms the page inside the window around (cx, cy)
+// and dims all of it but r (page px, a red outline round it): the window itself stays put, so nothing next to it is covered
+function browser(name, crop, x, y, w, look) {
+  const [sx, sy, sw, sh] = crop, m = mapOf(crop, x, y, w), h = m.h, bar = BAR;
+  ctx.save(); card(x, y, w, h, { r: 18, shadow: .3 });
+  [0, 1, 2].forEach(i => circle(x + 30 + i * 24, y + bar / 2, 7, ['#FF6159', '#FFBD2E', '#28C941'][i]));
+  rr(x + w / 2 - 170, y + 12, 340, 26, 13, K.lightBox); text(C.title.url, x + w / 2, y + 25, { size: 16, weight: 600, color: K.muted, align: 'center' });
+  ctx.beginPath(); ctx.roundRect(x, y + bar, w, h - bar, [0, 0, 18, 18]); ctx.clip(); ctx.imageSmoothingQuality = 'high';
+  if (look) zoomAt(look.cx, look.cy, look.z);
+  ctx.drawImage(IMG[name], sx, sy, sw, sh, x, y + bar, w, h - bar);
+  if (look && look.on > 0) { const [x0, y0, x1, y1] = look.r, rad = 12 / look.z;
+    ctx.beginPath(); ctx.rect(-W, -H, 3 * W, 3 * H); ctx.roundRect(x0, y0, x1 - x0, y1 - y0, rad); ctx.fillStyle = `rgba(14,20,36,${.5 * look.on})`; ctx.fill('evenodd');
+    rr(x0, y0, x1 - x0, y1 - y0, rad, null, K.red, 5 / look.z, look.on); }
+  ctx.restore(); return m;
+}
+// a magnifier over a screenshot: PNG point (px, py) shown mag× bigger in a circle at (cx, cy), with a connector from the point
+function lens(t, t0, name, m, px, py, cx, cy, R, mag) {
+  const k = p(t, t0, .5); if (k <= 0) return; const r = R * eBack(k), S2 = m.s * mag;
+  ctx.save(); ctx.globalAlpha *= clamp(k * 2);
+  ctx.strokeStyle = WHITE; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(m.X(px), m.Y(py)); ctx.lineTo(cx, cy); ctx.stroke(); circle(m.X(px), m.Y(py), 9, WHITE, K.red, 4);
+  ctx.shadowColor = 'rgba(20,24,40,.35)'; ctx.shadowBlur = 40; ctx.shadowOffsetY = 14; circle(cx, cy, r + 10, WHITE); ctx.shadowColor = 'transparent';
+  ctx.save(); ctx.beginPath(); ctx.arc(cx, cy, r, 0, 7); ctx.clip(); ctx.fillStyle = WHITE; ctx.fillRect(cx - r, cy - r, 2 * r, 2 * r);
+  ctx.drawImage(IMG[name], px - r / S2, py - r / S2, 2 * r / S2, 2 * r / S2, cx - r, cy - r, 2 * r, 2 * r); ctx.restore();
+  circle(cx, cy, r + 4, null, K.red, 6); ctx.restore();
+}
+// dim everything but some rounded rects
+function spot(rects, a, r = 14) {
+  if (a <= 0) return; ctx.save(); ctx.beginPath(); ctx.rect(0, 0, W, H); rects.forEach(([x, y, w, h]) => ctx.roundRect(x, y, w, h, r));
+  ctx.fillStyle = `rgba(14,20,36,${.55 * a})`; ctx.fill('evenodd'); rects.forEach(([x, y, w, h]) => rr(x, y, w, h, r, null, K.red, 5, a)); ctx.restore();
+}
+const AIS = () => [['ChatGPT', K.red], ['Gemini', K.blue], ['Claude', K.mintDark]];   // three AIs = 1st / 2nd / 3rd of a comparison
+// "GEO 모니터링 콘솔" on one line, centred at (x, y); its width (for an underline as long as the words)
+const lockupW = size => measure('GEO', size, 900) + size * .3 + measure('모니터링 콘솔', size * .82, 800) - 7;
+function lockup(x, y, size, col = WHITE) {
+  const w1 = measure('GEO', size, 900), gap = size * .3, x0 = x - lockupW(size) / 2;
+  text('GEO', x0, y, { size, weight: 900, color: col }); text('모니터링 콘솔', x0 + w1 + gap, y + size * .04, { size: size * .82, weight: 800, color: col, spacing: -1 });
+}
+
+// ============================================================
+// scenes (absolute time t), tools/script.py SCENES order. BGOF: the scene's background, ORIGIN: where its circle wipe starts
+// ============================================================
+const SC = {}, BGOF = {}, ORIGIN = {};
+const H0 = id => S(id).start + .15;
+
+// ---------- a screen, explained: the capture in a browser window; a spotlight walks over its parts as the narration names them ----------
+// marks: [{ r: [x0, y0, x1, y1] in PNG px of the capture, at: s, z: zoom on it (1 = none) }], notes: one short line per mark.
+// side: false = the note is a red chip by the spotlight (wide screens, a caption under the window); true = the notes are a list to the
+// right of the window (tall screens), the newest one red. The page zooms inside the window around the lit part, which stays where it is
+function screen(t, o) {
+  const m = mapOf(o.crop, o.x, o.y, o.w), k = p(t, o.at, .9); if (k <= 0) return m;
+  const ms = o.marks, R = j => { const [a, b, c, d] = ms[j].r; return [m.X(a), m.Y(b), m.X(c), m.Y(d)]; };
+  let r = R(0), z = ms[0].z || 1;
+  for (let j = 1; j < ms.length; j++) { const e = eIO(p(t, ms[j].at - .1, .8)), r2 = R(j); r = r.map((v, i) => lerp(v, r2[i], e)); z = lerp(z, ms[j].z || 1, e); }
+  const on = p(t, ms[0].at - .2, .6), Z = lerp(1, z, eIO(p(t, ms[0].at - .2, .9)));
+  const cx = (r[0] + r[2]) / 2, cy = (r[1] + r[3]) / 2, P = (x, y) => [cx + (x - cx) * Z, cy + (y - cy) * Z];
+  ctx.save(); ctx.globalAlpha *= clamp(k * 2); ctx.translate(0, (1 - eOut(k)) * 140);
+  browser(o.img, o.crop, o.x, o.y, o.w, { cx, cy, z: Z, r: [r[0] - 8, r[1] - 8, r[2] + 8, r[3] + 8], on });
+  ctx.restore();
+  const notes = o.notes || [];
+  if (!o.side) {   // the note of the part being lit, by the spotlight (below it, else above, else inside its top)
+    ms.forEach((mk, j) => {
+      if (!notes[j]) return; const a = p(t, mk.at + .15, .4) * (j + 1 < ms.length ? 1 - p(t, ms[j + 1].at - .25, .25) : 1); if (a <= 0) return;
+      const [x0, y0] = P(r[0], r[1]), [x1, y1] = P(r[2], r[3]), below = y1 + 72 < 905, above = y0 - 72 > 40;
+      const ny = below ? y1 + 50 : above ? y0 - 50 : y0 + 50, nx = clamp((x0 + x1) / 2, 260, 1660);
+      ctx.save(); ctx.globalAlpha *= clamp(a * 2); zoomAt(nx, ny, lerp(.7, 1, eBack(a)));
+      chip(notes[j], nx, ny, { size: 34, fill: K.red, align: 'center', weight: 800, pad: 26 }); ctx.restore();
+    });
+  } else {         // the notes as a list on the right; the newest one red with a dot, the older ones grey
+    const X = o.sideX || 1200;
+    ms.forEach((mk, j) => {
+      if (!notes[j]) return; const a = p(t, mk.at + .1, .5); if (a <= 0) return;
+      const cur = j + 1 >= ms.length || t < ms[j + 1].at, y = (o.sideY || 470) + j * 112;
+      enter(t, mk.at + .1, () => {
+        circle(X + 18, y, 13, cur ? (o.ink === WHITE ? WHITE : K.red) : o.ink === WHITE ? 'rgba(255,255,255,.4)' : K.lineGrey);
+        text(notes[j], X + 52, y + 1, { size: 42, weight: cur ? 800 : 600, color: cur ? o.ink || K.ink : o.dim || K.muted, maxW: 1860 - X - 52 });
+      }, { dx: 40, dy: 0, d: .6 });
+    });
+  }
+  return m;
+}
+// the page's name over the window (wide screens) or above the list (tall ones)
+function kicker(t, s0, str, x, y, { fill = K.ink, color = WHITE } = {}) { enter(t, s0, () => chip(str, x, y, { size: 30, fill, color, weight: 800, pad: 24 }), { dx: -30, dy: 0, d: .7 }); }
+// the captions of a page: caps[i] is timed to the page's line i (its words where the narration says them) and leaves when the next comes
+function caps(t, list, ids, y = 985, { color = K.ink, size = 78 } = {}) {
+  list.forEach((s, i) => { if (!s || !ids[i]) return; const ws = words(s, ids[i]), t1 = i + 1 < list.length && ids[i + 1] ? ws.length && words(list[i + 1], ids[i + 1])[0][1] - .35 : 1e9;
+    leave(t, t1, () => kin(t, ws.map(([w, tt], j) => [w, tt, { weight: j === ws.length - 1 ? 900 : 600 }]), 960, y, { size, color, d: .6 }), 50); });
+}
+const WIDE = (img, crop) => ({ img, crop, x: 180, y: 110, w: 1560 });   // wide captures: the window over most of the page, a caption under it
+const TALL = (img, crop) => ({ img, crop, x: 90, y: 130, w: 1060, side: true, sideX: 1220 });   // tall captures: the window on the left, the notes on the right
+
+// ---------- 1. the hook: a parent asks an AI — how do we come up? ----------
+BGOF.title = 'red';
+SC.title = t => {
+  const T = C.title, id = 'l1_1';
+  const a = Wc(id, '학부모', .05), b = Wc(id, ['ai', '에이'], .2), send = Wc(id, '하면', .5), d = Wc(id, '재능', .65), f = Wc(id, '어떻게', .8);
+  // the chat box: a dot that stretches into a bar, the question typed in, sent, then it moves up
+  const up = eIO(p(t, send + .1, .8)), Y = lerp(520, 260, up), k0 = p(t, .2, .5), k1 = eOut(p(t, .5, .8));
+  const pw = lerp(110, 1080, k1), ph = 112, x0 = 960 - pw / 2, typeEnd = send - .25;
+  if (k0 > 0) {
+    ctx.save(); ctx.globalAlpha *= clamp(k0 * 2); zoomAt(960, Y, lerp(.3, 1, eBack(k0)));
+    card(x0, Y - ph / 2, pw, ph, { r: ph / 2, shadow: .3 });
+    ico('sparkle', x0 + 62, Y, 20, K.red, k1);
+    const n = Math.floor(T.ask.length * clamp((t - (a + .15)) / (typeEnd - a - .15))), str = T.ask.slice(0, n);
+    if (k1 > .95) {
+      ctx.save(); ctx.beginPath(); ctx.rect(x0 + 100, Y - 50, pw - 210, 100); ctx.clip();
+      text(str, x0 + 108, Y + 2, { size: 42, weight: 600, color: K.ink });
+      if (t < send && (n < T.ask.length || Math.floor(t * 2.5) % 2 === 0)) rr(x0 + 112 + measure(str, 42, 600), Y - 26, 4, 52, 2, K.red);
+      ctx.restore();
+    }
+    const pk = p(t, send - .05, .4), ps = 1 - .2 * Math.sin(Math.PI * pk);
+    circle(x0 + pw - 58, Y, 38 * ps, n >= T.ask.length ? K.red : K.lineGrey); ico('send', x0 + pw - 58, Y, 15, WHITE, k1);
+    ctx.restore();
+  }
+  enter(t, a - .1, () => { chip('학부모', 960 - 540 + 20, Y - 104, { size: 28, fill: 'rgba(255,255,255,.2)', pad: 22 + 34 }); ico('person', 960 - 540 + 54, Y - 104, 14, WHITE); }, { dy: 16, d: .7 });
+  // three AIs about to answer (typing dots once the question is sent)
+  const names = AIS(), cw = names.map(([n]) => measure(n, 30, 700) + 92), tot = cw.reduce((s, w) => s + w, 0) + 24 * 2;
+  let cx = 960 - tot / 2;
+  names.forEach(([n, col], i) => { const k = p(t, b + i * .15, .6), w = cw[i], x = cx; cx += w + 24; if (k <= 0) return;
+    ctx.save(); ctx.globalAlpha *= clamp(k * 2); zoomAt(x + w / 2, Y + 120, lerp(.5, 1, eBack(k)));
+    rr(x, Y + 120 - 30, w, 60, 30, WHITE); circle(x + 32, Y + 120, 9, col); text(n, x + 52, Y + 121, { size: 30, weight: 700, color: K.ink });
+    ctx.restore();
+    const dk = p(t, send + .1, .3) * (1 - p(t, d, .4));
+    for (let j = 0; j < 3; j++) circle(x + w / 2 - 18 + j * 18, Y + 172 - Math.max(0, Math.sin((t - send) * 7 - j * .9 - i)) * 8, 6, WHITE, null, 0, dk);
+  });
+  const q = kin(t, [[T.q[0], d, { weight: 900, hl: d + .35 }], [T.q[1], f, { weight: 900 }]], 900, 720, { size: 112, d: .6 });
+  qmark(t, f + .4, q.x1 + 70, 708, 190);
+};
+
+// ---------- 2. the console, screen by screen ----------
+BGOF.intro = 'white'; ORIGIN.intro = [960, 708];
+const THUMBS = ['01-sets', '02-summary', '03-metrics', '04-question', '05-sources', '06-competitors', '07-responses', '08-settings', '09-top-questions', '10-criteria', '11-roles'];
+SC.intro = t => {
+  const id = 'l2_1', s0 = H0('intro'), g = Wc(id, ['geo', '지이오'], .1), h = Wc(id, '하나', .55), e = en(id);
+  ctx.save(); ctx.globalAlpha *= clamp(p(t, g - .1, .7) * 2); zoomAt(960, 250, lerp(.7, 1, eBack(p(t, g - .1, .9)))); lockup(960, 250, 120, K.red); ctx.restore();
+  const uw = lockupW(120); rr(960 - uw / 2, 335, uw * eOut(p(t, g + .5, .8)), 7, 4, K.red);
+  // every capture as a card, dealt into a fan one by one as "하나씩" is said
+  THUMBS.forEach((n, i) => {
+    const t0 = lerp(h - .3, e - .2, i / (THUMBS.length - 1)), k = p(t, t0, .7); if (k <= 0) return;
+    const u = i / (THUMBS.length - 1) - .5, x = 960 + u * 1500, y = 730 + u * u * 260, rot = u * .35, cw = 300, ch = 190;
+    ctx.save(); ctx.globalAlpha *= clamp(k * 2); ctx.translate(lerp(960, x, eOut(k)), lerp(1200, y, eOut(k))); ctx.rotate(rot * eOut(k));
+    card(-cw / 2, -ch / 2, cw, ch, { r: 14, shadow: .22 });
+    const im = IMG[n], sw = im.width > 1500 ? 1900 : 940, sh = sw * (ch - 16) / (cw - 16);   // the top of the page, the same width of it for every card
+    ctx.save(); ctx.beginPath(); ctx.roundRect(-cw / 2 + 8, -ch / 2 + 8, cw - 16, ch - 16, 8); ctx.clip(); ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(im, 0, 0, sw, Math.min(sh, im.height), -cw / 2 + 8, -ch / 2 + 8, cw - 16, ch - 16); ctx.restore();
+    ctx.restore();
+  });
+  kin(t, words(C.intro, id).map(([w, tt], i, a) => [w, tt, i === a.length - 1 ? { weight: 900, hl: tt + .3, box: K.red, hlColor: WHITE } : { weight: 600 }]), 960, 470, { size: 84, color: K.ink, d: .6 });
+};
+
+// ---------- 3. how it runs: the collector asks the three AIs, the server judges and computes, the team reads the console ----------
+BGOF.flow = 'red';
+SC.flow = t => {
+  const A = 'l3_1', B = 'l3_2', F = C.flow;
+  const c0 = Wc(A, '수집기', .05), ai = Wc(A, ['세', 'ai'], .3), q = Wc(A, '질문', .45), an = Wc(A, ['답변', '원문'], .7), src = Wc(A, '출처', .85);
+  const sv = Wc(B, '서버', .05), ju = Wc(B, '판정', .25), me = Wc(B, '지표', .4), tm = Wc(B, ['팀은', '팀'], .65), wc = Wc(B, ['웹', '콘솔'], .8);
+  const node = (x, y, w, h, title, sub, icon, t0) => enter(t, t0, () => {
+    card(x, y, w, h, { r: 28, shadow: .3 }); circle(x + 70, y + h / 2, 40, K.redTint); ico(icon, x + 70, y + h / 2, 20, K.red);
+    text(title, x + 132, y + h / 2 - 22, { size: 46, weight: 900, color: K.ink }); text(sub, x + 132, y + h / 2 + 30, { size: 30, weight: 600, color: K.muted });
+  }, { pop: true, ox: x + w / 2, oy: y + h / 2, d: .8 });
+  const col = [130, 440, 440, 200], ais = AIS().map(([n, c], i) => [n, c, 820, 300 + i * 175]);
+  node(col[0], col[1], col[2], col[3], F.collector[0], F.collector[1], 'download', c0 - .1);
+  // the three AIs; dotted lines from the collector
+  ais.forEach(([n, c, x, y], i) => { const k = p(t, ai + i * .15, .6); if (k <= 0) return;
+    ctx.save(); ctx.strokeStyle = 'rgba(255,255,255,.55)'; ctx.lineWidth = 4; ctx.setLineDash([2, 12]); ctx.lineCap = 'round'; ctx.globalAlpha *= clamp(k * 2);
+    ctx.beginPath(); ctx.moveTo(570, 540); ctx.bezierCurveTo(700, 540, 700, y, x - 10, y); ctx.stroke(); ctx.restore();
+    enter(t, ai + i * .15, () => { card(x, y - 55, 330, 110, { r: 55, shadow: .25 }); circle(x + 58, y, 20, c); text(n, x + 96, y + 2, { size: 40, weight: 800, color: K.ink }); }, { pop: true, ox: x + 165, oy: y, d: .7 }); });
+  const bez = (y, u) => { const x0 = 570, y0 = 540, x3 = 810, v = 1 - u; return [v * v * v * x0 + 3 * v * v * u * 700 + 3 * v * u * u * 700 + u * u * u * x3, v * v * v * y0 + 3 * v * v * u * y0 + 3 * v * u * u * y + u * u * u * y]; };
+  ais.forEach(([n, c, x, y], i) => {
+    for (let r = 0; r < 2; r++) {
+      const uq = p(t, q + i * .1 + r * .4, .8); if (uq > 0 && uq < 1) { const [px, py] = bez(y, eIO(uq)); circle(px, py, 24, WHITE); ico('q', px, py, 14, K.red); }
+      const ua = p(t, an + i * .12 + r * .4, .8); if (ua > 0 && ua < 1) { const [px, py] = bez(y, 1 - eIO(ua)); rr(px - 30, py - 22, 60, 44, 10, WHITE); rr(px - 30, py - 22, 60, 10, [10, 10, 0, 0], c); skel(px - 18, py + 4, 36, 6, K.lineGrey); }
+    }
+  });
+  enter(t, src, () => chip(F.got, 350, 700, { size: 32, fill: WHITE, color: K.red, weight: 900, align: 'center' }), { pop: true, ox: 350, oy: 700, d: .7 });
+  // the server: answers go up to it, it judges (checks) and computes (bars); the console gets the results
+  const sk = p(t, sv - .1, .7);
+  if (sk > 0) { ctx.save(); ctx.strokeStyle = WHITE; ctx.lineWidth = 6; ctx.lineCap = 'round'; ctx.globalAlpha *= clamp(sk * 2);
+    ctx.beginPath(); ctx.moveTo(1160, 300); ctx.lineTo(lerp(1160, 1290, eOut(sk)), 300); ctx.stroke(); ctx.restore(); }
+  node(1300, 190, 500, 220, F.server[0], F.server[1], 'check', sv - .1);
+  [0, 1, 2].forEach(i => { const kk = p(t, ju + i * .15, .4); if (kk > 0) { circle(1440 + i * 70, 470, 26 * eBack(kk), WHITE); ico('check', 1440 + i * 70, 470, 18, K.red, kk); } });
+  [60, 95, 75, 120].forEach((hh, i) => { const kk = eOut(p(t, me + i * .1, .6)); if (kk > 0) rr(1640 + i * 34, 500 - hh * kk, 24, hh * kk, 6, WHITE); });
+  const ck = p(t, tm - .1, .7);
+  if (ck > 0) { ctx.save(); ctx.strokeStyle = WHITE; ctx.lineWidth = 6; ctx.lineCap = 'round'; ctx.globalAlpha *= clamp(ck * 2);
+    ctx.beginPath(); ctx.moveTo(1550, 530); ctx.lineTo(1550, lerp(530, 640, eOut(ck))); ctx.stroke(); ctx.restore(); }
+  node(1300, 650, 500, 200, F.console[0], F.console[1], 'team', wc - .2);
+};
+
+// ---------- 4. question groups ----------
+BGOF.sets = 'white'; ORIGIN.sets = [1550, 740];
+SC.sets = t => {
+  const A = 'l4_1', B = 'l4_2', s0 = H0('sets');
+  kicker(t, s0 + .2, C.sets.label, 180, 62);
+  screen(t, { ...WIDE('01-sets', [20, 80, 1960, 920]), at: s0 + .1, notes: C.sets.notes, marks: [
+    { r: [55, 415, 1955, 968], at: Wc(A, '질문군', .5) },
+    { r: [95, 875, 905, 925], at: Wc(B, '주기', .3), z: 1.12 },
+    { r: [415, 745, 528, 798], at: Wc(B, '상태', .55), z: 1.12 },
+    { r: [540, 875, 775, 925], at: Wc(B, '다음', .75), z: 1.12 }] });
+  caps(t, [null, C.sets.cap], [A, B]);
+};
+
+// ---------- 5. the report: the AI summary with its source links ----------
+BGOF.summary = 'red';
+SC.summary = t => {
+  const A = 'l5_1', B = 'l5_2', s0 = H0('summary');
+  kicker(t, s0 + .2, C.summary.label, 180, 62, { fill: WHITE, color: K.red });
+  screen(t, { ...WIDE('02-summary', [20, 300, 1960, 920]), at: s0 + .1, notes: C.summary.notes, marks: [
+    { r: [55, 352, 372, 432], at: Wc(A, '리포트', .6), z: 1.08 },
+    { r: [55, 466, 588, 547], at: Wc(B, '회차', .2), z: 1.08 },
+    { r: [86, 610, 1830, 712], at: Wc(B, '요약', .4) },
+    { r: [86, 738, 1440, 786], at: Wc(B, '근거', .7), z: 1.12 }] });
+  caps(t, [null, C.summary.cap], [A, B], 985, { color: WHITE });
+};
+
+// ---------- 6. the report: metric cards ----------
+BGOF.metrics = 'white';
+SC.metrics = t => {
+  const A = 'l6_1', B = 'l6_2', s0 = H0('metrics');
+  kicker(t, s0 + .2, C.metrics.label, 180, 62);
+  screen(t, { ...WIDE('03-metrics', [20, 330, 1960, 920]), at: s0 + .1, notes: C.metrics.notes, marks: [
+    { r: [55, 455, 650, 840], at: Wc(A, '자사', .15) },
+    { r: [662, 455, 1256, 840], at: Wc(A, ['share', '셰어', '쉐어'], .35) },
+    { r: [1266, 455, 1860, 840], at: Wc(A, '일관', .55) },
+    { r: [55, 852, 650, 1237], at: Wc(A, '평균', .7) },
+    { r: [55, 392, 455, 442], at: Wc(B, '직전', .2), z: 1.08 },
+    { r: [1670, 580, 1832, 655], at: Wc(B, ['추이', '그래프'], .6), z: 1.12 }] });
+  caps(t, C.metrics.cap, [A, B]);
+};
+
+// ---------- 7. the report: one question, the three AIs side by side ----------
+BGOF.question = 'red';
+SC.question = t => {
+  const A = 'l7_1', B = 'l7_2', s0 = H0('question');
+  kicker(t, s0 + .2, C.question.label, 180, 62, { fill: WHITE, color: K.red });
+  screen(t, { ...WIDE('04-question', [20, 340, 1960, 920]), at: s0 + .1, notes: C.question.notes, marks: [
+    { r: [55, 448, 1860, 825], at: Wc(A, ['세', '답을'], .2) },
+    { r: [55, 524, 1860, 580], at: Wc(A, '언급', .45), z: 1.1 },
+    { r: [55, 622, 1860, 672], at: Wc(A, '등장', .6), z: 1.1 },
+    { r: [55, 668, 1860, 757], at: Wc(A, '출처', .72), z: 1.1 },
+    { r: [55, 754, 1860, 802], at: Wc(A, '경쟁사', .85), z: 1.1 },
+    { r: [75, 840, 1430, 1118], at: Wc(B, '응답', .2), z: 1.05 }] });
+  caps(t, C.question.cap, [A, B], 985, { color: WHITE });
+};
+
+// ---------- 8. the report: cited sources ----------
+BGOF.sources = 'white';
+SC.sources = t => {
+  const A = 'l8_1', B = 'l8_2', s0 = H0('sources');
+  kicker(t, s0 + .2, C.sources.label, 180, 62);
+  screen(t, { ...WIDE('05-sources', [20, 330, 1960, 920]), at: s0 + .1, notes: C.sources.notes, marks: [
+    { r: [78, 425, 800, 1245], at: Wc(A, ['근거', '페이지'], .45) },
+    { r: [1766, 425, 1850, 1245], at: Wc(A, '횟수', .75) },
+    { r: [928, 425, 1160, 1245], at: Wc(B, ['어떤', 'ai'], .1) },
+    { r: [1176, 425, 1752, 1245], at: Wc(B, '질문', .45) }] });
+  caps(t, C.sources.cap, [A, B]);
+};
+
+// ---------- 9. the report: brands side by side ----------
+BGOF.competitors = 'red';
+SC.competitors = t => {
+  const A = 'l9_1', s0 = H0('competitors');
+  kicker(t, s0 + .2, C.competitors.label, 180, 62, { fill: WHITE, color: K.red });
+  screen(t, { ...WIDE('06-competitors', [20, 330, 1960, 920]), at: s0 + .1, notes: C.competitors.notes, marks: [
+    { r: [55, 450, 800, 1245], at: Wc(A, ['우리와', '우리'], .2) },
+    { r: [895, 450, 1015, 1245], at: Wc(A, '언급률', .4) },
+    { r: [1200, 450, 1392, 1245], at: Wc(A, '평균', .55) },
+    { r: [1615, 450, 1845, 1245], at: Wc(A, '직전', .72) }] });
+  caps(t, [C.competitors.cap], [A], 985, { color: WHITE });
+};
+
+// tall screens: the page's name and a title over the notes on the right
+function sideHead(t, s0, F, { dark = false } = {}) {
+  kicker(t, s0 + .3, F.label, 1220, 250, dark ? { fill: WHITE, color: K.red } : {});
+  rise(t, s0 + .5, F.title, 1220, 350, { size: 72, weight: 900, color: dark ? WHITE : K.ink, d: .8 });
+}
+
+// ---------- 10. one question's past answers, round by round ----------
+BGOF.responses = 'white';
+SC.responses = t => {
+  const A = 'l10_1', B = 'l10_2', s0 = H0('responses');
+  sideHead(t, s0, C.responses);
+  screen(t, { ...TALL('07-responses', [0, 30, 967, 770]), at: s0 + .1, notes: C.responses.notes, marks: [
+    { r: [25, 62, 600, 112], at: Wc(A, '질문', .1), z: 1.1 },
+    { r: [25, 200, 325, 770], at: Wc(A, '회차', .65) },
+    { r: [25, 148, 325, 198], at: Wc(B, ['ai별', 'ai', '골라'], .1), z: 1.12 },
+    { r: [345, 200, 912, 770], at: Wc(B, '바뀌', .6) }] });
+};
+
+// ---------- 11. settings: automatic collection on a cycle ----------
+BGOF.settings = 'red';
+SC.settings = t => {
+  const A = 'l11_1', s0 = H0('settings');
+  sideHead(t, s0, C.settings, { dark: true });
+  screen(t, { ...TALL('08-settings', [0, 30, 967, 770]), at: s0 + .1, ink: WHITE, dim: 'rgba(255,255,255,.65)', notes: C.settings.notes, marks: [
+    { r: [138, 168, 202, 220], at: Wc(A, '설정', .05), z: 1.12 },
+    { r: [25, 518, 300, 562], at: Wc(A, '자동', .25), z: 1.12 },
+    { r: [25, 565, 300, 662], at: Wc(A, ['반복', '간격'], .45), z: 1.08 },
+    { r: [25, 710, 560, 752], at: Wc(A, '다음', .7), z: 1.08 }] });
+};
+
+// ---------- 12. parents' top questions ----------
+BGOF.top = 'white';
+SC.top = t => {
+  const A = 'l12_1', B = 'l12_2', s0 = H0('top');
+  sideHead(t, s0, C.top);
+  screen(t, { ...TALL('09-top-questions', [0, 40, 967, 700]), at: s0 + .1, notes: C.top.notes, marks: [
+    { r: [25, 62, 805, 135], at: Wc(A, '학부모', .05) },
+    { r: [25, 222, 805, 718], at: Wc(A, ['순위', '순이'], .8) },
+    { r: [668, 64, 805, 94], at: Wc(B, '매월', .1), z: 1.12 },
+    { r: [25, 266, 805, 402], at: Wc(B, ['고를', '질문을'], .6), z: 1.1 }] });
+};
+
+// ---------- 13. judging rules: what counts as us ----------
+BGOF.criteria = 'red';
+SC.criteria = t => {
+  const A = 'l13_1', B = 'l13_2', s0 = H0('criteria');
+  sideHead(t, s0, C.criteria, { dark: true });
+  screen(t, { ...TALL('10-criteria', [0, 40, 967, 760]), at: s0 + .1, ink: WHITE, dim: 'rgba(255,255,255,.65)', notes: C.criteria.notes, marks: [
+    { r: [25, 180, 805, 752], at: Wc(A, ['표현', '브랜드'], .4) },
+    { r: [25, 553, 805, 653], at: Wc(A, '경쟁사', .75), z: 1.08 },
+    { r: [25, 105, 568, 134], at: Wc(B, '고치', .1), z: 1.12 },
+    { r: [25, 105, 568, 134], at: Wc(B, '일관', .7), z: 1.12 }] });
+};
+
+// ---------- 14. members and the chat alert ----------
+BGOF.team = 'white';
+SC.team = t => {
+  const A = 'l14_1', B = 'l14_2', s0 = H0('team'), T = C.team;
+  kicker(t, s0 + .2, T.label, 310, 62);
+  screen(t, { img: '11-roles', crop: [0, 60, 967, 275], x: 310, y: 110, w: 1300, at: s0 + .1, notes: T.notes, marks: [
+    { r: [25, 226, 705, 258], at: Wc(A, '관리자', .3), z: 1.05 },
+    { r: [25, 254, 705, 286], at: Wc(A, '편집자', .5), z: 1.05 },
+    { r: [25, 282, 705, 314], at: Wc(A, '열람자', .7), z: 1.05 }] });
+  // the alert: a chat message sliding in at 11:00 (drawn, not a capture: the alert page shows the webhook address)
+  const c = Wc(B, ['구글챗', '팀'], .6), k = p(t, Wc(B, '수집', .1) - .1, .8);
+  if (k > 0) {
+    ctx.save(); ctx.globalAlpha *= clamp(k * 2); ctx.translate((1 - eOut(k)) * 300, 0);
+    const x = 510, y = 590, w = 900, h = 250; card(x, y, w, h, { r: 28, shadow: .25 });
+    circle(x + 70, y + 70, 36, K.redTint); ico('bell', x + 70, y + 66, 18, K.red);
+    text(T.chat[0], x + 128, y + 58, { size: 34, weight: 800, color: K.ink }); text('11:00', x + w - 50, y + 58, { size: 30, weight: 700, color: K.muted, align: 'right' });
+    text(T.chat[1], x + 128, y + 110, { size: 30, weight: 600, color: K.muted });
+    [620, 520].forEach((ww, i) => skel(x + 128, y + 165 + i * 40, ww * eOut(p(t, c + i * .15, .6)), 18, K.lineGrey));
+    ctx.restore();
+  }
+  caps(t, T.cap, [A, B], 960);
+};
+
+// ---------- 15. end card ----------
+BGOF.end = 'red';
+SC.end = t => {
+  const id = 'l15_1', s0 = H0('end');
+  const kk = p(t, s0 + .1, .9);
+  if (kk > 0) { ctx.save(); ctx.globalAlpha *= clamp(kk * 2); zoomAt(960, 420, lerp(.7, 1, eBack(kk))); lockup(960, 420, 150); ctx.restore();
+    const uw = lockupW(150); rr(960 - uw / 2, 520, uw * eOut(p(t, s0 + .7, .8)), 8, 4, WHITE); }
+  const ws = words(C.end, id);
+  kin(t, ws.map(([w, tt], i) => [w, tt, i ? { weight: 800 } : { weight: 900, hl: tt + .3 }]), 960, 660, { size: 90, d: .6 });
+  enter(t, en(id, -.2), () => chip(C.title.url, 960, 820, { size: 38, fill: WHITE, color: K.red, weight: 800, align: 'center', pad: 34 }), { pop: true, ox: 960, oy: 820, d: .7 });
+};
+
+// ============================================================
+// compositor: each scene on its own background; a circle wipe (with the whoosh) brings the next one in
+// ============================================================
+const TR = .9;   // the circle wipe (.9 s like ../geo-monitor-ko after its review: .6 felt rushed)
+function paint(i, t) {
+  const s = TL.scenes[i]; BG[BGOF[s.id] || 'white'](t);
+  SC[s.id](t);   // no slow push-in (../geo-monitor-ko has one): Chrome snaps canvas text to whole pixels, so under a slow zoom the words
+                 // stepped down 1 px about every second while the pictures moved smoothly (review: "글자가 살짝씩 아래로")
+}
+function draw(t) {
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1;
+  const SCN = TL.scenes; let i = SCN.findIndex(s => t < s.end); if (i < 0) i = SCN.length - 1;
+  const k = i > 0 ? eIO(p(t, SCN[i].start - .15, TR)) : 1;
+  if (k >= 1) { paint(i, t); return; }
+  ctx.save(); zoomAt(960, 540, 1 + .08 * k); paint(i - 1, t); ctx.restore();
+  const [ox, oy] = ORIGIN[SCN[i].id] || [960, 540], R = k * Math.hypot(Math.max(ox, W - ox), Math.max(oy, H - oy));
+  if (R <= 0) return;
+  ctx.save(); ctx.beginPath(); ctx.arc(ox, oy, R, 0, 7); ctx.clip(); paint(i, t); ctx.restore();
+}
+
+// ---------- preview player ----------
+const seekEl = document.getElementById('seek'), timeEl = document.getElementById('time'), playEl = document.getElementById('play');
+seekEl.max = DURATION.toFixed(2);
+let playing = false, t0 = 0, tCur = 0;
+const audio = new Audio('audio/mix.wav'); audio.preload = 'auto';
+function show(t) { tCur = t; draw(t); seekEl.value = t; timeEl.textContent = t.toFixed(2) + 's'; }
+function loop(now) { if (!playing) return; const t = (now - t0) / 1000; if (t >= DURATION) { playing = false; playEl.textContent = '▶ Play'; audio.pause(); show(DURATION); return; } show(t); requestAnimationFrame(loop); }
+playEl.onclick = () => { playing = !playing; playEl.textContent = playing ? '❚❚ Pause' : '▶ Play'; if (playing) { if (tCur >= DURATION) tCur = 0; t0 = performance.now() - tCur * 1000; try { audio.currentTime = tCur; audio.play().catch(() => {}); } catch (e) {} requestAnimationFrame(loop); } else audio.pause(); };
+seekEl.oninput = () => { show(+seekEl.value); if (playing) { t0 = performance.now() - tCur * 1000; try { audio.currentTime = tCur; } catch (e) {} } };
+
+window.draw = draw; window.DURATION = DURATION;
+function merge(base, over) {
+  if (Array.isArray(base)) return Array.isArray(over) ? over.map((v, i) => base[i] !== undefined ? merge(base[i], v) : v) : base;
+  if (base && typeof base === 'object') { const o = {}; for (const k in base) o[k] = over && k in over ? merge(base[k], over[k]) : base[k]; return o; }
+  return over === undefined || over === null ? base : over;
+}
+function apply(content) { C = window.CONTENT = merge(DEFAULT_CONTENT, content); K = C.colors; }
+window.VIDEO = { schema: window.SCHEMA, defaults: DEFAULT_CONTENT, get content() { return C; }, apply, canvas: cv };
+window.ready = Promise.all([document.fonts.load(`700 100px 'Noto Sans KR'`, '가A'), ...Object.values(IMG).map(i => i.decode())]).then(([r]) => {
+  if (!r.length) throw new Error('font failed to load (check fonts/)');
+}).then(() => document.fonts.ready).then(() => {
+  if (location.search.includes('render')) document.body.classList.add('render');
+  const m = location.search.match(/[?&]t=([\d.]+)/); show(m ? +m[1] : 0); return true;
+});
+</script>
+</body>
+</html>

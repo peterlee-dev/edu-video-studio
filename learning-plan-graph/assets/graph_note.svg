@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="602" height="362" viewBox="0 0 602 362" role="img" aria-label="D등급 학생 맞춤 학습 안내: C등급 6세트와 D등급 19세트, 10주차 학습출발점, 26주차 D등급 총괄평가">
+  <rect width="602" height="362" fill="#ffffff"/>
+  <rect x="15" y="14" width="572" height="335" rx="18" fill="#e4e4e4"/>
+  <g font-family="Noto Sans CJK KR, Pretendard, Malgun Gothic, Apple SD Gothic Neo, sans-serif" font-size="17.1" font-weight="400" fill="#303030" letter-spacing="-0.46">
+    <text x="42" y="66">처방된 순서대로 한 세트씩 해내는 동안, 스스로 문제를 발견하고 생각하고</text>
+    <text x="42" y="95">해결하며 끝까지 해내는 힘이 자랍니다.</text>
+
+    <text x="42" y="143">먼저 <tspan font-weight="700">C등급 6개 세트</tspan>와 <tspan font-weight="700">D등급 3개 세트</tspan>, <tspan font-weight="700">총 9개 세트</tspan>를</text>
+    <text x="42" y="173">준비 학습으로 진행합니다.</text>
+
+    <text x="42" y="202"><tspan font-weight="700">10주차</tspan>에는 학습출발점인 <tspan font-weight="700">D20세트</tspan>부터 본학습을 시작하며,</text>
+    <text x="42" y="231">이후 <tspan font-weight="700">16개 세트</tspan>를 포함해 <tspan font-weight="700">총 25개 세트</tspan>의 학습을 완료할 예정입니다.</text>
+
+    <text x="42" y="278"><tspan font-weight="700">26주차</tspan>에는 <tspan font-weight="700">D등급 총괄평가</tspan>를 통해 학습 성취도를 확인하고 다음 학습을</text>
+    <text x="42" y="307">준비합니다.</text>
+  </g>
+</svg>

@@ -1,0 +1,9 @@
+node_modules/
+audio/*
+!audio/.gitkeep
+!audio/mix.flac
+!audio/lines/
+out/*
+!out/.gitkeep
+__pycache__/
+out_tts.log
