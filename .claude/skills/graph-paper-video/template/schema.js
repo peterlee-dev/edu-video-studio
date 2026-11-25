@@ -1,4 +1,4 @@
-// Fields shown in the video editor (../video-editor.html). Rules: ../editor/PROTOCOL.md
+// Fields shown in the video editor, if the repo has one (editor/PROTOCOL.md there). Harmless without it
 (() => {
 const TL = window.TL;
 const col = (path, label, at) => ({ path, label, desc: '', type: 'color', at });

@@ -37,7 +37,7 @@ async function openPage() {
   const page = await browser.newPage({ viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 1 });
   await page.goto(pathToFileURL(path.join(dir, 'index.html')).href + '?render');
   await page.evaluate(() => window.ready);
-  const projectPath = arg('--project');                  // 영상 편집기에서 저장한 문구·색 (../editor/PROTOCOL.md)
+  const projectPath = arg('--project');                  // 영상 편집기에서 저장한 문구·색 (편집기가 있는 저장소에서만)
   if (projectPath) await page.evaluate(p => window.VIDEO.apply(p.content), JSON.parse(readFileSync(path.resolve(projectPath), 'utf8')));
   return { browser, page, canvas: await page.$('#c') };
 }

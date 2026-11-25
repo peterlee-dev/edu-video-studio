@@ -7,3 +7,6 @@ audio/*
 !audio/narration.m4a
 out/
 __pycache__/
+
+!audio/mix.flac
+out_tts*.log

@@ -1,5 +1,5 @@
-// On-screen text and colours (the video editor saves edits in this same shape, ../editor/PROTOCOL.md)
-// Palette and rules: .claude/skills/graph-paper-video/reference/colors.md — red is the one main colour (positive · up · correct ·
+// On-screen text and colours (an optional video editor saves edits in this same shape)
+// Palette and rules: the graph-paper-video skill, reference/colors.md — red is the one main colour (positive · up · correct ·
 // section tags · key numbers · teacher's pen, 1st of a comparison); blue / mint the 2nd / 3rd of a comparison; navy negative · wrong · down; the rest grey
 window.CONTENT = {
  "title": { "kicker": "SELF-LEARNING JEI MATH  ·  MATH ONLINE", "words": ["Adaptive", "Diagnostic", "Assessment"], "sub": "Development direction & expected benefits", "team": "2026  ·  Mathematics Team" },

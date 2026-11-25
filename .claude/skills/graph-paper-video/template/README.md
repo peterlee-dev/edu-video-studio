@@ -5,7 +5,7 @@
 - **모눈종이 워크북 한 장**: 장면마다 한 쪽(p. 1 ~ p. N). 장면이 바뀔 때 종이 위를 옆으로 넘어가고(믹스의 휙 소리와 같은 때), 읽는 동안은 화면이 움직이지 않아요
 - 선생님 펜 표시: <이 영상에서 쓴 것: 빨간 동그라미 · 체크 · 밑줄, 형광펜, 포스트잇, 도장(…)>
 - 색: `수학 영상 컬러 개선.pdf` 기준(레드 `#E5303A` 메인, 네이비 부정 · 하락, 비교는 레드 → 블루 → 민트, 나머지 그레이). 팔레트는 `content.js` 의 `colors`
-- 1920×1080, 30fps. 글꼴은 macOS 시스템 글꼴 Avenir Next(본문) · Noteworthy(손글씨). 배경음악 없음 (내레이션 + 쪽 넘김 휙 소리, 끝인사 딩)
+- 1920×1080, 30fps. 글꼴: 영문 Avenir Next(본문) · Noteworthy(손글씨, macOS 시스템 글꼴), 한글 Noto Sans KR · Gaegu(`fonts/`, OFL). 배경음악 없음 (내레이션 + 쪽 넘김 휙 소리, 차임)
 - 화면에 자막은 넣지 않아요. 필요하면 `subtitles.srt`
 
 | p. | 장면 | 문장 | 화면 |
@@ -14,11 +14,13 @@
 
 ## 음성 · 시각표 만들기
 
-- 대본: `tools/script.py`. <목소리: tts(복제 샘플 …) / take(녹음 …)>
+- 대본: `tools/script.py`. <목소리: tts(그래프 페이퍼 스킬 voices/<id>, 약 … Hz) / take(녹음 …)>. 고정한 테이크(`TAKE`)와 이유, `PACE`
 
 ```bash
 npm install
 uv run --with numpy --with mlx-whisper python tools/make_audio.py <tts|take>   # timeline.js, audio/mix.wav, subtitles.srt
+uv run --with numpy --with praat-parselmouth python tools/voice_check.py pitch   # 문장마다 톤 확인
+ffmpeg -i audio/mix.flac audio/mix.wav                                          # 저장소에서 받은 뒤 다시 렌더할 때
 ```
 
 ## 고치기 · 렌더링
@@ -33,4 +35,4 @@ node render.mjs --workers 3 --only 99-115,217-end   # 고친 구간(초)만 다�
 node render.mjs --cpu --workers 6                # GPU 가 없을 때: 예전 CPU 방식
 ```
 
-`render.mjs` 는 GPU 로 렌더해요: Chrome 이 Metal 로 캔버스를 그리고, 브라우저 안의 하드웨어 H.264 인코더(WebCodecs → VideoToolbox)로 바로 압축해 조각을 다시 인코딩하지 않고 이어 붙여요(`jei-english-adaptive-diagnosis` 에서 가져옴). 예전 CPU 방식(SwiftShader + PNG + libx264)보다 훨씬 빠르고 메모리도 덜 써요. GPU 가 없는 컴퓨터는 `--cpu`.
+`render.mjs` 는 GPU 로 렌더해요: Chrome 이 Metal 로 캔버스를 그리고, 브라우저 안의 하드웨어 H.264 인코더(WebCodecs → VideoToolbox)로 바로 압축해 조각을 다시 인코딩하지 않고 이어 붙여요. 예전 CPU 방식(SwiftShader + PNG + libx264)보다 훨씬 빠르고 메모리도 덜 써요. GPU 가 없는 컴퓨터는 `--cpu`.

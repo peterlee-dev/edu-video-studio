@@ -4,8 +4,11 @@
 <meta charset="utf-8">
 <title>Graph-paper workbook video</title>
 <style>
+  /* fonts/ is copied from the skill by scripts/new_video.sh (OFL): Korean text and Korean handwriting */
+  @font-face { font-family: 'Noto Sans KR'; src: url('fonts/NotoSansKR.ttf') format('truetype'); font-weight: 100 900; font-display: block; }
+  @font-face { font-family: 'Gaegu'; src: url('fonts/Gaegu-Bold.ttf') format('truetype'); font-weight: 100 900; font-display: block; }
   html, body { margin: 0; background: #0E1424; }
-  body { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 12px; font-family: 'Avenir Next', sans-serif; color: #ddd; }
+  body { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 12px; font-family: 'Avenir Next', 'Noto Sans KR', sans-serif; color: #ddd; }
   canvas { width: min(100%, 1280px); aspect-ratio: 16 / 9; display: block; background: #FEFFFF; }
   .bar { display: flex; gap: 12px; align-items: center; width: min(100%, 1280px); }
   .bar input { flex: 1; }
@@ -36,8 +39,9 @@ const W = 1920, H = 1080, TL = window.TL, DURATION = TL.duration;
 const cv = document.getElementById('c'), ctx = cv.getContext('2d');
 const DEFAULT_CONTENT = JSON.parse(JSON.stringify(window.CONTENT));
 let C = window.CONTENT, K = C.colors;
-const SANS = "'Avenir Next', 'Helvetica Neue', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif";
-const HAND = "'Noteworthy', 'Bradley Hand', 'Marker Felt', cursive";
+// Latin letters in Avenir Next / Noteworthy (macOS), Hangul falls through to Noto Sans KR / Gaegu (fonts/)
+const SANS = "'Avenir Next', 'Noto Sans KR', 'Helvetica Neue', sans-serif";
+const HAND = "'Noteworthy', 'Gaegu', 'Noto Sans KR', cursive";
 const LINE = '#E2E4E8';   // card outline (neutral)
 
 // ---------- basics ----------
@@ -52,12 +56,14 @@ const L = id => TL.lines[id] || { start: 0, end: 0, words: [] };
 const S = id => TL.scenes.find(s => s.id === id) || { start: 0, end: 0 };
 const st = (id, f = 0) => L(id).start + (L(id).end - L(id).start) * f;   // f: 0 = start of the narration line, 1 = end
 const en = (id, d = 0) => L(id).end + d;
-// time a word is spoken in a line (one of several spellings, the nth time it occurs); falls back to a fraction of the line
-const norm = s => String(s).toLowerCase().replace(/[^a-z0-9]/g, '');
+// time a word is spoken in a line (one of several spellings, the nth time it occurs); falls back to a fraction of the line.
+// Korean words carry their particles ("재능스스로수학은", "덧셈식으로"), so a Korean cue matches the start of a spoken word
+const norm = s => String(s).toLowerCase().replace(/[^a-z0-9가-힣]/g, '');
+const cueHit = (w, c) => w === c || (/[가-힣]/.test(c) && w.startsWith(c));
 const MISS = window.CUE_MISS = new Set();
 function Wd(id, words, f = 0, nth = 1) {
   const want = (Array.isArray(words) ? words : [words]).map(norm); let n = 0;
-  for (const [w, s] of L(id).words || []) if (want.includes(norm(w)) && ++n === nth) return s;
+  for (const [w, s] of L(id).words || []) if (want.some(c => cueHit(norm(w), c)) && ++n === nth) return s;
   MISS.add(`${id}:${want.join('|')}`); return st(id, f);
 }
 const cueCache = {};
@@ -70,7 +76,8 @@ function line0(x1, y1, x2, y2, c, lw = 3, dash) { ctx.save(); ctx.strokeStyle = 
 function card(x, y, w, h, { fill = '#FFFFFF', stroke = LINE, r = 16, a = 1, shadow = true, lw = 2 } = {}) {
   if (a <= 0) return; ctx.save(); ctx.globalAlpha *= a;
   if (shadow) { ctx.shadowColor = 'rgba(30,30,30,.08)'; ctx.shadowBlur = 22; ctx.shadowOffsetY = 8; }
-  ctx.beginPath(); ctx.roundRect(x, y, w, h, r); ctx.fillStyle = fill; ctx.fill(); ctx.shadowColor = 'transparent';
+  ctx.beginPath(); ctx.roundRect(x, y, w, h, r); ctx.fillStyle = '#FFFFFF'; ctx.fill(); ctx.shadowColor = 'transparent';   // white under a tinted card: no grid through it
+  if (fill !== '#FFFFFF') { ctx.fillStyle = fill; ctx.fill(); }
   if (stroke) { ctx.lineWidth = lw; ctx.strokeStyle = stroke; ctx.stroke(); } ctx.restore();
 }
 function measure(str, size, weight = 600, fam = SANS) { ctx.save(); ctx.font = `${weight} ${size}px ${fam}`; const w = ctx.measureText(str).width; ctx.restore(); return w; }
@@ -159,7 +166,9 @@ function stamp(str, x, y, k, c = K.red, rot = -.08, size = 34) {
 // pill label; returns its width. White underneath: tinted labels never show the grid
 function chip(str, x, y, { size = 22, fill = K.red, color = '#FFFFFF', a = 1, pad = 16, weight = 700, spacing = 1.5, align = 'left' } = {}) {
   if (a <= 0) return 0; const w = measure(str, size, weight) + spacing * str.length + pad * 2, h = size * 1.8, x0 = align === 'center' ? x - w / 2 : x;
-  rr(x0, y - h / 2, w, h, h / 2, '#FFFFFF', null, 0, a); rr(x0, y - h / 2, w, h, h / 2, fill, null, 0, a); text(str, x0 + pad, y + 1, { size, weight, color, alpha: a, spacing }); return w;
+  rr(x0, y - h / 2, w, h, h / 2, '#FFFFFF', null, 0, a); rr(x0, y - h / 2, w, h, h / 2, fill, null, 0, a);
+  ctx.save(); ctx.font = `${weight} ${size}px ${SANS}`; if (spacing) ctx.letterSpacing = spacing + 'px'; const m = ctx.measureText(str); ctx.restore();
+  text(str, x0 + w / 2 - (m.actualBoundingBoxRight - m.actualBoundingBoxLeft) / 2, y + 1, { size, weight, color, alpha: a, spacing }); return w;   // the ink, not the advance, sits in the middle
 }
 // numbered circle (1 2 3 of a comparison: red, blue, mint)
 function num(n, x, y, col, { r = 26, a = 1 } = {}) { if (a <= 0) return; circle(x, y, r, '#FFFFFF', null, 0, a); circle(x, y, r, col, null, 0, a); text(String(n), x, y + 1, { size: r * 1.1, weight: 800, color: '#FFFFFF', align: 'center', alpha: a }); }
@@ -298,7 +307,7 @@ SC.outro = t => {
 const CONT = new Set(TL.cont || []), SHARED = {};
 let SHARED_OFF = false;
 const PAGE_NO = TL.scenes.map((s, i) => i - TL.scenes.slice(1, i + 1).filter(x => CONT.has(x.id)).length);
-const TR = .8;
+const TR = 1.1;   // page turn length (tools/make_audio.py TURN starts a page this much + .1 s before its first line)
 function frame(i, t, ox) {
   if (Math.abs(ox) >= W) return; const s = TL.scenes[i];
   ctx.save(); ctx.translate(Math.round(ox), 0); pageFurniture(PAGE_NO[i]); SC[s.id](t); ctx.restore();
@@ -330,7 +339,7 @@ function loop(now) { if (!playing) return; const t = (now - t0) / 1000; if (t >=
 playEl.onclick = () => { playing = !playing; playEl.textContent = playing ? '❚❚ Pause' : '▶ Play'; if (playing) { if (tCur >= DURATION) tCur = 0; t0 = performance.now() - tCur * 1000; try { audio.currentTime = tCur; audio.play().catch(() => {}); } catch (e) {} requestAnimationFrame(loop); } else audio.pause(); };
 seekEl.oninput = () => { show(+seekEl.value); if (playing) { t0 = performance.now() - tCur * 1000; try { audio.currentTime = tCur; } catch (e) {} } };
 
-// ---------- video editor hooks (../editor/PROTOCOL.md) ----------
+// ---------- video editor hooks (optional: a repo with an editor/ folder reads window.VIDEO; see SKILL.md) ----------
 window.draw = draw; window.DURATION = DURATION;
 function merge(base, over) {
   if (Array.isArray(base)) return Array.isArray(over) ? over.map((v, i) => base[i] !== undefined ? merge(base[i], v) : v) : base;
@@ -339,7 +348,9 @@ function merge(base, over) {
 }
 function apply(content) { C = window.CONTENT = merge(DEFAULT_CONTENT, content); K = C.colors; }
 window.VIDEO = { schema: window.SCHEMA, defaults: DEFAULT_CONTENT, get content() { return C; }, apply, canvas: cv };
-window.ready = document.fonts.ready.then(() => {
+window.ready = Promise.all([document.fonts.load(`700 100px 'Noto Sans KR'`, '가A'), document.fonts.load(`700 100px 'Gaegu'`, '가A')]).then(([r]) => {
+  if (!r.length) throw new Error('font failed to load (copy the skill fonts/ into this folder)');
+}).then(() => document.fonts.ready).then(() => {
   if (location.search.includes('render')) document.body.classList.add('render');
   const m = location.search.match(/[?&]t=([\d.]+)/); show(m ? +m[1] : 0); return true;
 });

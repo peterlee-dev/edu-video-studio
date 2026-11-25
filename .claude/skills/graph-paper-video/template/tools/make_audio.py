@@ -1,18 +1,19 @@
 """Narration, timeline and mix for a graph-paper workbook video. The script is tools/script.py.
 
   dry       no voice yet: each line's length is estimated from its text (CPS chars/s) → timeline.js only, for laying out pages first
-  tts       every line is read by Qwen3-TTS cloning audio/voice_ref.wav (+ its words, audio/voice_ref.txt) on the DGX TTS API
-            (TTS_URL, POST /v1/tts/clone), 3 takes each. whisper large-v3-turbo (mlx-whisper) transcribes every take; takes that do
+  tts       every line is read by Qwen3-TTS cloning audio/voice_ref.wav (+ its words, audio/voice_ref.txt) on a Qwen3-TTS server
+            (TTS_URL, POST /v1/tts/clone; reference/narration.md), 3 takes each. whisper large-v3-turbo (mlx-whisper) transcribes every take; takes that do
             not read the script word for word are dropped, and of the rest the one nearest the median pace without long pauses wins.
             Takes and transcripts are cached in audio/tts_cache/, so changing a line re-reads only that line.
             --redo l3_2,l6_4 throws those lines' takes away and reads them again (N=8 reads 8 takes for them)
   take      one recorded reading of the whole script (audio/narration.mp3 | .wav | .m4a): transcribed once (audio/narration_words.json),
             the script aligned to the transcript, every line cut in the silences around its own words. Lines in CLONE (reworded after
             the recording) are read like tts mode by a clone of the recorded voice, then brought to the recording's pace, EQ and loudness
-  ref A B   cut audio/voice_ref.wav and voice_ref.txt from the recording, A–B seconds (a clean 15–30 s stretch of whole sentences)
+  ref A B   take mode: cut audio/voice_ref.wav and voice_ref.txt from the recording, A–B seconds (a clean 15–30 s stretch of whole sentences)
 
 Writes timeline.js (scenes, and every line with its spoken words and their times: index.html keys pictures to them),
-audio/mix.wav (narration + a whoosh at each page turn + a ding before DING_BEFORE, no music) and subtitles.srt (never burned in).
+audio/mix.wav (narration + a whoosh at each page turn + a chime at CHIME_AT and before DING_BEFORE / after the last line when DING_END, no music)
+and subtitles.srt (never burned in).
 
   uv run --with numpy python tools/make_audio.py dry
   uv run --with numpy --with mlx-whisper python tools/make_audio.py tts
@@ -22,13 +23,24 @@ import os, sys, json, re, glob, hashlib, subprocess, difflib, urllib.request, uu
 import numpy as np
 sys.dont_write_bytecode = True   # no __pycache__ next to script.py
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from script import LANGUAGE, SCENES, CONT, SCRIPT, CLONE, LEAD, GAP, SCENE_GAP, TAIL, DING_BEFORE
+from script import LANGUAGE, SCENES, CONT, SCRIPT, CLONE, LEAD, GAP, SCENE_GAP, TAIL, DING_BEFORE, JOIN
+import script
+TEMPO, CHIME_AT = getattr(script, 'TEMPO', 1.), getattr(script, 'CHIME_AT', None)
+PACE = getattr(script, 'PACE', None)   # target pace (chars/s) for picking takes; default the median of all takes, which moves when one line gets many extra takes
+TAKE = getattr(script, 'TAKE', {})   # {line id: take index (sorted order of its takes)}: overrides the automatic pick
+SAY = getattr(script, 'SAY', [])     # [(written, read)]: names said the Korean way
+def say_as(s):
+    for a, b in SAY: s = re.sub(re.escape(a), b, s, flags=re.I)
+    return s
+DING_END = getattr(script, 'DING_END', False)
 
 SR = 48000
+TURN = 1.2                  # a page starts this long before its first line (its turn, index.html TR = 1.1 s, starts .15 s before that)
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
 AUD = os.path.join(ROOT, 'audio')
 CACHE = os.path.join(AUD, 'tts_cache')
-REF, REF_TXT = os.path.join(AUD, 'voice_ref.wav'), os.path.join(AUD, 'voice_ref.txt')
+VOICE = os.environ.get('VOICE', getattr(script, 'VOICE', 'voice_ref'))   # the reference voice: audio/<VOICE>.wav + .txt (script.py VOICE, or VOICE=… to try another)
+REF, REF_TXT = os.path.join(AUD, VOICE + '.wav'), os.path.join(AUD, VOICE + '.txt')
 WORDS = os.path.join(AUD, 'narration_words.json')
 TTS = os.environ.get('TTS_URL', 'http://192.168.51.8:8095')
 N_TAKES = int(os.environ.get('N', 3))
@@ -165,11 +177,37 @@ def post(path, fields, files):
 
 
 def ref_id(): return h(open(REF, 'rb').read().hex()[:40000], open(REF_TXT, encoding='utf-8').read().strip())
-def takes_of(lid): return sorted(glob.glob(os.path.join(CACHE, f'{lid}_{h(ref_id(), LINE[lid][2])}_*.wav')))
+def take_key(lid): return h(ref_id(), LINE[lid][2], TAIL_TEXT)
+def takes_of(lid): return sorted(glob.glob(os.path.join(CACHE, f'{lid}_{take_key(lid)}_*.wav')))
+
+# The TTS server stops the moment the speech stops, so a line's last syllable loses its natural fall and sounds cut off (worst with
+# voices whose sentences end hard, like ad narration). So every line is read with a short sentence after it, and the take is cut in the
+# pause between the two: the line then ends the way a sentence inside speech does, with its fall and a little air.
+TAIL_TEXT = os.environ.get('TAIL_TEXT', '감사합니다.' if LANGUAGE == 'Korean' else 'Thank you.')
+def cut_tail(data):
+    """the take without the extra sentence, cut in the last pause (>= 80 ms below SILENT_DB) before it; None when there is no such pause"""
+    tmp = os.path.join(CACHE, '_tail.wav'); open(tmp, 'wb').write(data); x = decode(tmp); os.remove(tmp)
+    db = frames_db(x); v = np.where(db > SILENT_DB)[0]
+    if not len(v): return None
+    end, runs, i = v[-1], [], 0
+    while i <= end:
+        if db[i] <= SILENT_DB:
+            j = i
+            while j <= end and db[j] <= SILENT_DB: j += 1
+            if j - i >= 8: runs.append((i, j))
+            i = j
+        else: i += 1
+    for a, b in reversed(runs):
+        rest = (end + 1 - b) / 100   # the extra sentence: about 0.4–1.5 s
+        if rest > 1.6: return None
+        if rest >= .35:
+            y = x[:(a + max(0, min(b - a - 3, 20))) * (SR // 100)]   # keep up to 200 ms of the pause after the line (not the 30 ms before the extra sentence)
+            return np.concatenate([y, np.zeros(int(.1 * SR))])
+    return None
 
 
 def make_takes(ids, redo):
-    if not (os.path.exists(REF) and os.path.exists(REF_TXT)): sys.exit('needs audio/voice_ref.wav and audio/voice_ref.txt (take mode: make_audio.py ref A B)')
+    if not (os.path.exists(REF) and os.path.exists(REF_TXT)): sys.exit('needs audio/voice_ref.wav and audio/voice_ref.txt: copy a voice from the skill (scripts/new_video.sh --voice, voices/README.md), or in take mode cut one with make_audio.py ref A B')
     os.makedirs(CACHE, exist_ok=True)
     ref, ref_text = open(REF, 'rb').read(), open(REF_TXT, encoding='utf-8').read().strip()
     for lid in ids:
@@ -178,8 +216,14 @@ def make_takes(ids, redo):
             for f in takes_of(lid): os.remove(f); os.path.exists(f[:-4] + '.json') and os.remove(f[:-4] + '.json')
         for k in range(len(takes_of(lid)), N_TAKES if lid in redo else 3):
             print(f'TTS {lid} #{k}', read[:60], flush=True)
-            data = post('/v1/tts/clone', {'text': read, 'ref_text': ref_text, 'language': LANGUAGE, 'format': 'wav'}, {'ref_audio': ('ref.wav', ref)})
-            open(os.path.join(CACHE, f'{lid}_{h(ref_id(), read)}_{k}.wav'), 'wb').write(data)
+            for attempt in range(3):   # a take whose extra sentence cannot be cut off is read again (kept as it is after 3 tries: it then fails the word check)
+                data = post('/v1/tts/clone', {'text': f'{read} {TAIL_TEXT}', 'ref_text': ref_text, 'language': LANGUAGE, 'format': 'wav'}, {'ref_audio': ('ref.wav', ref)})
+                y = cut_tail(data)
+                if y is not None: break
+                print(f'  {lid} #{k}: no pause before the extra sentence, reading again', flush=True)
+            out = os.path.join(CACHE, f'{lid}_{take_key(lid)}_{k}.wav')
+            if y is None: open(out, 'wb').write(data)
+            else: write_wav(out, y)
 
 
 def pick_takes(ids, rate=None):
@@ -189,16 +233,25 @@ def pick_takes(ids, rate=None):
         want, cs = flat(LINE[lid][1]), []
         for k, p in enumerate(takes_of(lid)):
             tr = transcribe(p); x = decode(p); db = frames_db(x); off, y = trim(x, db)
-            got = flat(tr['text'])
-            miss = 0 if got == want else sum(max(i2 - i1, j2 - j1) for op, i1, i2, j1, j2 in difflib.SequenceMatcher(None, want, got, autojunk=False).get_opcodes() if op != 'equal')
-            cs.append({'k': k, 'tr': tr, 'y': y, 'off': off, 'miss': miss, 'rate': len(want) / (len(y) / SR), 'pause': longest_pause(db)})
+            got = flat(say_as(tr['text']))
+            # whisper may write what was read either way ("Knowledge Map" / "날리지 맵", "7개" / "일곱 개"): the nearer of the written and the read form counts.
+            # Names whisper writes in letters ("JEI", "POD") are turned into their read form first (script.py SAY), so a line mixing both still matches
+            miss = min(0 if got == w else sum(max(i2 - i1, j2 - j1) for op, i1, i2, j1, j2 in difflib.SequenceMatcher(None, w, got, autojunk=False).get_opcodes() if op != 'equal')
+                       for w in {want, flat(LINE[lid][2]), flat(say_as(LINE[lid][1]))})
+            # a take that still stops mid-sound (its last 30 ms loud) sounds clipped: such takes lose
+            cut = 10 * np.log10(np.mean(x[-int(.03 * SR):] ** 2) + 1e-12) > 10 * np.log10(np.mean(x ** 2) + 1e-12) - 20
+            # and one that ends its last word on its own leaves air after it: under 0.2 s of silence at the end means the voice was stopped
+            v = np.where(db > -45)[0]; tail = (len(db) - 1 - v[-1]) / 100 if len(v) else 0
+            cut = cut or tail < .2
+            cs.append({'k': k, 'tr': tr, 'y': y, 'off': off, 'miss': miss, 'rate': len(want) / (len(y) / SR), 'pause': longest_pause(db), 'cut': cut, 'tail': tail})
         cands[lid] = cs
     med = rate or float(np.median([c['rate'] for cs in cands.values() for c in cs if c['miss'] == 0] or [1]))
     pick = {}
     for lid, cs in cands.items():
-        for c in cs: c['score'] = c['miss'] * 10 + abs(c['rate'] - med) / med + max(0, c['pause'] - .7) * 4
-        pick[lid] = c = min(cs, key=lambda c: c['score'])
-        print(f"  {lid:6s} take {c['k']}  {len(c['y']) / SR:5.2f}s  miss {c['miss']}  pause {c['pause']:.2f}s  [{' '.join(str(x['miss']) for x in cs)}]")
+        for c in cs: c['score'] = c['miss'] * 10 + abs(c['rate'] - med) / med + max(0, c['pause'] - .7) * 4 + c['cut'] * 5
+        pick[lid] = c = cs[TAKE[lid]] if lid in TAKE else min(cs, key=lambda c: c['score'])   # TAKE: a take chosen by ear / phoneme check
+        print(f"  {lid:6s} take {c['k']}  {len(c['y']) / SR:5.2f}s  miss {c['miss']}  pause {c['pause']:.2f}s  tail {c['tail']:.2f}s  [{' '.join(str(x['miss']) + ('c' if x['cut'] else '') for x in cs)}]" + ('  (TAKE)' if lid in TAKE else ''))
+        if c['cut'] and not c['miss']: print(f"  ! {lid}: every take ends mid-sound (clipped last syllable) → N=8 ... --redo {lid}")
         if c['miss']: print(f"  ! {lid}: no take reads the script word for word (best differs by {c['miss']} chars: {c['tr']['text']}) → N=8 ... --redo {lid}, or write a read form in script.py")
     print(f'pace {med:.2f} chars/s')
     return pick, med
@@ -217,11 +270,13 @@ def clips_dry():
 
 def clips_tts(redo):
     make_takes(IDS, redo)
-    pick, _ = pick_takes(IDS)
+    pick, _ = pick_takes(IDS, PACE)
     out = {}
     for lid, c in pick.items():
         db = frames_db(c['y']); y = c['y'] * (.08 / np.sqrt(np.mean(10 ** (db[db > -40] / 10))))   # same loudness for every line
-        out[lid] = {'y': y, 'dur': len(y) / SR, 'words': spoken(c['tr']['words'], c['off'])}
+        if TEMPO != 1: y = atempo(y, TEMPO)
+        y = y.copy(); y[-int(.02 * SR):] *= np.linspace(1, 0, int(.02 * SR))   # no click where a take stops
+        out[lid] = {'y': y, 'dur': len(y) / SR, 'words': spoken(c['tr']['words'], c['off'], TEMPO)}
     return out
 
 
@@ -292,11 +347,12 @@ def lay_out(clips):
     t, prev, lines, scene_t, voice = LEAD, None, {}, {}, []
     for lid in IDS:
         sc, sub, _, extra = LINE[lid]; c = clips[lid]
-        if prev and sc != prev: t += SCENE_GAP
-        if sc not in scene_t: scene_t[sc] = 0 if not prev else t - .9   # the page turn lands just before its first line
+        if lid in JOIN: t = t_end + JOIN[lid]   # the sentence goes on: its scene starts in the short pause (a CONT scene, no page turn)
+        elif prev and sc != prev: t += SCENE_GAP
+        if sc not in scene_t: scene_t[sc] = 0 if not prev else t - JOIN[lid] / 2 if lid in JOIN else t - TURN   # the page turn (index.html TR) lands just before its first line
         lines[lid] = {'scene': sc, 'text': sub, 'start': round(t, 3), 'end': round(t + c['dur'], 3), 'words': [[w, round(t + s, 3)] for w, s in c['words']]}
         if c['y'] is not None: voice.append((t, c['y']))
-        t += c['dur'] + GAP + extra; prev = sc
+        t_end = t + c['dur']; t += c['dur'] + GAP + extra; prev = sc
     dur = round(t - GAP + TAIL, 2)
     ids = [s for s, _ in SCENES]
     for s in ids:
@@ -335,9 +391,14 @@ def lp(x, a):
     for i, v in enumerate(x): s += a * (v - s); y[i] = s
     return y
 def whoosh():
-    x = lp(np.random.default_rng(3).standard_normal(int(.55 * SR)), .07); e = np.sin(np.pi * np.linspace(0, 1, len(x)) ** .8) ** 2; return x * e * 1.4
-def ding():
-    tt = t_(.9); return sum(np.sin(2 * np.pi * 1318.5 * k * tt) / k ** 1.5 for k in (1, 2, 3)) * np.exp(-tt * 5) * .3
+    x = lp(np.random.default_rng(3).standard_normal(int(.75 * SR)), .06); e = np.sin(np.pi * np.linspace(0, 1, len(x)) ** .8) ** 2; return x * e * 1.4
+def chime():
+    """a bright rising C–E–G–C bell arpeggio (the single high ding sounded like a wrong-answer buzzer, review 1)"""
+    out = np.zeros(int(1.6 * SR))
+    for i, f in enumerate((1046.5, 1318.5, 1568.0, 2093.0)):
+        tt = t_(1.6 - i * .09); y = (np.sin(2 * np.pi * f * tt) + .25 * np.sin(2 * np.pi * 2 * f * tt) * np.exp(-tt * 6)) * np.exp(-tt * (3.2 if i == 3 else 5.5))
+        y[:int(.004 * SR)] *= np.linspace(0, 1, int(.004 * SR)); place(out, i * .09, y * (.22 if i < 3 else .3))
+    return out
 def place(buf, t, x, g=1.):
     i = int(t * SR); n = min(len(x), len(buf) - i)
     if n > 0 and i >= 0: buf[i:i + n] += x[:n] * g
@@ -349,7 +410,9 @@ def mix(scenes, lines, voice, dur):
     nar *= .9 / (np.abs(nar).max() + 1e-9)
     for s in scenes[1:]:   # the page slides sideways at the same time (index.html draw); CONT pages do not turn
         if s['id'] not in CONT: place(fx, s['start'] - .15, whoosh(), .3)
-    if DING_BEFORE: place(fx, lines[DING_BEFORE]['start'] - .3, ding(), .35)
+    if CHIME_AT is not None: place(fx, CHIME_AT, chime(), .4)
+    if DING_BEFORE: place(fx, lines[DING_BEFORE]['start'] - .55, chime(), .4)
+    if DING_END: place(fx, lines[IDS[-1]]['end'] + .45, chime(), .4)
     m = np.tanh((nar + fx) * 1.1) / 1.1
     write_wav(os.path.join(AUD, 'mix.wav'), m / (np.abs(m).max() + 1e-9) * .89, stereo=True)
 
