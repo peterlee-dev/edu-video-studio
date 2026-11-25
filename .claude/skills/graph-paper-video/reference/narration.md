@@ -32,7 +32,7 @@ uv run --with numpy --with mlx-whisper python tools/make_audio.py take
 
 ## tts 모드
 
-- 목소리 샘플: `audio/voice_ref.wav`(15~30초, 잡음 없이 문장 단위) + 그 대사 `audio/voice_ref.txt`. 지금까지 쓴 샘플: `ai-learning-platform-v3/audio/voice_ref.wav`(D–I 개선 내레이션 29초, 여성 영어)
+- 목소리 샘플: `audio/voice_ref.wav`(15~30초, 잡음 없이 문장 단위) + 그 대사 `audio/voice_ref.txt`. 지금까지 쓴 샘플: `ai-learning-platform-v3/audio/voice_ref.wav`(D–I 개선 내레이션 29초, 남자 영어, 약 124 Hz) · `jei-corporation-overview-female/audio/voice_ref.wav`(어댑티브진단 내레이션 14.1–28.95초, 여자 영어, 약 232 Hz) · 한국어 여자 `jei-ai-vision-ko/audio/voice_ref.wav`(`~/Desktop/어댑티브학습용.mp3`, 약 229 Hz). 한국어 `ai플랫폼학습용.mp3`(약 176 Hz)는 남자 목소리로 들려요. 문서의 남녀 표기를 믿지 말고 샘플의 음 높이(여자 ≈ 210 Hz 이상)를 재서 확인해요
 - 받아쓰기 결과와 읽은 것은 `audio/tts_cache/` 에 남아요. 문장을 고치면 그 문장만 다시 읽어요. 샘플을 바꾸면 모두 다시 읽어요
 - `! l3_2: no take reads the script word for word` 가 나오면: `N=8 ... tts --redo l3_2` (그 문장만 8번 새로 읽기), 그래도 안 되면 읽는 문장(4번째 칸)을 고쳐요
 - 문장마다 소리 크기를 같게 맞춰요

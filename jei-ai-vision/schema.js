@@ -5,7 +5,7 @@ const col = (path, label, at) => ({ path, label, desc: '', type: 'color', at });
 const sceneAt = (id, d = 3) => { const s = TL.scenes.find(x => x.id === id); return s ? s.start + d : 0; };
 window.SCHEMA = {
  id: 'jei-ai-vision',
- title: 'JEI AI Transformation Vision · JEI AI 전환 비전 (영문, 남자 목소리, 모눈종이 워크북)',
+ title: 'JEI AI Transformation Vision · JEI AI 전환 비전 (영문, 여자 목소리, 모눈종이 워크북)',
  duration: TL.duration, fps: 30,
  audio: ['audio/mix.wav', 'audio/mix.mp3'],
  audioFade: { in: 0.3, out: 2 },
@@ -25,7 +25,7 @@ window.SCHEMA = {
    col('colors.blush', 'Blush (highlighter)', 8), col('colors.redTint', 'Red tint', sceneAt('universe', 15)), col('colors.blueTint', 'Blue tint', sceneAt('country', 10)), col('colors.mintTint', 'Mint tint', sceneAt('wiki', 5)), col('colors.navyTint', 'Navy tint', sceneAt('kmapAI', 8)),
    col('colors.muted', 'Slate (secondary text)', 20), col('colors.midGrey', 'Mid grey (not yet studied)', sceneAt('statuses', 6)), col('colors.lineGrey', 'Line grey (outlines)', sceneAt('kmapDots', 8)), col('colors.lightBox', 'Light box (secondary boxes)', sceneAt('title', 8)), col('colors.grid', 'Graph-paper lines', 20), col('colors.gridMajor', 'Graph-paper lines (every 5th)', 20), col('colors.margin', 'Left margin line', 20)] },
  ],
- locked: 'Narration: Qwen3-TTS reading the English script (tools/script.py) in the voice of audio/voice_ref.wav (as ../ai-learning-platform-v3), timed by tools/make_audio.py. Every animation is keyed to a narration line or a spoken word.',
+ locked: 'Narration: Qwen3-TTS reading the English script (tools/script.py) in the voice of audio/voice_ref.wav (female English voice, as ../jei-corporation-overview-female since the 2026-11-06 review), timed by tools/make_audio.py. Every animation is keyed to a narration line or a spoken word.',
  warnings: [],
 };
 })();

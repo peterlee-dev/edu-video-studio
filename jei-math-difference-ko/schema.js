@@ -34,7 +34,7 @@ window.SCHEMA = {
    col('colors.muted', 'Slate (secondary text)', 20), col('colors.midGrey', 'Mid grey', 20), col('colors.lineGrey', 'Line grey (tape · outlines)', sceneEnd('areas')), col('colors.lightBox', 'Light box (secondary boxes · sticky notes)', sceneEnd('kumon')),
    col('colors.grid', 'Graph-paper lines', 20), col('colors.gridMajor', 'Graph-paper lines (every 5th)', 20), col('colors.margin', 'Left margin line', 20)] },
  ],
- locked: 'Narration: Qwen3-TTS reading tools/script.py in the voice of audio/voice_ref.wav (as ../jei-ai-vision-ko), timed by tools/make_audio.py. Every animation is keyed to a narration line or a spoken word.',
+ locked: 'Narration: Qwen3-TTS reading tools/script.py in the voice of audio/voice_ref.wav (the ai플랫폼학습용 recording, as ../ai-learning-platform-v3-ko; heard as male), timed by tools/make_audio.py. Every animation is keyed to a narration line or a spoken word.',
  warnings: [],
 };
 })();

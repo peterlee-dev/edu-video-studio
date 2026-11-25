@@ -4,7 +4,7 @@
 
 - **한 공간 · 카메라 이동**: 어두운 공간에 PDF 쪽마다 앱 창(패널) 하나가 4 × 3 격자로 놓여 있고, 쪽이 바뀌면 카메라가 옆 패널로 날아가요(이동 + 살짝 줌아웃, 믹스의 휙 소리와 같은 때). 쪽 안에서는 천천히 다가가고, 내레이션이 가리키는 곳으로 줌해요. 마무리 쪽은 먼저 모든 패널을 한눈에 보여 준 뒤 마무리 카드로 들어가요
 - **인터랙티브**: 마우스 커서가 버튼 · 토글 · 카드를 누르고(누를 때 금색 물결) 올려 두면 카드가 들려요. 지식맵 점이 별자리처럼 이어지고, 학습자 지식맵이 실시간으로 갱신되고, 3계층이 아이소메트릭으로 쌓이고, 로드맵이 스크롤바를 끌어 펼쳐지고, POD 순환이 돌아가요
-- **내레이션**: `../jei-ai-vision-ko` 와 **같은 내레이션**이에요(코디네이터 지시로 통일). 그쪽 `tools/script.py` · `audio/tts_cache/` · `timeline.js` · `audio/mix.wav` · `subtitles.srt` 를 그대로 복사해 썼어요. 목소리는 `ai-learning-platform-v3-ko` 와 같은 복제 목소리(`audio/voice_ref.wav`, DGX Qwen3-TTS)
+- **내레이션**: `../jei-ai-vision-ko` 와 **같은 내레이션**이에요(코디네이터 지시로 통일). 그쪽 `tools/script.py` · `audio/tts_cache/` · `timeline.js` · `audio/mix.wav` · `subtitles.srt` 를 그대로 복사해 썼어요. 목소리는 `ai-learning-platform-v3-ko` 와 같은 복제 목소리(`audio/voice_ref.wav`, DGX Qwen3-TTS, 약 176 Hz로 남자 목소리로 들려요). `../jei-ai-vision-ko` 는 그 뒤 2026.11.06 검토에서 여자 목소리로 바뀌어서, 지금은 두 영상의 목소리가 달라요
 - **큐**: 그쪽 시각표는 한 쪽을 여러 장면(예: `kmapList · kmapDots · kmapAI`)으로 나눠요. 여기서는 `index.html` 의 `PAGE_OF` 로 같은 쪽의 장면을 한 패널로 묶어요. 그림은 `Wc(문장 id, 단어)` 로 그 단어가 읽히는 때에 맞춰 움직여요(한국어는 조사가 붙어 읽히므로 단어의 앞부분이 맞으면 찾아요)
 - 색: 남색 공간 + 금색(JEI 강조 · Phase 1), 초록(Phase 2 · 완전학습), 파랑(서비스 · 온라인), 주황(미숙), 빨강(결손만), 회색(미학습). `content.js` 의 `colors`
 - 글꼴: Noto Sans KR(`fonts/`, OFL)
