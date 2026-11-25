@@ -1,6 +1,7 @@
 # The script: what is read, line by line. Edit this file, then run tools/make_audio.py tts (VOICE=male | female).
 # Source: Google Docs "김현태 본부장님 · JEI Repositioning: Core Strategy (English Explanation Script | Presentation Summary)" (2026.11.09, 구글챗 유정 · 대언 · 승은 · 소정 방), body word for word.
-# Not read: the doc title and meta lines, section headings and the footer. Audio only, no video: scenes are the doc's sections,
+# Also read (2026.11.09 request): the title and section headings highlighted yellow in the doc, numbers read as words.
+# Not read (2026.11.09 request): "I'm Hyuntae Kim." after the greeting. Not read: the meta lines, the unhighlighted headings and the footer. Audio only, no video: scenes are the doc's sections,
 # all in CONT (no page-turn whoosh), SCENE_GAP is the pause between sections.
 LANGUAGE = 'English'
 
@@ -10,8 +11,8 @@ CONT = {s for s, _ in SCENES}
 # (id, scene, line as written, line as read (None = as written), extra pause after it in s)
 SCRIPT = [
     # Opening | Key Conclusion
+    ('title', 's1', 'JEI Repositioning: Core Strategy', 'J-E-I Repositioning: Core Strategy.', 0.6),
     ('l1_1', 's1', 'Good morning, everyone.', None, 0),
-    ('l1_2', 's1', "I'm Hyuntae Kim.", None, 0),
     ('l1_3', 's1', "Today, I will share JEI's core repositioning strategy.", "Today, I will share J-E-I's core repositioning strategy.", 0.25),
     ('l1_4', 's1', 'Let me start with our key conclusion.', None, 0),
     ('l1_5', 's1', 'JEI must move beyond competing on workbooks, scale, and digital features.', 'J-E-I must move beyond competing on workbooks, scale, and digital features.', 0),
@@ -19,6 +20,7 @@ SCRIPT = [
     ('l1_7', 's1', 'I will explain the market changes, customer needs, the competitive gap, our positioning, and the strategic actions we need to take.', None, 0),
 
     # 01 | Market Shifts and the Limitations of Traditional Competition
+    ('h2', 's2', '01 | Market Shifts and the Limitations of Traditional Competition', 'One. Market Shifts and the Limitations of Traditional Competition.', 0.35),
     ('l2_1', 's2', 'First, let’s look at the challenges we face.', None, 0),
     ('l2_2', 's2', 'Three changes are important.', None, 0.25),
     ('l2_3', 's2', 'First, the limitations of our business scale.', None, 0),
@@ -34,6 +36,7 @@ SCRIPT = [
     ('l2_13', 's2', 'This is why Learning Design is central to our repositioning strategy.', None, 0),
 
     # 02 | Customer Needs and Pain Points
+    ('h3', 's3', '02 | Customer Needs and Pain Points', 'Two. Customer Needs and Pain Points.', 0.35),
     ('l3_1', 's3', 'So, what are parents really willing to pay for?', None, 0),
     ('l3_2', 's3', 'We can understand parents’ needs in three layers.', None, 0.25),
     ('l3_3', 's3', 'The first layer is functional needs: learning materials for different levels, connections to school curricula, and learning data.', None, 0),
@@ -52,6 +55,7 @@ SCRIPT = [
     ('l3_16', 's3', 'This is why we must shift our focus from workbooks to how children’s ability to learn improves.', None, 0),
 
     # 03 | Competitor Perceptions and the Learning Design Gap
+    ('h4', 's4', '03 | Competitor Perceptions and the Learning Design Gap', 'Three. Competitor Perceptions and the Learning Design Gap.', 0.35),
     ('l4_1', 's4', 'Now, let’s look at whether our competitors are meeting this need.', None, 0),
     ('l4_2', 's4', 'These evaluations are based on customer perceptions.', None, 0.25),
     ('l4_3', 's4', 'Each of our three major competitors is associated with a different strength.', None, 0),
@@ -66,6 +70,7 @@ SCRIPT = [
     ('l4_12', 's4', 'Rather than trying to move up the existing competitive ladder, JEI aims to establish a new ladder centered on Learning Design—one where we can build a distinctive leadership position.', 'Rather than trying to move up the existing competitive ladder, J-E-I aims to establish a new ladder centered on Learning Design—one where we can build a distinctive leadership position.', 0),
 
     # 04 | Repositioning: From workbooks to Learning Design
+    ('h5', 's5', '04 | Repositioning: From workbooks to Learning Design', 'Four. Repositioning: From workbooks to Learning Design.', 0.35),
     ('l5_1', 's5', 'We will move from selling workbooks to providing Learning Design.', None, 0),
     ('l5_2', 's5', 'We aim to provide personalized learning roadmaps that help each child understand what to learn next and how to progress.', None, 0.25),
     ('l5_3', 's5', 'We will build on our existing strengths: the JEI Self-Learning Method, diagnostic assessment, and structured learning materials.', 'We will build on our existing strengths: the J-E-I Self-Learning Method, diagnostic assessment, and structured learning materials.', 0),
@@ -75,6 +80,7 @@ SCRIPT = [
     ('l5_7', 's5', 'We want to create clear learning paths for individual students and become a leader in the Learning Design category.', None, 0),
 
     # 05 | Proposed Positioning Statement and Brand Messages
+    ('h6', 's6', '05 | Proposed Positioning Statement and Brand Messages', 'Five. Proposed Positioning Statement and Brand Messages.', 0.35),
     ('l6_1', 's6', 'Our proposed positioning statement is: "JEI designs learning to develop children\'s ability to learn independently."', "Our proposed positioning statement is, J-E-I designs learning to develop children's ability to learn independently.", 0.25),
     ('l6_2', 's6', "This statement reflects our shift from simply providing workbooks to developing children's Self-Learning Ability through Learning Design.", None, 0.25),
     ('l6_3', 's6', 'Our brand messaging is built around two key concepts: "Design" and "Self-Learning Ability."', 'Our brand messaging is built around two key concepts, Design and Self-Learning Ability.', 0.25),
@@ -85,6 +91,7 @@ SCRIPT = [
     ('l6_8', 's6', "Whatever we ultimately choose, our messages must reinforce a clear and consistent position in customers' minds.", None, 0),
 
     # 06 | Proposed Strategic Actions
+    ('h7', 's7', '06 | Proposed Strategic Actions', 'Six. Proposed Strategic Actions.', 0.35),
     ('l7_1', 's7', 'Finally, let me outline five strategic priorities for execution.', None, 0.25),
     ('l7_2', 's7', 'First, we will focus on our strongest core subjects rather than promoting all 17 subjects equally.', 'First, we will focus on our strongest core subjects rather than promoting all seventeen subjects equally.', 0),
     ('l7_3', 's7', 'This will allow us to build a clear and differentiated Learning Design approach.', None, 0.25),
@@ -109,6 +116,7 @@ CLONE = set()
 LEAD, GAP, SCENE_GAP, TAIL = .6, .45, 1.0, 1.2
 DING_BEFORE = None
 import os
-# pinned takes per voice (sorted position): female l1_2 Hyuntae = h iː ʊ n t eɪ (the other 10 takes read hoon-tee / heen-tie / hi-yoon-tay)
-TAKE = {'female': {'l1_2': 3}}.get(os.environ.get('VOICE'), {})
-PACE = None
+# pinned takes per voice (sorted position)
+TAKE = {}.get(os.environ.get('VOICE'), {})
+# pace pinned to the first cut's median (female), so the added heading takes do not move the other lines' picks
+PACE = 15.03

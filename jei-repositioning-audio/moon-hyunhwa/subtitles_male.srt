@@ -1,552 +1,586 @@
 1
-00:00:00,600 --> 00:00:05,490
+00:00:00,600 --> 00:00:03,110
+JEI Korea Market Repositioning
+
+2
+00:00:04,160 --> 00:00:09,050
 Today, I will present JEI's repositioning
 strategy for the Korean market.
 
-2
-00:00:06,190 --> 00:00:08,700
+3
+00:00:09,750 --> 00:00:12,260
 Our key message to customers is clear.
 
-3
-00:00:09,400 --> 00:00:13,040
+4
+00:00:12,960 --> 00:00:16,600
 JEI can differentiate itself
 by using precise diagnosis and
 
-4
-00:00:13,102 --> 00:00:16,803
+5
+00:00:16,662 --> 00:00:20,363
 assessment to design the learning
 path each child needs, and
 
-5
-00:00:16,865 --> 00:00:20,690
+6
+00:00:20,425 --> 00:00:24,250
 by helping children develop the
 ability to grow independently.
 
-6
-00:00:21,390 --> 00:00:25,864
+7
+00:00:24,950 --> 00:00:29,424
 To deliver on that promise, we must
 connect our diagnostic results to each
 
-7
-00:00:25,924 --> 00:00:30,700
+8
+00:00:29,484 --> 00:00:34,260
 child's actual learning experience and
 show parents clear evidence of progress.
 
-8
-00:00:31,400 --> 00:00:34,584
+9
+00:00:34,960 --> 00:00:38,144
 I'll begin with the competitive
 landscape, then discuss
 
-9
-00:00:34,642 --> 00:00:37,825
+10
+00:00:38,202 --> 00:00:41,385
 JEI's strengths and limitations,
 what parents need, our
 
-10
-00:00:37,883 --> 00:00:41,530
+11
+00:00:41,443 --> 00:00:45,090
 proposed brand positioning, and
 the steps needed to deliver it.
 
-11
-00:00:42,980 --> 00:00:46,827
+12
+00:00:46,540 --> 00:00:49,820
+01. Korean Workbook Market
+and Competitive Landscape
+
+13
+00:00:50,620 --> 00:00:54,467
 The Korean workbook market has become
 more competitive, with traditional
 
-12
-00:00:46,881 --> 00:00:49,980
+14
+00:00:54,521 --> 00:00:57,620
 providers offering increasingly
 different learning models.
 
-13
-00:00:50,680 --> 00:00:54,490
+15
+00:00:58,320 --> 00:01:02,130
 Competition now extends beyond
 workbook providers to local study
 
-14
-00:00:54,550 --> 00:00:58,300
+16
+00:01:02,190 --> 00:01:05,940
 rooms, private learning centers,
 and digital learning programs.
 
-15
-00:00:59,000 --> 00:01:01,402
+17
+00:01:06,640 --> 00:01:09,042
 The four major workbook providers in Korea
 
-16
-00:01:01,459 --> 00:01:04,090
+18
+00:01:09,099 --> 00:01:11,730
 have different business
 models and strategies.
 
-17
-00:01:04,790 --> 00:01:08,319
+19
+00:01:12,430 --> 00:01:15,959
 Daekyo operates learning spaces
 such as Learning Centers and
 
-18
-00:01:08,378 --> 00:01:12,260
+20
+00:01:16,018 --> 00:01:19,900
 Hi CAMPUS, and offers learning
 content through its Summit program.
 
-19
-00:01:12,960 --> 00:01:15,964
+21
+00:01:20,600 --> 00:01:23,604
 Kumon records students'
 handwritten work digitally and
 
-20
-00:01:16,019 --> 00:01:19,190
+22
+00:01:23,659 --> 00:01:26,830
 supports learning between home
 visits through Daily Care.
 
-21
-00:01:19,890 --> 00:01:22,719
+23
+00:01:27,530 --> 00:01:30,359
 Woongjin combines learning
 across all subjects
 
-22
-00:01:22,780 --> 00:01:25,670
+24
+00:01:30,420 --> 00:01:33,310
 with AI features through
 its Smart All program.
 
-23
-00:01:26,370 --> 00:01:29,955
+25
+00:01:34,010 --> 00:01:37,595
 JEI's strengths include paper-based
 learning, individualized
 
-24
-00:01:30,015 --> 00:01:33,600
+26
+00:01:37,655 --> 00:01:41,240
 learning paths, precise assessment,
 and instructor coaching.
 
-25
-00:01:34,300 --> 00:01:37,866
+27
+00:01:41,940 --> 00:01:45,506
 Among these competitors, Kumon
 is our most direct competitor
 
-26
-00:01:37,925 --> 00:01:41,610
+28
+00:01:45,565 --> 00:01:49,250
 because we both focus on paper-based
 learning and home visits.
 
-27
-00:01:42,310 --> 00:01:45,325
+29
+00:01:49,950 --> 00:01:52,965
 Therefore, JEI needs to
 clearly show how we design
 
-28
-00:01:45,385 --> 00:01:48,520
+30
+00:01:53,025 --> 00:01:56,160
 learning for each child
 based on assessment results.
 
-29
-00:01:49,970 --> 00:01:55,071
+31
+00:01:57,610 --> 00:02:00,950
+02. JEI's Strengths and
+Current Limitations
+
+32
+00:02:01,750 --> 00:02:06,851
 JEI has five key strengths: precise diagnostic
 assessment, learning at each child's
 
-30
-00:01:55,133 --> 00:02:00,050
+33
+00:02:06,913 --> 00:02:11,830
 own pace, step-by-step workbooks, paper-based
 learning, and instructor coaching.
 
-31
-00:02:00,750 --> 00:02:05,690
+34
+00:02:12,530 --> 00:02:17,470
 We also have a long history and a strong
 reputation for quality learning materials.
 
-32
-00:02:06,390 --> 00:02:11,410
+35
+00:02:18,170 --> 00:02:23,190
 However, parents now have many learning
 options, including AI and digital programs.
 
-33
-00:02:12,110 --> 00:02:16,150
+36
+00:02:23,890 --> 00:02:27,930
 So, we need to give parents a
 clear reason to choose JEI.
 
-34
-00:02:16,850 --> 00:02:21,096
+37
+00:02:28,630 --> 00:02:32,876
 The problem we want to solve is that
 assessment results do not always lead
 
-35
-00:02:21,153 --> 00:02:25,800
+38
+00:02:32,933 --> 00:02:37,580
 to the right learning materials, starting
 level, or learning pace for each child.
 
-36
-00:02:26,500 --> 00:02:29,711
+39
+00:02:38,280 --> 00:02:41,491
 Even at JEI Learning Centers,
 if we assess students only
 
-37
-00:02:29,768 --> 00:02:32,979
+40
+00:02:41,548 --> 00:02:44,759
 when they first join, or only
 tell parents how far their
 
-38
-00:02:33,036 --> 00:02:36,190
+41
+00:02:44,816 --> 00:02:47,970
 child has progressed, parents
 may still have questions.
 
-39
-00:02:36,890 --> 00:02:41,300
+42
+00:02:48,670 --> 00:02:53,080
 Assessment results should lead to real
 changes in each child's learning.
 
-40
-00:02:42,000 --> 00:02:46,190
+43
+00:02:53,780 --> 00:02:57,970
 We also need to show parents how these
 changes help their children improve.
 
-41
-00:02:46,890 --> 00:02:50,810
+44
+00:02:58,670 --> 00:03:02,590
 Simply emphasizing self-learning,
 personalized learning,
 
-42
-00:02:50,880 --> 00:02:54,940
+45
+00:03:02,660 --> 00:03:06,720
 or AI is not enough to
 differentiate JEI from competitors.
 
-43
-00:02:56,390 --> 00:02:59,508
+46
+00:03:08,170 --> 00:03:11,340
+03. Parents' Needs and
+Primary Target Customers
+
+47
+00:03:12,140 --> 00:03:15,258
 The first question parents
 ask is, "Where is my child
 
-44
-00:02:59,567 --> 00:03:02,920
+48
+00:03:15,317 --> 00:03:18,670
 having difficulty, and what
 should my child learn first?"
 
-45
-00:03:03,620 --> 00:03:07,827
+49
+00:03:19,370 --> 00:03:23,577
 When sharing assessment results, we should
 also explain which subject and level
 
-46
-00:03:07,880 --> 00:03:11,980
+50
+00:03:23,630 --> 00:03:27,730
 their child should start with, as well
 as the most appropriate learning pace.
 
-47
-00:03:12,680 --> 00:03:17,500
+51
+00:03:28,430 --> 00:03:33,250
 Parents also want their children to study
 independently, without constant reminders.
 
-48
-00:03:18,200 --> 00:03:21,468
+52
+00:03:33,950 --> 00:03:37,218
 Once learning begins, short
 assignments and instructors'
 
-49
-00:03:21,526 --> 00:03:24,560
+53
+00:03:37,276 --> 00:03:40,310
 encouragement help children
 keep studying every day.
 
-50
-00:03:25,260 --> 00:03:28,686
+54
+00:03:41,010 --> 00:03:44,436
 Over time, progress reports
 should show parents what their
 
-51
-00:03:28,745 --> 00:03:32,290
+55
+00:03:44,495 --> 00:03:48,040
 child can now do on their own
 and what they will learn next.
 
-52
-00:03:32,990 --> 00:03:36,456
+56
+00:03:48,740 --> 00:03:52,206
 Our first priority is parents
 of children in Grades 1 to 4
 
-53
-00:03:36,515 --> 00:03:40,220
+57
+00:03:52,265 --> 00:03:55,970
 who want to understand where
 their child is having difficulty.
 
-54
-00:03:40,920 --> 00:03:43,892
+58
+00:03:56,670 --> 00:03:59,642
 For Grades 1 and 2, we
 focus on building regular
 
-55
-00:03:43,954 --> 00:03:46,740
+59
+00:03:59,704 --> 00:04:02,490
 study habits and independent
 learning skills.
 
-56
-00:03:47,440 --> 00:03:52,520
+60
+00:04:03,190 --> 00:04:08,270
 For Grades 2 to 4, we focus on identifying
 learning gaps and areas of difficulty.
 
-57
-00:03:53,220 --> 00:03:56,852
+61
+00:04:08,970 --> 00:04:12,602
 Seven-year-olds preparing for
 elementary school and students
 
-58
-00:03:56,913 --> 00:04:00,000
+62
+00:04:12,663 --> 00:04:15,750
 in Grades 5 and 6 are also
 important target groups.
 
-59
-00:04:01,450 --> 00:04:04,650
+63
+00:04:17,200 --> 00:04:21,300
+04. Core Differentiation: From
+Assessment to Visible Growth
+
+64
+00:04:22,100 --> 00:04:25,300
 Our key differentiation is
 not simply better grading.
 
-60
-00:04:05,350 --> 00:04:08,759
+65
+00:04:26,000 --> 00:04:29,409
 It is how we connect assessment
 results to individualized
 
-61
-00:04:08,819 --> 00:04:11,690
+66
+00:04:29,469 --> 00:04:32,340
 learning and make each
 child's progress visible.
 
-62
-00:04:12,390 --> 00:04:15,560
+67
+00:04:33,040 --> 00:04:36,210
 We use assessment to find
 where each child needs help.
 
-63
-00:04:16,260 --> 00:04:20,075
+68
+00:04:36,910 --> 00:04:40,725
 Based on the results, we select
 appropriate workbooks, determine
 
-64
-00:04:20,135 --> 00:04:23,890
+69
+00:04:40,785 --> 00:04:44,540
 the starting level, and design
 an individualized learning path.
 
-65
-00:04:24,590 --> 00:04:26,934
+70
+00:04:45,240 --> 00:04:47,584
 Instructors check their work, coach them
 
-66
-00:04:26,993 --> 00:04:29,630
+71
+00:04:47,643 --> 00:04:50,280
 where needed, and adjust
 their learning pace.
 
-67
-00:04:30,330 --> 00:04:33,462
+72
+00:04:50,980 --> 00:04:54,112
 Then, we assess students again
 and use progress reports
 
-68
-00:04:33,518 --> 00:04:36,650
+73
+00:04:54,168 --> 00:04:57,300
 to see what has changed and
 set the next learning goal.
 
-69
-00:04:37,350 --> 00:04:40,921
+74
+00:04:58,000 --> 00:05:01,571
 This is how we connect assessment,
 individualized learning,
 
-70
-00:04:40,981 --> 00:04:44,370
+75
+00:05:01,631 --> 00:05:05,020
 and instructor coaching to
 each child's actual progress.
 
-71
-00:04:45,070 --> 00:04:49,380
+76
+00:05:05,720 --> 00:05:10,030
 Progress reports should not simply
 present information in a better format.
 
-72
-00:04:50,080 --> 00:04:53,047
+77
+00:05:10,730 --> 00:05:13,697
 They should provide clear
 evidence of how our learning
 
-73
-00:04:53,102 --> 00:04:55,520
+78
+00:05:13,752 --> 00:05:16,170
 system works and how
 children are improving.
 
-74
-00:04:56,970 --> 00:05:01,766
+79
+00:05:17,620 --> 00:05:20,990
+05. Proposed Brand Positioning
+and Customer Messaging
+
+80
+00:05:21,790 --> 00:05:26,586
 JEI aims to be a brand that helps children
 build the ability to grow on their own
 
-75
-00:05:01,825 --> 00:05:06,740
+81
+00:05:26,645 --> 00:05:31,560
 through precise assessment and personalized
 learning paths designed for each child.
 
-76
-00:05:07,440 --> 00:05:11,950
+82
+00:05:32,260 --> 00:05:36,770
 For parents, precise assessment
 is a reason to choose JEI.
 
-77
-00:05:12,650 --> 00:05:15,943
+83
+00:05:37,470 --> 00:05:40,763
 The core of our service is using
 assessment results to choose
 
-78
-00:05:15,997 --> 00:05:19,560
+84
+00:05:40,817 --> 00:05:44,380
 the right learning materials and
 learning sequence for each child.
 
-79
-00:05:20,260 --> 00:05:25,040
+85
+00:05:45,080 --> 00:05:49,860
 Our goal is to help children understand
 more and solve more problems on their own.
 
-80
-00:05:25,740 --> 00:05:28,310
+86
+00:05:50,560 --> 00:05:53,130
 This is based on JEI's philosophy:
 
-81
-00:05:29,010 --> 00:05:31,300
+87
+00:05:53,830 --> 00:05:56,120
 "We believe in the power
 of self-learning."
 
-82
-00:05:32,000 --> 00:05:33,750
+88
+00:05:56,820 --> 00:05:58,570
 Our message to customers is:
 
-83
-00:05:34,450 --> 00:05:38,300
+89
+00:05:59,270 --> 00:06:03,120
 "What your child needs to learn.
 The power to learn independently."
 
-84
-00:05:39,000 --> 00:05:41,540
+90
+00:06:03,820 --> 00:06:06,360
 We can explain this
 message in one sentence:
 
-85
-00:05:42,240 --> 00:05:46,820
+91
+00:06:07,060 --> 00:06:11,640
 "Start with a precise assessment and focus
 on what your child needs to learn now."
 
-86
-00:05:47,520 --> 00:05:51,176
+92
+00:06:12,340 --> 00:06:15,996
 In our advertising and on our
 website, we will show how we check
 
-87
-00:05:51,234 --> 00:05:55,290
+93
+00:06:16,054 --> 00:06:20,110
 each child's level and help them learn
 step by step in the right order.
 
-88
-00:05:55,990 --> 00:05:58,478
+94
+00:06:20,810 --> 00:06:23,298
 When meeting with
 parents, we will start by
 
-89
-00:05:58,536 --> 00:06:01,140
+95
+00:06:23,356 --> 00:06:25,960
 asking, "What should
 your child learn first?"
 
-90
-00:06:01,840 --> 00:06:06,019
+96
+00:06:26,660 --> 00:06:30,839
 Rather than simply promoting personalized
 learning or AI features, we need
 
-91
-00:06:06,076 --> 00:06:10,650
+97
+00:06:30,896 --> 00:06:35,470
 to show parents what their child needs to
 learn and how their child is improving.
 
-92
-00:06:12,100 --> 00:06:14,985
+98
+00:06:36,920 --> 00:06:40,140
+06. Service Development
+and Operational Directions
+
+99
+00:06:40,940 --> 00:06:43,825
 We need to connect JEI's
 strengths in assessment
 
-93
-00:06:15,046 --> 00:06:17,450
+100
+00:06:43,886 --> 00:06:46,290
 and learning management across subjects.
 
-94
-00:06:18,150 --> 00:06:22,290
+101
+00:06:46,990 --> 00:06:51,130
 First, we will set clear standards
 for assessment and learning plans.
 
-95
-00:06:22,740 --> 00:06:26,200
+102
+00:06:51,580 --> 00:06:55,040
 Then, we will expand from
 Math to Korean and English.
 
-96
-00:06:26,900 --> 00:06:29,659
+103
+00:06:55,740 --> 00:06:58,499
 Second, we will connect
 paper-based learning and
 
-97
-00:06:29,716 --> 00:06:32,590
+104
+00:06:58,556 --> 00:07:01,430
 instructor coaching with
 digital progress reports.
 
-98
-00:06:33,290 --> 00:06:36,553
+105
+00:07:02,130 --> 00:07:05,393
 These reports should help
 parents track their child's
 
-99
-00:06:36,615 --> 00:06:39,940
+106
+00:07:05,455 --> 00:07:08,780
 progress through mobile apps
 and parent consultations.
 
-100
-00:06:40,640 --> 00:06:43,335
+107
+00:07:09,480 --> 00:07:12,175
 We can also explore how
 our Learning Centers
 
-101
-00:06:43,396 --> 00:06:46,520
+108
+00:07:12,236 --> 00:07:15,360
 and personalized POD workbooks
 could work together.
 
-102
-00:06:47,220 --> 00:06:51,575
+109
+00:07:16,060 --> 00:07:20,415
 In addition, we need to focus not only
 on new enrollment but also on student
 
-103
-00:06:51,632 --> 00:06:55,700
+110
+00:07:20,472 --> 00:07:24,540
 retention, the number of subjects per
 member, and revenue per customer.
 
-104
-00:06:56,400 --> 00:07:00,293
+111
+00:07:25,240 --> 00:07:29,133
 We will check our results using
 enrollment rates after assessment,
 
-105
-00:07:00,352 --> 00:07:04,010
+112
+00:07:29,192 --> 00:07:32,850
 reassessment rates, report viewing
 rates, and retention rates.
 
-106
-00:07:05,460 --> 00:07:08,998
+113
+00:07:34,300 --> 00:07:37,839
 In the end, parents should be
 able to explain how their child's
 
-107
-00:07:09,055 --> 00:07:12,200
+114
+00:07:37,895 --> 00:07:41,040
 learning has changed and what
 the next learning goal is.
 
-108
-00:07:12,900 --> 00:07:17,100
+115
+00:07:41,740 --> 00:07:45,940
 Our goal is to connect precise
 assessment, individualized learning, and
 
-109
-00:07:17,160 --> 00:07:21,360
+116
+00:07:45,000 --> 00:07:50,200
 instructor coaching, and make each
 child's progress visible to parents.
 
-110
-00:07:22,060 --> 00:07:25,360
+117
+00:07:50,900 --> 00:07:54,200
 This is the reason we want
 parents to choose JEI.
 
-111
-00:07:26,060 --> 00:07:28,030
+118
+00:07:54,900 --> 00:07:56,870
 This concludes my presentation.
 
-112
-00:07:28,730 --> 00:07:29,390
+119
+00:07:57,570 --> 00:07:58,230
 Thank you.
 

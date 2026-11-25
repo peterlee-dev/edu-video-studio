@@ -1,6 +1,7 @@
 # The script: what is read, line by line. Edit this file, then run tools/make_audio.py tts (VOICE=male | female).
 # Source: Google Docs "문현화 팀장님 · JEI Korea Market Repositioning (English Presentation Script | Executive Summary)" (2026.11.09, 구글챗 유정 · 대언 · 승은 · 소정 방), body word for word.
-# Not read: the doc title and meta lines, section headings and the footer. Audio only, no video: scenes are the doc's sections,
+# Also read (2026.11.09 request): the title and section headings highlighted yellow in the doc, numbers read as words.
+# Not read: the meta lines, the unhighlighted headings and the footer. Audio only, no video: scenes are the doc's sections,
 # all in CONT (no page-turn whoosh), SCENE_GAP is the pause between sections.
 LANGUAGE = 'English'
 
@@ -10,6 +11,7 @@ CONT = {s for s, _ in SCENES}
 # (id, scene, line as written, line as read (None = as written), extra pause after it in s)
 SCRIPT = [
     # Opening & Key Takeaway
+    ('title', 's1', 'JEI Korea Market Repositioning', 'J-E-I Korea Market Repositioning.', 0.6),
     ('l1_1', 's1', "Today, I will present JEI's repositioning strategy for the Korean market.", "Today, I will present J-E-I's repositioning strategy for the Korean market.", 0.25),
     ('l1_2', 's1', 'Our key message to customers is clear.', None, 0.25),
     ('l1_3', 's1', 'JEI can differentiate itself by using precise diagnosis and assessment to design the learning path each child needs, and by helping children develop the ability to grow independently.', 'J-E-I can differentiate itself by using precise diagnosis and assessment to design the learning path each child needs, and by helping children develop the ability to grow independently.', 0.25),
@@ -17,6 +19,7 @@ SCRIPT = [
     ('l1_5', 's1', "I'll begin with the competitive landscape, then discuss JEI's strengths and limitations, what parents need, our proposed brand positioning, and the steps needed to deliver it.", "I'll begin with the competitive landscape, then discuss J-E-I's strengths and limitations, what parents need, our proposed brand positioning, and the steps needed to deliver it.", 0),
 
     # 01. Korean Workbook Market and Competitive Landscape
+    ('h2', 's2', '01. Korean Workbook Market and Competitive Landscape', 'One. Korean Workbook Market and Competitive Landscape.', 0.35),
     ('l2_1', 's2', 'The Korean workbook market has become more competitive, with traditional providers offering increasingly different learning models.', None, 0.25),
     ('l2_2', 's2', 'Competition now extends beyond workbook providers to local study rooms, private learning centers, and digital learning programs.', None, 0.25),
     ('l2_3', 's2', 'The four major workbook providers in Korea have different business models and strategies.', None, 0.25),
@@ -28,6 +31,7 @@ SCRIPT = [
     ('l2_9', 's2', 'Therefore, JEI needs to clearly show how we design learning for each child based on assessment results.', 'Therefore, J-E-I needs to clearly show how we design learning for each child based on assessment results.', 0),
 
     # 02. JEI's Strengths and Current Limitations
+    ('h3', 's3', "02. JEI's Strengths and Current Limitations", "Two. J-E-I's Strengths and Current Limitations.", 0.35),
     ('l3_1', 's3', "JEI has five key strengths: precise diagnostic assessment, learning at each child's own pace, step-by-step workbooks, paper-based learning, and instructor coaching.", "J-E-I has five key strengths: precise diagnostic assessment, learning at each child's own pace, step-by-step workbooks, paper-based learning, and instructor coaching.", 0.25),
     ('l3_2', 's3', 'We also have a long history and a strong reputation for quality learning materials.', None, 0.25),
     ('l3_3', 's3', 'However, parents now have many learning options, including AI and digital programs.', None, 0.25),
@@ -39,6 +43,7 @@ SCRIPT = [
     ('l3_9', 's3', 'Simply emphasizing self-learning, personalized learning, or AI is not enough to differentiate JEI from competitors.', 'Simply emphasizing self-learning, personalized learning, or AI is not enough to differentiate J-E-I from competitors.', 0),
 
     # 03. Parents' Needs and Primary Target Customers
+    ('h4', 's4', "03. Parents' Needs and Primary Target Customers", "Three. Parents' Needs and Primary Target Customers.", 0.35),
     ('l4_1', 's4', 'The first question parents ask is, "Where is my child having difficulty, and what should my child learn first?"', 'The first question parents ask is, Where is my child having difficulty, and what should my child learn first?', 0.25),
     ('l4_2', 's4', 'When sharing assessment results, we should also explain which subject and level their child should start with, as well as the most appropriate learning pace.', None, 0.25),
     ('l4_3', 's4', 'Parents also want their children to study independently, without constant reminders.', None, 0.25),
@@ -50,6 +55,7 @@ SCRIPT = [
     ('l4_9', 's4', 'Seven-year-olds preparing for elementary school and students in Grades 5 and 6 are also important target groups.', 'Seven-year-olds preparing for elementary school and students in Grades five and six are also important target groups.', 0),
 
     # 04. Core Differentiation: From Assessment to Visible Growth
+    ('h5', 's5', '04. Core Differentiation: From Assessment to Visible Growth', 'Four. Core Differentiation: From Assessment to Visible Growth.', 0.35),
     ('l5_1', 's5', 'Our key differentiation is not simply better grading.', None, 0.25),
     ('l5_2', 's5', "It is how we connect assessment results to individualized learning and make each child's progress visible.", None, 0.25),
     ('l5_3', 's5', 'We use assessment to find where each child needs help.', None, 0.25),
@@ -61,6 +67,7 @@ SCRIPT = [
     ('l5_9', 's5', 'They should provide clear evidence of how our learning system works and how children are improving.', None, 0),
 
     # 05. Proposed Brand Positioning and Customer Messaging
+    ('h6', 's6', '05. Proposed Brand Positioning and Customer Messaging', 'Five. Proposed Brand Positioning and Customer Messaging.', 0.35),
     ('l6_1', 's6', 'JEI aims to be a brand that helps children build the ability to grow on their own through precise assessment and personalized learning paths designed for each child.', 'J-E-I aims to be a brand that helps children build the ability to grow on their own through precise assessment and personalized learning paths designed for each child.', 0.25),
     ('l6_2', 's6', 'For parents, precise assessment is a reason to choose JEI.', 'For parents, precise assessment is a reason to choose J-E-I.', 0.25),
     ('l6_3', 's6', 'The core of our service is using assessment results to choose the right learning materials and learning sequence for each child.', None, 0.25),
@@ -76,6 +83,7 @@ SCRIPT = [
     ('l6_13', 's6', 'Rather than simply promoting personalized learning or AI features, we need to show parents what their child needs to learn and how their child is improving.', None, 0),
 
     # 06. Service Development and Operational Directions
+    ('h7', 's7', '06. Service Development and Operational Directions', 'Six. Service Development and Operational Directions.', 0.35),
     ('l7_1', 's7', "We need to connect JEI's strengths in assessment and learning management across subjects.", "We need to connect J-E-I's strengths in assessment and learning management across subjects.", 0.25),
     ('l7_2', 's7', 'First, we will set clear standards for assessment and learning plans.', None, 0),
     ('l7_3', 's7', 'Then, we will expand from Math to Korean and English.', None, 0.25),
@@ -98,4 +106,5 @@ DING_BEFORE = None
 import os
 # pinned takes per voice (sorted position): female closing Thank you = θ æ n k uː at her normal pitch, 260 → 135 Hz (the first 3 takes sat at ~145 Hz)
 TAKE = {'female': {'l8_5': 5}}.get(os.environ.get('VOICE'), {})
-PACE = None
+# pace pinned to the first cut's median (male), so the added heading takes do not move the other lines' picks
+PACE = 14.03
