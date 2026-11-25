@@ -11,3 +11,4 @@ out_tts.log
 # staff e-mails / webhook space id on these captures: kept locally, never committed
 assets/screens/09-members.png
 assets/screens/10-notify.png
+!audio/lines/

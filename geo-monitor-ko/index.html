@@ -332,19 +332,20 @@ const LOOK_ROWS = ['언급 여부', '등장 순서', '출처', '경쟁사'];
 SC.look = t => {
   const id = 'l4_1', s0 = H0('look');
   const cues = [Wc(id, '나오', .1), Wc(id, ['몇', '번째'], .3), Wc(id, '출처', .5), Wc(id, '경쟁사', .65)], cmp = Wc(id, ['나란히', '비교'], .85);
-  const k = p(t, s0 + .1, .6); if (k <= 0) return;
+  const k = p(t, s0 + .1, .9); if (k <= 0) return;
   ctx.save(); ctx.globalAlpha *= clamp(k * 2); ctx.translate(0, (1 - eOut(k)) * 140);
   const m = browser('03-report-metrics-questions', [600, 1000, 1820, 470], 140, 190, 1640);
   ctx.restore();
-  // the spotlight walks down the rows as they are named, across the three AIs' cards (rows in PNG px of the capture)
+  // the spotlight walks down the rows as they are named, across the three AIs' cards (rows in PNG px of the capture); slower than the
+  // other scenes (review: too fast around 0:20), with pauses in the narration between the rows (script.py PAUSE)
   const cards = [[610, 1193], [1213, 1795], [1815, 2400]], rows = [[1165, 1218], [1268, 1306], [1312, 1394], [1398, 1436]];
-  let [y0, y1] = rows[0]; for (let j = 1; j < 4; j++) { const e = eIO(p(t, cues[j] - .1, .35)); y0 = lerp(y0, rows[j][0], e); y1 = lerp(y1, rows[j][1], e); }
-  const a = p(t, cues[0] - .15, .3) * (1 - p(t, cmp - .1, .35));
+  let [y0, y1] = rows[0]; for (let j = 1; j < 4; j++) { const e = eIO(p(t, cues[j] - .1, .7)); y0 = lerp(y0, rows[j][0], e); y1 = lerp(y1, rows[j][1], e); }
+  const a = p(t, cues[0] - .15, .5) * (1 - p(t, cmp - .1, .6));
   spot(cards.map(([x0, x1]) => [m.X(x0 + 6), m.Y(y0) - 8, m.X(x1 - 6) - m.X(x0 + 6), m.Y(y1) - m.Y(y0) + 16]), a);
   // the row being named, one big word at a time
   LOOK_ROWS.forEach((s, j) => { const t1 = j < 3 ? cues[j + 1] - .3 : cmp - .3;   // white on the dimmed page
-    leave(t, t1, () => kin(t, [[String(j + 1).padStart(2, '0'), cues[j] - .05, { weight: 900, color: rgba(WHITE, .55), size: 64 }], [s, cues[j], { weight: 900 }]], 960, 870, { size: 96 }), 90); });
-  kin(t, [['나란히', cmp, { weight: 300 }], ['비교', cmp + .3, { weight: 900, hl: cmp + .5, box: K.red, hlColor: WHITE }]], 960, 870, { size: 96, color: K.ink });
+    leave(t, t1, () => kin(t, [[String(j + 1).padStart(2, '0'), cues[j] - .05, { weight: 900, color: rgba(WHITE, .55), size: 64 }], [s, cues[j], { weight: 900 }]], 960, 870, { size: 96, d: .7 }), 90); });
+  kin(t, [['나란히', cmp, { weight: 300 }], ['비교', cmp + .4, { weight: 900, hl: cmp + .7, box: K.red, hlColor: WHITE }]], 960, 870, { size: 96, color: K.ink, d: .7 });
 };
 
 // ---------- 5. AI summaries carry their source questions: one click to the original answer (the report's summary) ----------
@@ -478,10 +479,11 @@ SC.end = t => {
 // ============================================================
 // compositor: each scene on its own background; a circle wipe (with the whoosh) brings the next one in
 // ============================================================
-const TR = .6;
+const TR = .9;   // the circle wipe (was .6 s: the page turns felt rushed, review)
 function paint(i, t) {
   const s = TL.scenes[i]; BG[BGOF[s.id] || 'white'](t);
-  ctx.save(); zoomAt(960, 540, 1 + .025 * p(t, s.start, s.end - s.start)); SC[s.id](t); ctx.restore();   // a slow push-in keeps every scene alive
+  SC[s.id](t);   // no slow push-in: Chrome snaps canvas text to whole pixels, so under a slow zoom the words stepped down 1 px
+                 // about every second while the pictures moved smoothly (review: "글자가 살짝씩 아래로")
 }
 function draw(t) {
   ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1;

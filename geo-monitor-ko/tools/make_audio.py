@@ -9,6 +9,8 @@
   take      one recorded reading of the whole script (audio/narration.mp3 | .wav | .m4a): transcribed once (audio/narration_words.json),
             the script aligned to the transcript, every line cut in the silences around its own words. Lines in CLONE (reworded after
             the recording) are read like tts mode by a clone of the recorded voice, then brought to the recording's pace, EQ and loudness
+  remix     no reading: the lines picked last time (audio/lines/<id>.flac + .json, saved by tts and take) laid out again with the
+            current LEAD / GAP / SCENE_GAP / TAIL / PAUSE and mixed (changing the pacing keeps the same takes)
   ref A B   cut audio/voice_ref.wav and voice_ref.txt from the recording, A–B seconds (a clean 15–30 s stretch of whole sentences)
 
 Writes timeline.js (scenes, and every line with its spoken words and their times: index.html keys pictures to them),
@@ -25,6 +27,7 @@ sys.dont_write_bytecode = True   # no __pycache__ next to script.py
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from script import LANGUAGE, SCENES, CONT, SCRIPT, CLONE, LEAD, GAP, SCENE_GAP, TAIL, DING_BEFORE
 import script
+PAUSE = getattr(script, 'PAUSE', {})
 TEMPO, CHIME_AT = getattr(script, 'TEMPO', 1.), getattr(script, 'CHIME_AT', None)
 MUSIC, QUESTIONS = getattr(script, 'MUSIC', False), getattr(script, 'QUESTIONS', set())
 
@@ -33,6 +36,7 @@ TURN = 1.2                  # a page starts this long before its first line (its
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
 AUD = os.path.join(ROOT, 'audio')
 CACHE = os.path.join(AUD, 'tts_cache')
+LINES = os.path.join(AUD, 'lines')   # the picked clip of every line (flac) and its spoken words (json): remix mode reads them
 VOICE = os.environ.get('VOICE', getattr(script, 'VOICE', 'voice_ref'))   # the reference voice: audio/<VOICE>.wav + .txt (script.py VOICE, or VOICE=… to try another)
 REF, REF_TXT = os.path.join(AUD, VOICE + '.wav'), os.path.join(AUD, VOICE + '.txt')
 WORDS = os.path.join(AUD, 'narration_words.json')
@@ -329,6 +333,46 @@ def clips_take(redo):
     return out
 
 
+def save_lines(clips):
+    os.makedirs(LINES, exist_ok=True)
+    for lid, c in clips.items():
+        tmp = os.path.join(LINES, f'_{lid}.wav'); write_wav(tmp, c['y'])
+        subprocess.run([FFMPEG, '-v', 'error', '-y', '-i', tmp, '-c:a', 'flac', os.path.join(LINES, lid + '.flac')], check=True); os.remove(tmp)
+        json.dump(c['words'], open(os.path.join(LINES, lid + '.json'), 'w', encoding='utf-8'), ensure_ascii=False)
+
+
+def clips_saved():
+    out = {}
+    for lid in IDS:
+        f = os.path.join(LINES, lid + '.flac')
+        if not os.path.exists(f): sys.exit(f'remix needs {f}: run tts (or take) once')
+        y = decode(f); out[lid] = {'y': y, 'dur': len(y) / SR, 'words': json.load(open(os.path.join(LINES, lid + '.json'), encoding='utf-8'))}
+    return out
+
+
+def add_pauses(clips):
+    """script.py PAUSE {line: {word: s}}: that much silence before the word, put in the middle of the pause the voice already makes there
+    (whisper's word times run ~0.25 s early, so the pause is looked for from just before the word's time to 0.5 s after it)"""
+    for lid, ws in PAUSE.items():
+        c = clips[lid]; y, words = c['y'], [list(w) for w in c['words']]
+        for want, d in sorted(ws.items(), key=lambda kv: -next((w[1] for w in words if w[0].startswith(kv[0])), 0)):   # from the end, so earlier cuts stay put
+            i = next((i for i, w in enumerate(words) if w[0].startswith(want)), None)
+            if i is None: print(f'  ! PAUSE {lid}: no spoken word "{want}"'); continue
+            db, at = frames_db(y), words[i][1]; runs, k = [], 0
+            while k < len(db):
+                if db[k] < SILENT_DB:
+                    j = k
+                    while j < len(db) and db[j] < SILENT_DB: j += 1
+                    if j - k >= 5 and at - .2 <= (k + j) / 200 <= at + .5: runs.append((j - k, (k + j) / 200))
+                    k = j
+                else: k += 1
+            if not runs: print(f'  ! PAUSE {lid}: no pause in the voice before "{want}"'); continue
+            cut = int(max(runs)[1] * SR); y = np.concatenate([y[:cut], np.zeros(int(d * SR)), y[cut:]])
+            for w in words[i:]: w[1] = round(w[1] + d, 3)
+        clips[lid] = {'y': y, 'dur': len(y) / SR, 'words': words}
+    return clips
+
+
 # ---------------------------------------------------------------- lay the lines out → timeline.js, subtitles.srt
 def lay_out(clips):
     known = {s for s, _ in SCENES}
@@ -460,8 +504,10 @@ def main():
         write_wav(REF, x[int(a * SR):int(b * SR)])
         said = ''.join(w['w'] for w in transcribe(rec, WORDS)['words'] if w['s'] >= a - .05 and w['e'] <= b + .05).strip()
         open(REF_TXT, 'w', encoding='utf-8').write(said + '\n'); print(f'audio/voice_ref.wav ({b - a:.1f}s): {said}'); return
-    if mode not in ('dry', 'tts', 'take'): sys.exit(__doc__)
-    clips = {'dry': clips_dry, 'tts': lambda: clips_tts(redo), 'take': lambda: clips_take(redo)}[mode]()
+    if mode not in ('dry', 'tts', 'take', 'remix'): sys.exit(__doc__)
+    clips = {'dry': clips_dry, 'tts': lambda: clips_tts(redo), 'take': lambda: clips_take(redo), 'remix': clips_saved}[mode]()
+    if mode in ('tts', 'take'): save_lines(clips)
+    if mode != 'dry': clips = add_pauses(clips)
     scenes, lines, voice, dur = lay_out(clips)
     if mode == 'dry':
         print(f'done: {dur:.1f}s, {len(IDS)} lines (estimated, no audio) → timeline.js, subtitles.srt')

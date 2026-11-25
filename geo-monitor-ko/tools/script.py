@@ -36,6 +36,8 @@ _SCRIPT = [
 READ = {'l7_2': '지난 회차까지 다시 판정해서, 일관성이 유지되어요.'}   # read in full: as "유지돼요" every take came out "유지되어" (the final 요 lost)
 # breaths: a comma after these words in the read form, so the voice pauses between phrases
 BREATH = {'l1_1': ['학부모가'], 'l3_1': ['콘솔이'], 'l7_2': ['판정해서'], 'l8_1': ['자동이라']}
+# extra silence before these spoken words (make_audio.py add_pauses), cut into the voice's own comma pauses; the voice is not slowed
+PAUSE = {'l4_1': {'몇': .45, '출처와': .45, '나란히': .35}}   # ~0:20: the spotlight walks the four rows more slowly (review)
 QUESTIONS = {'l1_1', 'l6_1', 'l7_1'}   # a rising two-note sting just before these lines (mix)
 def breathe(lid, s):
     for w in BREATH.get(lid, []):
@@ -47,8 +49,9 @@ SCRIPT = [(lid, sc, s, READ.get(lid) or (lambda r: r if r != s else None)(R(brea
 # take mode only: lines reworded after the recording. They are read by a clone of the recorded voice (audio/voice_ref.wav)
 CLONE = set()
 
-# under a minute: shorter breaks than the 6-minute videos
-LEAD, GAP, SCENE_GAP, TAIL = 1.1, .5, .8, 1.6   # s before the first line, between lines, extra between pages, after the last line (every take already ends with ~0.2 s of its own air)
+# breaks: the page used to turn the moment its last line ended (review: too abrupt), so a page now stays ~1.1 s after its narration
+# (GAP + SCENE_GAP - make_audio TURN 1.2 - .15) before the circle wipe starts
+LEAD, GAP, SCENE_GAP, TAIL = 1.1, .5, 2., 1.6   # s before the first line, between lines, extra between pages, after the last line (every take already ends with ~0.2 s of its own air)
 TEMPO = 1.              # tts mode: 1 = as read. Only change it when asked
 CHIME_AT = None         # a bright chime at this time on the title page; None for none (the music starts the video instead)
 DING_BEFORE = None

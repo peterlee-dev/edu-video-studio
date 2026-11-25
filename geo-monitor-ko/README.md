@@ -15,7 +15,9 @@ GEO 모니터링 콘솔(geo.esls.io)이 무엇이고 왜 만들었는지를 경�
 - 화면 글자는 가운뎃점(·) 대신 쉼표를 써요
 - 색: `content.js` 의 `colors`. 레드 = 브랜드, 배경, 강조 상자, ChatGPT. 블루 = Gemini, 민트 = Claude. 네이비 = "지금까지의 방식" 장면 하나
 - 강조 상자: 단어 뒤로 상자가 쓸려 들어오고, 상자가 지나간 부분만 글자 색이 바뀌어요(한 번에 바꾸면 깜빡여 보였어요). 한글은 '가'의 실제 높이로 가운데를 맞춰요
-- 1920×1080, 30fps, 1분 이내(59.8초)
+- 1920×1080, 30fps, 1분 10초(70.7초). 처음엔 1분 이내(59.8초)였는데 "화면 전환이 설명 끝나자마자 급하게 넘어가요, 0:20 부근은 더 천천히" 의견으로 늘렸어요
+  - 장면마다 설명이 끝나고 1.1초쯤 머문 뒤 넘어가요(`tools/script.py` 의 `SCENE_GAP` 2초), 원형 전환은 0.9초(`index.html` 의 `TR`)
+  - 나란히 비교 장면: 쉼표 자리에 쉼을 넣고(`PAUSE`, 목소리 속도는 그대로) 스포트라이트와 글자를 느리게 움직여요
 
 | p. | 장면 | 화면 |
 |---|---|---|
@@ -34,10 +36,12 @@ GEO 모니터링 콘솔(geo.esls.io)이 무엇이고 왜 만들었는지를 경�
 - `tools/script.py`: 대본(`_SCRIPT`), 장면 목록, 읽는 형태(GEO → 지이오), 숨 쉴 쉼표(`BREATH`), 질문 문장(`QUESTIONS`, 앞에 올라가는 두 음), 간격
 - 문장 끝 잘림: TTS 서버는 말소리가 끝나는 순간 출력을 끊어서 마지막 음절이 툭 끊겨 들려요(광고 내레이션처럼 끝을 세게 말하는 목소리에서 특히). 그래서 `make_audio.py` 가 문장마다 뒤에 "감사합니다."(`TAIL_TEXT`)를 붙여 읽히고, 두 문장 사이 쉼에서 잘라 내요. 그러면 문장 끝이 자연스럽게 떨어지고 0.2초쯤 여유가 남아요. 그래도 소리 도중에 끝나는 녹음은 고르지 않아요
 - 남는 `!` 경고는 받아쓰기 표기 차이예요(세 ↔ 새)
+- 고른 녹음은 `audio/lines/` 에 문장마다 남겨요(flac + 단어 시각). 간격(`LEAD` `GAP` `SCENE_GAP` `TAIL`)이나 쉼(`PAUSE`, 그 단어 앞 목소리의 쉼 가운데에 무음을 넣어요)만 바꿀 때는 `remix` 로 같은 녹음을 다시 배치해요(TTS를 다시 하면 녹음이 바뀌어요)
 
 ```bash
 npm install
-uv run --with numpy --with mlx-whisper python tools/make_audio.py tts                          # → timeline.js, audio/mix.wav, subtitles.srt
+uv run --with numpy --with mlx-whisper python tools/make_audio.py tts                          # → timeline.js, audio/mix.wav, subtitles.srt, audio/lines/
+uv run --with numpy python tools/make_audio.py remix                                            # 같은 녹음으로 간격, 쉼만 다시
 VOICE=voice_ref uv run --with numpy --with mlx-whisper python tools/make_audio.py tts          # 처음 목소리로 (같은 파일을 덮어써요)
 ```
 
